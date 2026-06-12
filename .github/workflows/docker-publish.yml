@@ -22,9 +22,9 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: tuduce/joinfs-console
+          images: joeherwig/joinfs-console
           tags: |
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=latest
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
 
