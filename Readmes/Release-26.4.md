@@ -4,7 +4,8 @@
 
 ## Bug Fixes
 
-- 
+- Fixed X-Plane models appearing exploded.
+- Fixed error in rendering glass for some aircraft models in X-Plane.
 
 ## Limitations
 
