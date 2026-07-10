@@ -1,6 +1,7 @@
 ## New Features
 
 - Added support for 8.33kHz channel separation on the COM frequencies. Frequencies are now displayed in the format `XXX.XXX` (e.g., `123.505`).
+- Model matching takes into account the ICAO type designator and the ICAO airline code when determining the best match for an aircraft model. (contributed by @joeherwig - Thank you!)
 
 ## Bug Fixes
 
