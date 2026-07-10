@@ -216,8 +216,10 @@ namespace JoinFS
                                 // get variables
                                 if (aircraft.variableSet != null)
                                 {
-                                    com1 = aircraft.variableSet.GetInteger(vuidCom1).ToString(CultureInfo.InvariantCulture);
-                                    com1 = (com1.Length < 4) ? "" : com1.Substring(0, 3) + "." + com1.Substring(3, 2);
+                                    // Try Float first (8.33 kHz-capable), fall back to legacy BCD Integer
+                                    float com1Value = aircraft.variableSet.GetFloat(vuidCom1);
+                                    if (com1Value == 0) com1Value = aircraft.variableSet.GetInteger(vuidCom1) / 100f;
+                                    if (com1Value != 0) com1 = com1Value.ToString("F3", CultureInfo.InvariantCulture);
                                     from = aircraft.variableSet.GetString8(vuidFrom);
                                     to = aircraft.variableSet.GetString8(vuidTo);
                                     squawk = aircraft.variableSet.GetInteger(vuidSquawk);

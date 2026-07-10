@@ -26,11 +26,7 @@ namespace JoinFS
             vuidCom2 = VariableMgr.CreateVuid("com active frequency:2");
         }
 
-        static string FormatFreq(int raw)
-        {
-            string s = raw.ToString();
-            return s.Length < 3 ? "" : s[..3] + "." + s[3..];
-        }
+        static string FormatFreq(float value) => value == 0 ? "" : value.ToString("F3");
 
         public void DoWork()
         {
@@ -49,8 +45,14 @@ namespace JoinFS
                     string com1 = "", com2 = "";
                     if (aircraft.variableSet != null)
                     {
-                        com1 = FormatFreq(aircraft.variableSet.GetInteger(vuidCom1));
-                        com2 = FormatFreq(aircraft.variableSet.GetInteger(vuidCom2));
+                        // Try Float first (8.33 kHz-capable), fall back to legacy BCD Integer
+                        float com1Value = aircraft.variableSet.GetFloat(vuidCom1);
+                        if (com1Value == 0) com1Value = aircraft.variableSet.GetInteger(vuidCom1) / 100f;
+                        com1 = FormatFreq(com1Value);
+
+                        float com2Value = aircraft.variableSet.GetFloat(vuidCom2);
+                        if (com2Value == 0) com2Value = aircraft.variableSet.GetInteger(vuidCom2) / 100f;
+                        com2 = FormatFreq(com2Value);
                     }
 
                     if (com1.Length == 0 && com2.Length == 0) continue;
