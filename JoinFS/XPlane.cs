@@ -1617,118 +1617,149 @@ namespace JoinFS
                     }
                 }
 
-                // go through all detected objects
-                foreach (var objRef in objectReferences)
+                // objects source folder
+                string objectsFolder = Path.Combine(simFolder, subFolder, "objects");
+                // inject base folder
+                string injectBaseFolder = Path.Combine(packageFolder, validLivery);
+
+                // copy all files from the objects folder
+                if (Directory.Exists(objectsFolder))
                 {
-                    string objName = objRef.Key;
-                    AcfObjectData data = objRef.Value;
-
-                    // interpret flags
-                    bool inside = (data.flags & 0x4) != 0;
-                    bool exterior = (data.flags & 0x10) != 0;
-                    bool broken = (data.flags & 0x200) != 0;
-
-                    // check if inside object and object is valid
-                    if (!data.file.StartsWith("..") &&
-                        !broken &&
-                        (exterior || !inside) &&
-                        (!data.hidden || data.file.IndexOf("pilot", StringComparison.OrdinalIgnoreCase) >= 0 || data.file.IndexOf("gear", StringComparison.OrdinalIgnoreCase) >= 0))
+                    foreach (string srcFile in Directory.GetFiles(objectsFolder, "*", SearchOption.AllDirectories))
                     {
-                        // object file
-                        string objectPath = Path.Combine(simFolder, subFolder, "objects", data.file);
-                        // inject file
-                        string injectPath = Path.Combine(packageFolder, validLivery, data.file);
-                        // check for object file and not already injected
-                        if (File.Exists(objectPath) && (main.settingsSkipCsl == false || File.Exists(injectPath) == false))
+                        string relativePath = srcFile.Substring(objectsFolder.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                        string destFile = Path.Combine(injectBaseFolder, relativePath);
+                        string destDir = Path.GetDirectoryName(destFile);
+                        if (Directory.Exists(destDir) == false) Directory.CreateDirectory(destDir);
+                        if (main.settingsSkipCsl == false || File.Exists(destFile) == false)
+                            File.Copy(srcFile, destFile, true);
+                    }
+                }
+
+                // go through all detected objects
+                //foreach (var objRef in objectReferences)
+                //{
+                //    string objName = objRef.Key;
+                //    AcfObjectData data = objRef.Value;
+
+                //    // interpret flags
+                //    bool inside = (data.flags & 0x4) != 0;
+                //    bool exterior = (data.flags & 0x10) != 0;
+                //    bool broken = (data.flags & 0x200) != 0;
+
+                //    // check if inside object and object is valid
+                //    if (!data.file.StartsWith("..") &&
+                //        !broken &&
+                //        (exterior || !inside) &&
+                //        (!data.hidden || data.file.IndexOf("pilot", StringComparison.OrdinalIgnoreCase) >= 0 || data.file.IndexOf("gear", StringComparison.OrdinalIgnoreCase) >= 0))
+                //    {
+                //        // object file
+                //        string objectPath = Path.Combine(simFolder, subFolder, "objects", data.file);
+                //        // inject file
+                //        string injectPath = Path.Combine(packageFolder, validLivery, data.file);
+                //        // check for object file and not already injected
+                //        if (File.Exists(objectPath) && (main.settingsSkipCsl == false || File.Exists(injectPath) == false))
+                //        {
+                //            // create reader
+                //            objReader = new StreamReader(objectPath);
+                //            // get inject folder
+                //            string injectFolder = Path.GetDirectoryName(injectPath);
+                //            // create inject folder
+                //            if (Directory.Exists(injectFolder) == false) Directory.CreateDirectory(injectFolder);
+                //            // open new object file
+                //            objWriter = new StreamWriter(Path.Combine(packageFolder, injectPath));
+
+                //            // read line
+                //            while ((line = objReader.ReadLine()) != null)
+                //            {
+                //                string[] words;
+                //                // get words
+                //                words = line.Split(whiteSpaces, StringSplitOptions.RemoveEmptyEntries);
+                //                // check for valid line
+                //                if (words.Length >= 2)
+                //                {
+                //                    // get command
+                //                    string command = words[0].ToUpper();
+
+                //                    // check for vertex
+                //                    if (command == "VT" && words.Length >= 4)
+                //                    {
+                //                        // read position
+                //                        double.TryParse(words[1], NumberStyles.Number, CultureInfo.InvariantCulture, out double x);
+                //                        double.TryParse(words[2], NumberStyles.Number, CultureInfo.InvariantCulture, out double y);
+                //                        double.TryParse(words[3], NumberStyles.Number, CultureInfo.InvariantCulture, out double z);
+
+                //                        // modify position
+                //                        //x += objX;
+                //                        //y += objY - cogY;
+                //                        //z += objZ - cogZ;
+                //                        if (y < minY) minY = y;
+                //                        // write new position
+                //                        objWriter.Write("VT\t" + x.ToString("F8", CultureInfo.InvariantCulture) + "\t" + y.ToString("F8", CultureInfo.InvariantCulture) + "\t" + z.ToString("F8", CultureInfo.InvariantCulture));
+                //                        // copy remaining line
+                //                        for (int i = 4; i < words.Length; i++) objWriter.Write("\t" + words[i]);
+                //                        // end of line
+                //                        objWriter.WriteLine();
+                //                    }
+                //                    // check for texture
+                //                    else if (command.Equals("TEXTURE") || 
+                //                             command.Equals("TEXTURE_LIT") || 
+                //                             command.Equals("TEXTURE_NORMAL") ||
+                //                             command.Equals("THERMAL_TEXTURE") ||
+                //                             command.Equals("WIPER_TEXTURE"))
+                //                    {
+                //                        // texture filenames
+                //                        string texturePNG = Path.Combine(Path.GetDirectoryName(objectPath), words[1]);
+                //                        string liveryPNG = texturePNG.Replace(@"\objects", Path.Combine(@"\liveries", livery, "objects")).Replace(@"/objects", Path.Combine(@"/liveries", livery, "objects"));
+                //                        string textureDDS = texturePNG.Replace(".png", ".dds");
+                //                        string liveryDDS = liveryPNG.Replace(".png", ".dds");
+
+                //                        // get file name
+                //                        string textureFile = Path.GetFileName(words[1]);
+                //                        // copy texture
+                //                        if (File.Exists(liveryDDS)) File.Copy(liveryDDS, Path.Combine(injectFolder, textureFile), true);
+                //                        else if (File.Exists(liveryPNG)) File.Copy(liveryPNG, Path.Combine(injectFolder, textureFile), true);
+                //                        else if (File.Exists(textureDDS)) File.Copy(textureDDS, Path.Combine(injectFolder, textureFile), true);
+                //                        else if (File.Exists(texturePNG)) File.Copy(texturePNG, Path.Combine(injectFolder, textureFile), true);
+
+                //                        // copy line
+                //                        objWriter.WriteLine(command + " " + textureFile);
+                //                    }
+                //                    else
+                //                    {
+                //                        // copy line
+                //                        objWriter.WriteLine(line);
+                //                    }
+                //                }
+                //                else
+                //                {
+                //                    // copy line
+                //                    objWriter.WriteLine(line);
+                //                }
+                //            }
+
+                //            // close files
+                //            objReader.Close();
+                //            objWriter.Close();
+                //            //File.Copy(objectPath, Path.Combine(packageFolder, injectPath), true);
+                //        }
+                //    }
+                //}
+
+                // write xsb entries
+                if (Directory.Exists(objectsFolder))
+                {
+                    foreach (string srcFile in Directory.GetFiles(objectsFolder, "*.obj", SearchOption.AllDirectories))
+                    {
+                        string fileName = Path.GetFileName(srcFile);
+                        if (fileName.IndexOf("pilot", StringComparison.OrdinalIgnoreCase) < 0 &&
+                            fileName.IndexOf("glass", StringComparison.OrdinalIgnoreCase) < 0 &&
+                            fileName.IndexOf("gear", StringComparison.OrdinalIgnoreCase) < 0)
                         {
-                            // create reader
-                            objReader = new StreamReader(objectPath);
-                            // get inject folder
-                            string injectFolder = Path.GetDirectoryName(injectPath);
-                            // create inject folder
-                            if (Directory.Exists(injectFolder) == false) Directory.CreateDirectory(injectFolder);
-                            // open new object file
-                            objWriter = new StreamWriter(Path.Combine(packageFolder, injectPath));
-
-                            // read line
-                            while ((line = objReader.ReadLine()) != null)
-                            {
-                                string[] words;
-                                // get words
-                                words = line.Split(whiteSpaces, StringSplitOptions.RemoveEmptyEntries);
-                                // check for valid line
-                                if (words.Length >= 2)
-                                {
-                                    // get command
-                                    string command = words[0].ToUpper();
-
-                                    // check for vertex
-                                    if (command == "VT" && words.Length >= 4)
-                                    {
-                                        // read position
-                                        double.TryParse(words[1], NumberStyles.Number, CultureInfo.InvariantCulture, out double x);
-                                        double.TryParse(words[2], NumberStyles.Number, CultureInfo.InvariantCulture, out double y);
-                                        double.TryParse(words[3], NumberStyles.Number, CultureInfo.InvariantCulture, out double z);
-
-                                        // modify position
-                                        //x += objX;
-                                        //y += objY - cogY;
-                                        //z += objZ - cogZ;
-                                        if (y < minY) minY = y;
-                                        // write new position
-                                        objWriter.Write("VT\t" + x.ToString("F8", CultureInfo.InvariantCulture) + "\t" + y.ToString("F8", CultureInfo.InvariantCulture) + "\t" + z.ToString("F8", CultureInfo.InvariantCulture));
-                                        // copy remaining line
-                                        for (int i = 4; i < words.Length; i++) objWriter.Write("\t" + words[i]);
-                                        // end of line
-                                        objWriter.WriteLine();
-                                    }
-                                    // check for texture
-                                    else if (command.Equals("TEXTURE") || 
-                                             command.Equals("TEXTURE_LIT") || 
-                                             command.Equals("TEXTURE_NORMAL") ||
-                                             command.Equals("THERMAL_TEXTURE") ||
-                                             command.Equals("WIPER_TEXTURE"))
-                                    {
-                                        // texture filenames
-                                        string texturePNG = Path.Combine(Path.GetDirectoryName(objectPath), words[1]);
-                                        string liveryPNG = texturePNG.Replace(@"\objects", Path.Combine(@"\liveries", livery, "objects")).Replace(@"/objects", Path.Combine(@"/liveries", livery, "objects"));
-                                        string textureDDS = texturePNG.Replace(".png", ".dds");
-                                        string liveryDDS = liveryPNG.Replace(".png", ".dds");
-
-                                        // get file name
-                                        string textureFile = Path.GetFileName(words[1]);
-                                        // copy texture
-                                        if (File.Exists(liveryDDS)) File.Copy(liveryDDS, Path.Combine(injectFolder, textureFile), true);
-                                        else if (File.Exists(liveryPNG)) File.Copy(liveryPNG, Path.Combine(injectFolder, textureFile), true);
-                                        else if (File.Exists(textureDDS)) File.Copy(textureDDS, Path.Combine(injectFolder, textureFile), true);
-                                        else if (File.Exists(texturePNG)) File.Copy(texturePNG, Path.Combine(injectFolder, textureFile), true);
-
-                                        // copy line
-                                        objWriter.WriteLine(command + " " + textureFile);
-                                    }
-                                    else
-                                    {
-                                        // copy line
-                                        objWriter.WriteLine(line);
-                                    }
-                                }
-                                else
-                                {
-                                    // copy line
-                                    objWriter.WriteLine(line);
-                                }
-                            }
-
-                            // close files
-                            objReader.Close();
-                            objWriter.Close();
-                            //File.Copy(objectPath, Path.Combine(packageFolder, injectPath), true);
+                            string relativePath = srcFile.Substring(objectsFolder.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                            xsbWriter.WriteLine("OBJ8 SOLID YES " + validType + @"/" + validLivery + @"/" + relativePath);
+                            objCount++;
                         }
-
-                        // write object information
-                        xsbWriter.WriteLine("OBJ8 SOLID YES " + validType + @"/" + validLivery + @"/" + data.file);
-                        // increment count
-                        objCount++;
                     }
                 }
 
