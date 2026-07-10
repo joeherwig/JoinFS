@@ -138,7 +138,7 @@ namespace JoinFS
                 writer.WriteLine("INTEGER|sim/cockpit/electrical/beacon_lights_on|LIGHT STATES|mask:1||INJECTED");
                 writer.WriteLine("INTEGER|sim/cockpit/electrical/landing_lights_on|LIGHT STATES|mask:2||INJECTED");
                 writer.WriteLine("INTEGER|sim/cockpit/electrical/taxi_light_on|LIGHT STATES|mask:3||INJECTED");
-                writer.WriteLine("INTEGER|sim/cockpit/electrical/strobe_lights_on|LIGHT STATES|mask:4||INJECTED");
+                writer.WriteLine("INTEGER|sim/cockpit/electrical/strobe_lights_on|LIGHT STROBE|bool|STROBES_SET|INJECTED");
                 writer.WriteLine("INTEGER||LIGHT STATES|mask:5||INJECTED");
                 writer.WriteLine("INTEGER||LIGHT STATES|mask:6||INJECTED");
                 writer.WriteLine("INTEGER||LIGHT STATES|mask:7||INJECTED");
