@@ -213,7 +213,11 @@ namespace JoinFS
                 writer.WriteLine("INTEGER||PAYLOAD STATION WEIGHT:2|pounds|");
                 writer.WriteLine("INTEGER||PAYLOAD STATION WEIGHT:3|pounds|");
                 writer.WriteLine("INTEGER||PAYLOAD STATION WEIGHT:4|pounds|");
-
+                writer.WriteLine("INTEGER||LIGHT POTENTIOMETER:19|percent|LIGHT_POTENTIOMETER_19_SET|INJECTED");
+                writer.WriteLine("INTEGER||LIGHT POTENTIOMETER:20|percent|LIGHT_POTENTIOMETER_20_SET|INJECTED");
+                writer.WriteLine("INTEGER||LIGHT POTENTIOMETER:2|percent|LIGHT_POTENTIOMETER_2_SET|INJECTED");
+                writer.WriteLine("INTEGER||LIGHT POTENTIOMETER:3|percent|LIGHT_POTENTIOMETER_3_SET|INJECTED");
+                writer.WriteLine("INTEGER||LIGHT POTENTIOMETER:24|percent|LIGHT_POTENTIOMETER_24_SET|INJECTED");
                 //writer.WriteLine("FLOAT|sim/flightmodel/controls/lsplrdef|SPOILERS HANDLE POSITION|position|SPOILERS_SET*16383");
                 //writer.WriteLine("FLOAT|sim/flightmodel/controls/tailhook_ratio|TAILHOOK POSITION|position|SET_TAIL_HOOK_HANDLE*16383");
                 //writer.WriteLine("FLOAT||FOLDING WING LEFT PERCENT|position");
