@@ -466,19 +466,41 @@ namespace JoinFS
         static bool IsKnownIcaoAirline(string code) => code.Length == 3 && icaoAirlineNames.ContainsKey(code);
 
         /// <summary>
+        /// True when needle appears in haystack as a standalone token - not immediately adjacent to another
+        /// letter/digit - to avoid false positives from two unrelated words coincidentally gluing together
+        /// at a boundary (e.g. stripping the space out of "...bus A32NX..." creates the substring "sA3", a
+        /// real but completely unrelated ICAO designator that just happens to span that seam).
+        /// </summary>
+        static bool ContainsToken(string haystack, string needle)
+        {
+            int searchFrom = 0;
+            while (true)
+            {
+                int idx = haystack.IndexOf(needle, searchFrom, StringComparison.OrdinalIgnoreCase);
+                if (idx < 0) return false;
+
+                bool leftOk = idx == 0 || !char.IsLetterOrDigit(haystack[idx - 1]);
+                int rightPos = idx + needle.Length;
+                bool rightOk = rightPos >= haystack.Length || !char.IsLetterOrDigit(haystack[rightPos]);
+                if (leftOk && rightOk) return true;
+
+                searchFrom = idx + 1;
+            }
+        }
+
+        /// <summary>
         /// Best-effort guess of an ICAO airline code from livery/title text, by matching the longest known
         /// airline name that appears in the text. Used only when a live ATC AIRLINE value doesn't look like
         /// a real ICAO code, e.g. "FSC739" reported for a Condor-liveried aircraft instead of "CFG".
         /// </summary>
         static string GuessIcaoAirlineFromText(string text)
         {
-            string haystack = text.ToLowerInvariant();
             (string code, int matchLength) best = ("", 0);
 
             foreach (var pair in icaoAirlineNames)
             {
-                string needle = pair.Value.ToLowerInvariant();
-                if (needle.Length >= 4 && needle.Length > best.matchLength && haystack.Contains(needle))
+                string needle = pair.Value;
+                if (needle.Length >= 4 && needle.Length > best.matchLength && ContainsToken(text, needle))
                 {
                     best = (pair.Key, needle.Length);
                 }
@@ -551,7 +573,9 @@ namespace JoinFS
         /// </summary>
         static string GuessIcaoTypeFromTitle(string title)
         {
-            string haystack = title.Replace("-", "").Replace(" ", "");
+            // Only dashes are stripped (common in titles like "A-320" for designator "A320"); spaces are
+            // kept so real word boundaries survive - see ContainsToken for why that matters.
+            string haystack = title.Replace("-", "");
 
             // Prefer a direct match against a real ICAO type designator itself (e.g. "A321", "B738").
             // These are unambiguous and far less prone to false positives than the manufacturer's full
@@ -562,7 +586,7 @@ namespace JoinFS
             foreach (var icaoType in doc8643Lookup.Keys)
             {
                 if (icaoType.Length >= 3 && icaoType.Length > bestIcao.matchLength &&
-                    haystack.Contains(icaoType, StringComparison.OrdinalIgnoreCase))
+                    ContainsToken(haystack, icaoType))
                 {
                     bestIcao = (icaoType, icaoType.Length);
                 }
@@ -576,9 +600,9 @@ namespace JoinFS
             (string icaoType, int matchLength) best = ("", 0);
             foreach (var row in doc8643Rows)
             {
-                string needle = row.modelName.Replace("-", "").Replace(" ", "");
+                string needle = row.modelName.Replace("-", "");
                 if (needle.Length >= 3 && needle.Length > best.matchLength &&
-                    haystack.Contains(needle, StringComparison.OrdinalIgnoreCase))
+                    ContainsToken(haystack, needle))
                 {
                     best = (row.icaoType, needle.Length);
                 }
