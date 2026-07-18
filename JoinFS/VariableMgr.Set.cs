@@ -604,6 +604,19 @@ namespace JoinFS
                         uint vuid = variableMgr.LookupVuid(variable.Key);
                         // get value
                         float value = variable.Value;
+
+                        // diagnostic - trace exactly what happens to the COM frequency vuids on receive
+                        if (vuid == 3033831200 || vuid == 304947845)
+                        {
+                            bool known = variableMgr.definitions.TryGetValue(vuid, out Definition dbgDef);
+                            main.MonitorVariables("RECEIVE FLOAT - vuid=" + vuid + " value=" + value +
+                                " known=" + known +
+                                " UserAircraft=" + UserAircraft +
+                                " injected(Set)=" + injected +
+                                (known ? " definition.injected=" + dbgDef.injected + " definition.pilot=" + dbgDef.pilot : "") +
+                                " simId=" + simId + " Connected=" + (main.sim != null && main.sim.Connected));
+                        }
+
                         // check for valid variable
                         if (variableMgr.definitions.TryGetValue(vuid, out Definition definition))
                         {

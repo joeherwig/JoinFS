@@ -5253,6 +5253,14 @@ namespace JoinFS
                             // check if aircraft is being broadcast
                             else if (IsBroadcast(obj) && obj.Injected == false)
                             {
+                                // diagnostic - dump float vuids/values actually being broadcast
+                                string floatsDump = "";
+                                foreach (var kv in obj.variableSet.floats)
+                                {
+                                    floatsDump += kv.Key + "=" + kv.Value + ", ";
+                                }
+                                main.MonitorVariables("BROADCAST FLOATS - " + obj.ModelTitle + " - " + floatsDump);
+
                                 // broadcast variables
                                 main.network.SendIntegerVariablesMessage(new LocalNode.Nuid(), obj.netId, obj.variableSet.integers, main.network.localNode.GetLocalNuid());
                                 main.network.SendFloatVariablesMessage(new LocalNode.Nuid(), obj.netId, obj.variableSet.floats, main.network.localNode.GetLocalNuid());
