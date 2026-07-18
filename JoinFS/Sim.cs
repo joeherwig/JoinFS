@@ -2099,12 +2099,8 @@ namespace JoinFS
                 // get controlled aircraft
                 Aircraft controlledAircraft = GetControlledObject(aircraft) as Aircraft;
 
-                // check for valid simconnect
-                if (Connected && controlledAircraft.Created)
-                {
-                    // update variable set
-                    controlledAircraft.variableSet ?. UpdateFloats(variables);
-                }
+                // update variable set
+                controlledAircraft.variableSet ?. UpdateFloats(variables);
 
                 // check if aircraft is injected and needs to be broadcast
                 if (aircraft.Injected && IsBroadcast(aircraft))
@@ -2129,12 +2125,8 @@ namespace JoinFS
                 // get controlled aircraft
                 Aircraft controlledAircraft = GetControlledObject(aircraft) as Aircraft;
 
-                // check for valid simconnect
-                if (Connected && controlledAircraft.Created)
-                {
-                    // update variable set
-                    controlledAircraft.variableSet ?. UpdateString8(variables);
-                }
+                // update variable set
+                controlledAircraft.variableSet ?. UpdateString8(variables);
 
                 // check if aircraft is injected and needs to be broadcast
                 if (aircraft.Injected && IsBroadcast(aircraft))
