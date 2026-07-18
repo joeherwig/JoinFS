@@ -177,6 +177,16 @@ namespace JoinFS
             }
 
             /// <summary>
+            /// Get COM frequency (MHz), preferring the 8.33kHz-capable float variable,
+            /// falling back to the legacy BCD integer format for older network peers
+            /// </summary>
+            public float GetFrequency(uint vuid)
+            {
+                float value = GetFloat(vuid);
+                return value != 0 ? value : GetInteger(vuid) / 100f;
+            }
+
+            /// <summary>
             /// Add variables from a file
             /// </summary>
             public void AddFromFile(string filename)

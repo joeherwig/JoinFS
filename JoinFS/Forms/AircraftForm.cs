@@ -350,19 +350,8 @@ namespace JoinFS
                 if (aircraft.variableSet != null)
                 {
                     // COM frequencies
-                    // Try Float first, if not available then try Integer
-                    var com1Value = aircraft.variableSet.GetFloat(vuidCom1);
-                    if (com1Value == 0)
-                    {
-                        com1Value = aircraft.variableSet.GetInteger(vuidCom1) / 100f;
-                    }
-                    item.com1 = com1Value.ToString("F3");
-                    var com2Value = aircraft.variableSet.GetFloat(vuidCom2);
-                    if (com2Value == 0)
-                    {  
-                        com2Value = aircraft.variableSet.GetInteger(vuidCom2) / 100f; 
-                    }
-                    item.com2 = com2Value.ToString("F3");
+                    item.com1 = aircraft.variableSet.GetFrequency(vuidCom1).ToString("F3");
+                    item.com2 = aircraft.variableSet.GetFrequency(vuidCom2).ToString("F3");
                     // squawk
                     item.squawk = aircraft.variableSet.GetInteger(vuidSquawk).ToString();
                     // rules
