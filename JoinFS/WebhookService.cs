@@ -45,14 +45,8 @@ namespace JoinFS
                     string com1 = "", com2 = "";
                     if (aircraft.variableSet != null)
                     {
-                        // Try Float first (8.33 kHz-capable), fall back to legacy BCD Integer
-                        float com1Value = aircraft.variableSet.GetFloat(vuidCom1);
-                        if (com1Value == 0) com1Value = aircraft.variableSet.GetInteger(vuidCom1) / 100f;
-                        com1 = FormatFreq(com1Value);
-
-                        float com2Value = aircraft.variableSet.GetFloat(vuidCom2);
-                        if (com2Value == 0) com2Value = aircraft.variableSet.GetInteger(vuidCom2) / 100f;
-                        com2 = FormatFreq(com2Value);
+                        com1 = FormatFreq(aircraft.variableSet.GetFrequency(vuidCom1));
+                        com2 = FormatFreq(aircraft.variableSet.GetFrequency(vuidCom2));
                     }
 
                     if (com1.Length == 0 && com2.Length == 0) continue;
