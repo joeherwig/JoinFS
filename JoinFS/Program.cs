@@ -761,6 +761,15 @@ namespace JoinFS
                 stats = new Stats();
                 variableMgr = new VariableMgr(this);
 
+#if !CONSOLE
+                // fetch the pilot's SimBrief flight plan on startup if a username is already saved -
+                // this is a cloud API call independent of the simulator, so it doesn't need to wait for a connection
+                if (string.IsNullOrWhiteSpace(Settings.Default.SimBriefUsername) == false)
+                {
+                    _ = sim.RefreshUserFlightPlanFromSimBriefAsync();
+                }
+#endif
+
                 // check for specified sim folder
                 if (simFolder.Length > 0)
                 {
