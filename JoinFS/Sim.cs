@@ -1186,10 +1186,10 @@ namespace JoinFS
 #if FS2024
             obj.ownerLivery = livery;
             // model match
-            (obj.subModel, obj.subType, obj.subTrace) = await main.substitution?.Match(obj.ownerModel, obj.ownerLivery, obj.ownerIcaoType, obj.ownerIcaoAirline, obj.typerole, (obj as Aircraft)?.flightPlan.callsign ?? "");
+            (obj.subModel, obj.subType, obj.subTrace) = await main.substitution?.Match(obj.ownerModel, obj.ownerLivery, obj.ownerIcaoType, obj.ownerIcaoAirline, obj.typerole, (obj as Aircraft)?.flightPlan.registration ?? "");
 #else
             // model match
-            (obj.subModel, obj.subType, obj.subTrace) = await main.substitution ?. Match(obj.ownerModel, obj.ownerIcaoType, obj.ownerIcaoAirline, obj.typerole, (obj as Aircraft)?.flightPlan.callsign ?? "");
+            (obj.subModel, obj.subType, obj.subTrace) = await main.substitution ?. Match(obj.ownerModel, obj.ownerIcaoType, obj.ownerIcaoAirline, obj.typerole, (obj as Aircraft)?.flightPlan.registration ?? "");
 #endif
             // reset failed flag
             obj.failed = false;
@@ -1635,8 +1635,10 @@ namespace JoinFS
             public const int MAX_REMARKS = 512;
 
             public string callsign = "";
+            public string registration = "";
             public string icaoType = "";
             public string icaoAirline = "";
+            public string flightNumber = "";
             public string departure = "";
             public string destination = "";
             public string rules = "";
@@ -1681,6 +1683,8 @@ namespace JoinFS
                 // update info
                 originalCallsign = callsign;
                 flightPlan.callsign = callsign;
+                // ATC ID is actually the tail number/registration, not a real callsign - see Substitution.cs
+                flightPlan.registration = callsign;
                 flightPlan.icaoType = icaoType;
                 ownerModel = model;
 #if FS2024
@@ -1930,9 +1934,9 @@ namespace JoinFS
         /// <param name="netId">Owner's sim ID</param>
         /// <param name="engine">Aircraft engine</param>
 #if FS2024
-        public Aircraft UpdateAircraft(LocalNode.Nuid ownerNuid, uint netId, bool user, bool plane, string callsign, string nickname, string model, string livery, string icaoType, string icaoAirline, int typerole, double netTime, ref AircraftPosition aircraftPosition)
+        public Aircraft UpdateAircraft(LocalNode.Nuid ownerNuid, uint netId, bool user, bool plane, string callsign, string registration, string nickname, string model, string livery, string icaoType, string icaoAirline, string flightNumber, int typerole, double netTime, ref AircraftPosition aircraftPosition)
 #else
-        public Aircraft UpdateAircraft(LocalNode.Nuid ownerNuid, uint netId, bool user, bool plane, string callsign, string nickname, string model, string icaoType, string icaoAirline, int typerole, double netTime, ref AircraftPosition aircraftPosition)
+        public Aircraft UpdateAircraft(LocalNode.Nuid ownerNuid, uint netId, bool user, bool plane, string callsign, string registration, string nickname, string model, string icaoType, string icaoAirline, string flightNumber, int typerole, double netTime, ref AircraftPosition aircraftPosition)
 #endif
         {
             // check for valid aircraft
@@ -1950,8 +1954,10 @@ namespace JoinFS
                 // info
                 aircraft.user = user;
                 aircraft.flightPlan.callsign = callsign;
+                aircraft.flightPlan.registration = registration;
                 aircraft.flightPlan.icaoType = icaoType;
                 aircraft.flightPlan.icaoAirline = icaoAirline;
+                aircraft.flightPlan.flightNumber = flightNumber;
                 // model
 #if FS2024
                 UpdateObject(aircraft, model, livery, icaoType, icaoAirline, typerole);
@@ -2013,6 +2019,8 @@ namespace JoinFS
 
                     // update callsign
                     aircraft.flightPlan.callsign = callsign;
+                    aircraft.flightPlan.registration = registration;
+                    aircraft.flightPlan.flightNumber = flightNumber;
                     // update position and velocity
                     UpdateAircraft(GetControlledObject(aircraft) as Aircraft, netTime, aircraftPosition);
                 }
@@ -2914,10 +2922,9 @@ namespace JoinFS
         /// Current data version
         /// </summary>
 #if FS2024
-        // TODO: Advance the data version for everybody, not just FS2024
-        public const short VERSION = 21005;
+        public const short VERSION = 21006;
 #else
-        public const short VERSION = 21004;
+        public const short VERSION = 21006;
 #endif
 
         /// <summary>

@@ -1386,9 +1386,9 @@ namespace JoinFS
                             Aircraft aircraft = obj as Aircraft;
                             // update position
 #if FS2024
-                            main.sim ?. UpdateAircraft(new LocalNode.Nuid(), obj.id, false, aircraft.plane, aircraft.callsign, aircraft.nickname, aircraft.model, aircraft.livery, aircraft.icaoType, aircraft.icaoAirline, aircraft.typerole, recentFrame.time, ref (recentFrame as AircraftPositionFrame).data);
+                            main.sim ?. UpdateAircraft(new LocalNode.Nuid(), obj.id, false, aircraft.plane, aircraft.callsign, "", aircraft.nickname, aircraft.model, aircraft.livery, aircraft.icaoType, aircraft.icaoAirline, "", aircraft.typerole, recentFrame.time, ref (recentFrame as AircraftPositionFrame).data);
 #else
-                            main.sim ?. UpdateAircraft(new LocalNode.Nuid(), obj.id, false, aircraft.plane, aircraft.callsign, aircraft.nickname, aircraft.model, aircraft.icaoType, aircraft.icaoAirline, aircraft.typerole, recentFrame.time, ref (recentFrame as AircraftPositionFrame).data);
+                            main.sim ?. UpdateAircraft(new LocalNode.Nuid(), obj.id, false, aircraft.plane, aircraft.callsign, "", aircraft.nickname, aircraft.model, aircraft.icaoType, aircraft.icaoAirline, "", aircraft.typerole, recentFrame.time, ref (recentFrame as AircraftPositionFrame).data);
 #endif
                         }
                         else
@@ -1553,9 +1553,9 @@ namespace JoinFS
                     Vector angles = InterpolateAngles(obj, from.data.pitch, from.data.heading, from.data.bank, to.data.pitch, to.data.heading, to.data.bank, t);
                     Sim.AircraftPosition data = Interpolate(from, to, t, angles);
 #if FS2024
-                    main.sim?.UpdateAircraft(new LocalNode.Nuid(), obj.id, false, aircraft.plane, aircraft.callsign, aircraft.nickname, aircraft.model, aircraft.livery, aircraft.icaoType, aircraft.icaoAirline, aircraft.typerole, time, ref data);
+                    main.sim?.UpdateAircraft(new LocalNode.Nuid(), obj.id, false, aircraft.plane, aircraft.callsign, "", aircraft.nickname, aircraft.model, aircraft.livery, aircraft.icaoType, aircraft.icaoAirline, "", aircraft.typerole, time, ref data);
 #else
-                    main.sim?.UpdateAircraft(new LocalNode.Nuid(), obj.id, false, aircraft.plane, aircraft.callsign, aircraft.nickname, aircraft.model, aircraft.icaoType, aircraft.icaoAirline, aircraft.typerole, time, ref data);
+                    main.sim?.UpdateAircraft(new LocalNode.Nuid(), obj.id, false, aircraft.plane, aircraft.callsign, "", aircraft.nickname, aircraft.model, aircraft.icaoType, aircraft.icaoAirline, "", aircraft.typerole, time, ref data);
 #endif
                 }
             }
