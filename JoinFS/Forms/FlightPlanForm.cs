@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Windows.Forms;
+using JoinFS.Properties;
 
 namespace JoinFS
 {
@@ -8,6 +9,14 @@ namespace JoinFS
         public Sim.FlightPlan plan;
 
         Main main;
+
+        // fields SimBrief can supply that this dialog doesn't have a visible control for -
+        // carried through to plan on OK so they still reach the network/EuroScope
+        string pendingRegistration;
+        string pendingIcaoAirline;
+        string pendingFlightNumber;
+        string pendingAlternate;
+        string pendingAltitude;
 
         public FlightPlanForm(Main main, Sim.FlightPlan plan)
         {
@@ -29,6 +38,7 @@ namespace JoinFS
             Combo_Rules.Font = main.dataFont;
             Text_Route.Font = main.dataFont;
             Text_Remarks.Font = main.dataFont;
+            Text_SimBriefUsername.Font = main.dataFont;
         }
 
         private void FlightPlanForm_Load(object sender, EventArgs e)
@@ -51,6 +61,58 @@ namespace JoinFS
                 Combo_Rules.SelectedIndex = plan.rules == "IFR" ? 1 : 0;
                 Text_Route.Text = plan.route;
                 Text_Remarks.Text = plan.remarks;
+
+                // carry through fields with no visible control, unchanged, unless an import replaces them
+                pendingRegistration = plan.registration;
+                pendingIcaoAirline = plan.icaoAirline;
+                pendingFlightNumber = plan.flightNumber;
+                pendingAlternate = plan.alternate;
+                pendingAltitude = plan.altitude;
+            }
+
+            Text_SimBriefUsername.Text = Settings.Default.SimBriefUsername;
+        }
+
+        private async void Button_ImportSimBrief_Click(object sender, EventArgs e)
+        {
+            string username = Text_SimBriefUsername.Text.Trim();
+
+            // remember the username regardless of fetch outcome
+            Settings.Default.SimBriefUsername = username;
+            Settings.Default.Save();
+
+            Button_ImportSimBrief.Enabled = false;
+            Label_SimBriefStatus.Text = "";
+            try
+            {
+                Sim.FlightPlan imported = new();
+                bool ok = await SimBrief.FetchAsync(username, imported);
+                if (ok)
+                {
+                    // pre-fill the dialog only - nothing is committed to plan/broadcast until OK is clicked
+                    Text_Callsign.Text = imported.callsign;
+                    Text_Type.Text = imported.icaoType;
+                    Text_From.Text = imported.departure;
+                    Text_To.Text = imported.destination;
+                    Combo_Rules.SelectedIndex = imported.rules == "IFR" ? 1 : 0;
+                    Text_Route.Text = imported.route;
+                    Text_Remarks.Text = imported.remarks;
+
+                    pendingRegistration = imported.registration;
+                    pendingAlternate = imported.alternate;
+                    pendingAltitude = imported.altitude;
+
+                    Label_SimBriefStatus.Text = "Imported " + imported.departure + " -> " + imported.destination;
+                }
+                else
+                {
+                    // never blank out already-shown data on failure
+                    Label_SimBriefStatus.Text = "No SimBrief flight plan found for that username";
+                }
+            }
+            finally
+            {
+                Button_ImportSimBrief.Enabled = true;
             }
         }
 
@@ -59,12 +121,18 @@ namespace JoinFS
             lock (main.conch)
             {
                 // return flight plan
+                plan.callsign = Text_Callsign.Text;
                 plan.icaoType = Text_Type.Text;
                 plan.departure = Text_From.Text.Substring(0, Math.Min(4, Text_From.Text.Length));
                 plan.destination = Text_To.Text.Substring(0, Math.Min(4, Text_To.Text.Length));
                 plan.rules = Combo_Rules.Text;
                 plan.route = Text_Route.Text.Substring(0, Math.Min(Sim.FlightPlan.MAX_ROUTE, Text_Route.Text.Length));
                 plan.remarks = Text_Remarks.Text.Substring(0, Math.Min(Sim.FlightPlan.MAX_REMARKS, Text_Remarks.Text.Length));
+                plan.registration = pendingRegistration;
+                plan.icaoAirline = pendingIcaoAirline;
+                plan.flightNumber = pendingFlightNumber;
+                plan.alternate = pendingAlternate;
+                plan.altitude = pendingAltitude;
             }
         }
     }
