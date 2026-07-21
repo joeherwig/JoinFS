@@ -255,6 +255,8 @@ namespace JoinFS
             [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)]
             public String airline;
 #endif
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+            public String flightNumber;
         };
 
         /// <summary>
@@ -1625,6 +1627,20 @@ namespace JoinFS
 
         static short ConvertToAxis(float input) { return (short)(input * 16384.0); }
         static float ConvertFromAxis(short input) { return (float)(int)input * (1.0f / 16384.0f); }
+
+        /// <summary>
+        /// Resolve a real-world callsign from ICAO airline + flight number (e.g. "DLH" + "1234" -> "DLH1234").
+        /// SimConnect's ATC ID is a tail number, not a callsign, and there is no single SimConnect variable that
+        /// delivers a combined real-world callsign - so fall back to the tail number when either part is missing.
+        /// </summary>
+        static string ResolveCallsign(string icaoAirline, string flightNumber, string tailNumber)
+        {
+            if (!string.IsNullOrEmpty(icaoAirline) && !string.IsNullOrEmpty(flightNumber))
+            {
+                return icaoAirline + flightNumber;
+            }
+            return tailNumber;
+        }
 
         /// <summary>
         /// Flight plan
@@ -3454,6 +3470,16 @@ namespace JoinFS
 
                                     // get nickname
                                     string callsign = info.callsign.TrimStart(' ', '\t').TrimEnd(' ', '\t');
+                                    // diagnostic - confirm what SimConnect actually returns for ATC ID/AIRLINE/FLIGHT NUMBER
+                                    // on the user's own aircraft when a distinct MSFS Call Sign is set (temporary, remove once confirmed)
+                                    if (info.isUser != 0)
+                                    {
+#if FS2024
+                                        main.MonitorEvent("DIAG ATC ID='" + info.callsign + "' ATC AIRLINE='" + info.airline + "' ATC FLIGHT NUMBER='" + info.flightNumber + "'");
+#else
+                                        main.MonitorEvent("DIAG ATC ID='" + info.callsign + "' ATC FLIGHT NUMBER='" + info.flightNumber + "'");
+#endif
+                                    }
                                     // remove any junk from type
                                     string type = info.type;
                                     type = type.Replace("TTATCCOM.AC_MODEL ", "");
@@ -3546,8 +3572,12 @@ namespace JoinFS
                                     {
                                         // aircraft
                                         Aircraft aircraft = obj as Aircraft;
-                                        // substitute callsign
-                                        aircraft.flightPlan.callsign = main.substitution != null ? main.substitution.Callsign(aircraft.ownerModel, callsign) : callsign;
+                                        // ATC ID is a tail number, not a callsign - keep the per-model override behavior for it
+                                        string tailNumber = main.substitution != null ? main.substitution.Callsign(aircraft.ownerModel, callsign) : callsign;
+                                        aircraft.flightPlan.registration = tailNumber;
+                                        aircraft.flightPlan.flightNumber = info.flightNumber;
+                                        // prefer a synthesized real callsign (ICAO airline + flight number) over the tail number
+                                        aircraft.flightPlan.callsign = ResolveCallsign(resolvedIcaoAirline, info.flightNumber, tailNumber);
                                         // message
 #if FS2024
                                         main.MonitorEvent("Listing aircraft '" + aircraft.flightPlan.callsign + "' User 'Me' - ID '" + obj.simId + "' - Model '" + obj.ownerModel + "' Livery '" + info.livery + "'");

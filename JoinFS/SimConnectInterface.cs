@@ -85,6 +85,7 @@ namespace JoinFS
                 sc.AddToDataDefinition(Sim.Definitions.OBJECT_GET_INFO, "LIVERY NAME", null, SIMCONNECT_DATATYPE.STRING256, 0.0f, SimConnect.SIMCONNECT_UNUSED);
                 sc.AddToDataDefinition(Sim.Definitions.OBJECT_GET_INFO, "ATC AIRLINE", null, SIMCONNECT_DATATYPE.STRING64, 0.0f, SimConnect.SIMCONNECT_UNUSED);
 #endif
+                sc.AddToDataDefinition(Sim.Definitions.OBJECT_GET_INFO, "ATC FLIGHT NUMBER", null, SIMCONNECT_DATATYPE.STRING32, 0.0f, SimConnect.SIMCONNECT_UNUSED);
 
                 // define a position velocity variables structure
                 sc.AddToDataDefinition(Sim.Definitions.OBJECT_POSITION_VELOCITY, "Plane Latitude", "radians", SIMCONNECT_DATATYPE.FLOAT64, 0.0f, SimConnect.SIMCONNECT_UNUSED);
