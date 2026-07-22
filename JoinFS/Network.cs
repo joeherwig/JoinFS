@@ -3764,8 +3764,8 @@ namespace JoinFS
                                             user.altitude = altitude;
                                             user.speed = speed;
                                             user.flightPlan.icaoType = icaoType;
-                                            user.flightPlan.departure = from;
-                                            user.flightPlan.destination = to;
+                                            user.flightPlan.departure = from.ToUpperInvariant();
+                                            user.flightPlan.destination = to.ToUpperInvariant();
                                             user.squawk = squawk;
                                             user.level = level;
                                             user.range = range;
@@ -3822,8 +3822,8 @@ namespace JoinFS
                                         user.range = reader.ReadByte();
                                         user.heading = reader.ReadUInt16();
                                         user.flightPlan.icaoType = reader.ReadString();
-                                        user.flightPlan.departure = reader.ReadString();
-                                        user.flightPlan.destination = reader.ReadString();
+                                        user.flightPlan.departure = reader.ReadString().ToUpperInvariant();
+                                        user.flightPlan.destination = reader.ReadString().ToUpperInvariant();
                                         user.flightPlan.rules = reader.ReadString();
                                         user.flightPlan.route = reader.ReadString();
                                         user.flightPlan.remarks = reader.ReadString();
@@ -4088,8 +4088,8 @@ namespace JoinFS
                                     reader.ReadByte();
                                     // read flight plan
                                     main.sim.userFlightPlan.icaoType = reader.ReadString();
-                                    main.sim.userFlightPlan.departure = reader.ReadString();
-                                    main.sim.userFlightPlan.destination = reader.ReadString();
+                                    main.sim.userFlightPlan.departure = reader.ReadString().ToUpperInvariant();
+                                    main.sim.userFlightPlan.destination = reader.ReadString().ToUpperInvariant();
                                     main.sim.userFlightPlan.rules = reader.ReadString();
                                     main.sim.userFlightPlan.route = reader.ReadString();
                                     main.sim.userFlightPlan.remarks = reader.ReadString();
@@ -4117,8 +4117,8 @@ namespace JoinFS
                                     aircraft.flightPlanVersion = reader.ReadByte();
                                     // read flight plan
                                     aircraft.flightPlan.icaoType = reader.ReadString();
-                                    aircraft.flightPlan.departure = reader.ReadString();
-                                    aircraft.flightPlan.destination = reader.ReadString();
+                                    aircraft.flightPlan.departure = reader.ReadString().ToUpperInvariant();
+                                    aircraft.flightPlan.destination = reader.ReadString().ToUpperInvariant();
                                     aircraft.flightPlan.rules = reader.ReadString();
                                     aircraft.flightPlan.route = reader.ReadString();
                                     aircraft.flightPlan.remarks = reader.ReadString();

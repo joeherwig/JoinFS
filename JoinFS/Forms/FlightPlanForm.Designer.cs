@@ -49,6 +49,7 @@
             this.Text_SimBriefUsername = new System.Windows.Forms.TextBox();
             this.Button_ImportSimBrief = new System.Windows.Forms.Button();
             this.Label_SimBriefStatus = new System.Windows.Forms.Label();
+            this.Button_Clear = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // label1
@@ -81,16 +82,18 @@
             // 
             resources.ApplyResources(this.Text_From, "Text_From");
             this.Text_From.Name = "Text_From";
-            // 
+            this.Text_From.CharacterCasing = System.Windows.Forms.CharacterCasing.Upper;
+            //
             // label4
-            // 
+            //
             resources.ApplyResources(this.label4, "label4");
             this.label4.Name = "label4";
-            // 
+            //
             // Text_To
-            // 
+            //
             resources.ApplyResources(this.Text_To, "Text_To");
             this.Text_To.Name = "Text_To";
+            this.Text_To.CharacterCasing = System.Windows.Forms.CharacterCasing.Upper;
             // 
             // label5
             // 
@@ -178,6 +181,18 @@
             this.Label_SimBriefStatus.Size = new System.Drawing.Size(305, 15);
             this.Label_SimBriefStatus.TabIndex = 9;
             //
+            // Button_Clear
+            // (clears route/remarks/departure/destination only - callsign/type/rules are already
+            // sourced live from the sim and untouched by this)
+            //
+            this.Button_Clear.Location = new System.Drawing.Point(9, 213);
+            this.Button_Clear.Name = "Button_Clear";
+            this.Button_Clear.Size = new System.Drawing.Size(75, 27);
+            this.Button_Clear.TabIndex = 10;
+            this.Button_Clear.Text = "Clear";
+            this.Button_Clear.UseVisualStyleBackColor = true;
+            this.Button_Clear.Click += new System.EventHandler(this.Button_Clear_Click);
+            //
             // FlightPlanForm
             //
             this.AcceptButton = this.Button_OK;
@@ -186,6 +201,7 @@
             this.CancelButton = this.Button_Cancel;
             // grown to fit the SimBrief row added below Remarks; overrides the resx-driven size above
             this.ClientSize = new System.Drawing.Size(323, 253);
+            this.Controls.Add(this.Button_Clear);
             this.Controls.Add(this.Label_SimBriefStatus);
             this.Controls.Add(this.Button_ImportSimBrief);
             this.Controls.Add(this.Text_SimBriefUsername);
@@ -239,5 +255,6 @@
         private System.Windows.Forms.TextBox Text_SimBriefUsername;
         private System.Windows.Forms.Button Button_ImportSimBrief;
         private System.Windows.Forms.Label Label_SimBriefStatus;
+        private System.Windows.Forms.Button Button_Clear;
     }
 }
