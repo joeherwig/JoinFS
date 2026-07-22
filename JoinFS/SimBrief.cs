@@ -16,26 +16,34 @@ namespace JoinFS
         /// <summary>
         /// Fetch the given pilot's latest SimBrief OFP and apply it to the flight plan
         /// </summary>
+        /// <param name="main">optional, used only to log DIAG detail about the fetch</param>
         /// <returns>true if a usable OFP was found and applied</returns>
-        public static async Task<bool> FetchAsync(string username, Sim.FlightPlan plan)
+        public static async Task<bool> FetchAsync(string username, Sim.FlightPlan plan, Main main = null)
         {
             if (string.IsNullOrWhiteSpace(username))
             {
+                main?.MonitorEvent("DIAG SimBrief: no username configured");
                 return false;
             }
 
             try
             {
                 string url = "https://www.simbrief.com/api/xml.fetcher.php?username=" + Uri.EscapeDataString(username) + "&json=1";
+                main?.MonitorEvent("DIAG SimBrief: fetching " + url);
                 string json = await httpClient.GetStringAsync(url);
+                main?.MonitorEvent("DIAG SimBrief: received " + json.Length + " bytes");
                 JObject ofp = JObject.Parse(json);
 
-                string departure = ofp["origin"]?["icao_code"]?.ToString() ?? "";
-                string destination = ofp["destination"]?["icao_code"]?.ToString() ?? "";
+                string departure = (ofp["origin"]?["icao_code"]?.ToString() ?? "").ToUpperInvariant();
+                string destination = (ofp["destination"]?["icao_code"]?.ToString() ?? "").ToUpperInvariant();
+                main?.MonitorEvent("DIAG SimBrief: origin.icao_code='" + departure + "' destination.icao_code='" + destination + "'");
+
                 // SimBrief can return a 200 with an empty/error payload (no origin/destination) when
                 // the username has no active OFP - treat that the same as a failed fetch
                 if (string.IsNullOrEmpty(departure) || string.IsNullOrEmpty(destination))
                 {
+                    string fetchStatus = ofp["fetch"]?["status"]?.ToString() ?? "";
+                    main?.MonitorEvent("DIAG SimBrief: no origin/destination in response - fetch.status='" + fetchStatus + "'");
                     return false;
                 }
 
@@ -44,7 +52,7 @@ namespace JoinFS
                 plan.icaoType = ofp["aircraft"]?["icaocode"]?.ToString() ?? "";
                 plan.departure = departure;
                 plan.destination = destination;
-                plan.alternate = ofp["alternate"]?["icao_code"]?.ToString() ?? "";
+                plan.alternate = (ofp["alternate"]?["icao_code"]?.ToString() ?? "").ToUpperInvariant();
                 plan.route = ofp["atc"]?["route"]?.ToString() ?? "";
                 plan.remarks = ofp["atc"]?["section18"]?.ToString() ?? "";
                 plan.rules = (ofp["atc"]?["flight_rules"]?.ToString() ?? "I").Equals("V", StringComparison.OrdinalIgnoreCase) ? "VFR" : "IFR";
@@ -52,9 +60,10 @@ namespace JoinFS
 
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
                 // no username configured, request/network error, or malformed response - treat as "not available"
+                main?.MonitorEvent("DIAG SimBrief: fetch failed - " + ex.Message);
                 return false;
             }
         }

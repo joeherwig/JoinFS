@@ -8,6 +8,12 @@ namespace JoinFS
     {
         public Sim.FlightPlan plan;
 
+        /// <summary>
+        /// When true, focuses the SimBrief username field on load instead of the callsign field -
+        /// used when the main-screen SimBrief button is clicked with no username configured yet
+        /// </summary>
+        public bool FocusSimBriefUsername { get; set; }
+
         Main main;
 
         // fields SimBrief can supply that this dialog doesn't have a visible control for -
@@ -39,6 +45,13 @@ namespace JoinFS
             Text_Route.Font = main.dataFont;
             Text_Remarks.Font = main.dataFont;
             Text_SimBriefUsername.Font = main.dataFont;
+
+            if (Settings.Default.ToolTips)
+            {
+                ToolTip tip = new() { ShowAlways = true, IsBalloon = true, AutomaticDelay = 2000 };
+                tip.SetToolTip(Text_SimBriefUsername, "Your SimBrief username");
+                tip.SetToolTip(Button_ImportSimBrief, "Save the SimBrief username and fetch the latest flight plan");
+            }
         }
 
         private void FlightPlanForm_Load(object sender, EventArgs e)
@@ -71,6 +84,11 @@ namespace JoinFS
             }
 
             Text_SimBriefUsername.Text = Settings.Default.SimBriefUsername;
+
+            if (FocusSimBriefUsername)
+            {
+                Text_SimBriefUsername.Focus();
+            }
         }
 
         private async void Button_ImportSimBrief_Click(object sender, EventArgs e)
@@ -86,7 +104,12 @@ namespace JoinFS
             try
             {
                 Sim.FlightPlan imported = new();
-                bool ok = await SimBrief.FetchAsync(username, imported);
+                bool ok = await SimBrief.FetchAsync(username, imported, main);
+
+                // the main-screen badge reflects the last fetch *attempt*, regardless of whether
+                // the pilot goes on to commit it via OK - update it immediately, not just on OK
+                main.sim.simBriefLastFetchSucceeded = ok;
+
                 if (ok)
                 {
                     // pre-fill the dialog only - nothing is committed to plan/broadcast until OK is clicked
@@ -116,6 +139,19 @@ namespace JoinFS
             }
         }
 
+        private void Button_Clear_Click(object sender, EventArgs e)
+        {
+            // leaves callsign/type/rules alone (already sourced live from the sim) - only clears
+            // the route-plan fields, same ones a SimBrief import would otherwise fill in
+            Text_From.Text = "";
+            Text_To.Text = "";
+            Text_Route.Text = "";
+            Text_Remarks.Text = "";
+            pendingAlternate = "";
+            pendingAltitude = "";
+            Label_SimBriefStatus.Text = "";
+        }
+
         private void Button_OK_Click(object sender, EventArgs e)
         {
             lock (main.conch)
@@ -123,8 +159,8 @@ namespace JoinFS
                 // return flight plan
                 plan.callsign = Text_Callsign.Text;
                 plan.icaoType = Text_Type.Text;
-                plan.departure = Text_From.Text.Substring(0, Math.Min(4, Text_From.Text.Length));
-                plan.destination = Text_To.Text.Substring(0, Math.Min(4, Text_To.Text.Length));
+                plan.departure = Text_From.Text.Substring(0, Math.Min(4, Text_From.Text.Length)).ToUpperInvariant();
+                plan.destination = Text_To.Text.Substring(0, Math.Min(4, Text_To.Text.Length)).ToUpperInvariant();
                 plan.rules = Combo_Rules.Text;
                 plan.route = Text_Route.Text.Substring(0, Math.Min(Sim.FlightPlan.MAX_ROUTE, Text_Route.Text.Length));
                 plan.remarks = Text_Remarks.Text.Substring(0, Math.Min(Sim.FlightPlan.MAX_REMARKS, Text_Remarks.Text.Length));

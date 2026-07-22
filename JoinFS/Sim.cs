@@ -1670,13 +1670,6 @@ namespace JoinFS
         public FlightPlan userFlightPlan = new();
 
         /// <summary>
-        /// Which source last supplied the user's flight plan, for main-screen source indication.
-        /// Simulator is reserved for the GPS-flight-plan fallback (not yet implemented).
-        /// </summary>
-        public enum FlightPlanSource { None, Simulator, SimBrief }
-        public FlightPlanSource userFlightPlanSource = FlightPlanSource.None;
-
-        /// <summary>
         /// Result of the most recent SimBrief fetch attempt, for the main-screen SimBrief icon's badge
         /// </summary>
         public bool simBriefLastFetchSucceeded = false;
@@ -1687,17 +1680,11 @@ namespace JoinFS
         /// </summary>
         public async Task<bool> RefreshUserFlightPlanFromSimBriefAsync()
         {
-            bool ok = await JoinFS.SimBrief.FetchAsync(Settings.Default.SimBriefUsername, userFlightPlan);
+            bool ok = await JoinFS.SimBrief.FetchAsync(Settings.Default.SimBriefUsername, userFlightPlan, main);
             simBriefLastFetchSucceeded = ok;
             if (ok)
             {
-                userFlightPlanSource = FlightPlanSource.SimBrief;
                 main.MonitorEvent("SimBrief flight plan imported: " + userFlightPlan.departure + " -> " + userFlightPlan.destination);
-            }
-            else if (userFlightPlanSource == FlightPlanSource.SimBrief)
-            {
-                // the previously-active SimBrief source is no longer valid
-                userFlightPlanSource = FlightPlanSource.None;
             }
             return ok;
         }

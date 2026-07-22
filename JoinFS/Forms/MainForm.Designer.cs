@@ -41,6 +41,8 @@
             this.Button_Network = new System.Windows.Forms.Button();
             this.Button_Join = new System.Windows.Forms.Button();
             this.Button_Global = new System.Windows.Forms.Button();
+            this.Button_FlightPlan = new System.Windows.Forms.Button();
+            this.Button_SimBrief = new System.Windows.Forms.Button();
             this.Main_Menu = new System.Windows.Forms.MenuStrip();
             this.fileToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.Menu_File_ScanModels = new System.Windows.Forms.ToolStripMenuItem();
@@ -181,7 +183,31 @@
             this.Button_Global.Name = "Button_Global";
             this.Button_Global.UseVisualStyleBackColor = true;
             this.Button_Global.Click += new System.EventHandler(this.Button_Global_Click);
-            // 
+            //
+            // Button_FlightPlan
+            // (not resx-driven - added below the Simulator/Network/Global row; see MainForm.cs for the
+            // dynamic repositioning that keeps it glued to that row under NO_CREATE/NO_JOIN)
+            //
+            this.Button_FlightPlan.Location = new System.Drawing.Point(8, 112);
+            this.Button_FlightPlan.Name = "Button_FlightPlan";
+            this.Button_FlightPlan.Size = new System.Drawing.Size(213, 25);
+            this.Button_FlightPlan.TabIndex = 30;
+            this.Button_FlightPlan.Text = "Flight plan";
+            this.Button_FlightPlan.UseVisualStyleBackColor = true;
+            this.Button_FlightPlan.Click += new System.EventHandler(this.Button_FlightPlan_Click);
+            //
+            // Button_SimBrief
+            //
+            this.Button_SimBrief.BackColor = System.Drawing.Color.FromArgb(79, 79, 79);
+            this.Button_SimBrief.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.Button_SimBrief.ImageAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.Button_SimBrief.Location = new System.Drawing.Point(227, 112);
+            this.Button_SimBrief.Name = "Button_SimBrief";
+            this.Button_SimBrief.Size = new System.Drawing.Size(44, 25);
+            this.Button_SimBrief.TabIndex = 31;
+            this.Button_SimBrief.UseVisualStyleBackColor = false;
+            this.Button_SimBrief.Click += new System.EventHandler(this.Button_SimBrief_Click);
+            //
             // Main_Menu
             // 
             resources.ApplyResources(this.Main_Menu, "Main_Menu");
@@ -394,6 +420,10 @@
             resources.ApplyResources(this, "$this");
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.AutoValidate = System.Windows.Forms.AutoValidate.EnablePreventFocusChange;
+            // grown to fit the flight-plan/SimBrief row added below Simulator/Network/Global
+            this.ClientSize = new System.Drawing.Size(this.ClientSize.Width, this.ClientSize.Height + 34);
+            this.Controls.Add(this.Button_SimBrief);
+            this.Controls.Add(this.Button_FlightPlan);
             this.Controls.Add(this.Button_Global);
             this.Controls.Add(this.Button_Join);
             this.Controls.Add(this.Button_Network);
@@ -435,6 +465,8 @@
         private System.Windows.Forms.ToolStripStatusLabel Tool_Map;
         private System.Windows.Forms.ToolStripStatusLabel Tool_Users;
         private System.Windows.Forms.Button Button_Global;
+        private System.Windows.Forms.Button Button_FlightPlan;
+        private System.Windows.Forms.Button Button_SimBrief;
         private System.Windows.Forms.MenuStrip Main_Menu;
         private System.Windows.Forms.ToolStripMenuItem fileToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem Menu_File_ScanModels;
