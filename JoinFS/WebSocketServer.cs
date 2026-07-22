@@ -43,7 +43,7 @@ namespace JoinFS
             public double altitude, speed, latitude, longitude;
             public int heading;
             public string com1, com2, squawk;
-            public string icaoType, from, to, rules, route, remarks;
+            public string icaoType, from, to, rules, route, remarks, livery;
             public int gear;
             public double flaps;
             public int lightNav, lightBeacon, lightLanding, lightTaxi, lightStrobe;
@@ -197,6 +197,7 @@ namespace JoinFS
             snap.rules    = aircraft.flightPlan.rules;
             snap.route    = aircraft.flightPlan.route;
             snap.remarks  = aircraft.flightPlan.remarks;
+            snap.livery   = aircraft.ModelLivery;
 
             if (aircraft.variableSet != null)
             {
@@ -257,7 +258,7 @@ namespace JoinFS
             a.heading == b.heading &&
             a.com1 == b.com1 && a.com2 == b.com2 && a.squawk == b.squawk &&
             a.icaoType == b.icaoType && a.from == b.from && a.to == b.to &&
-            a.rules == b.rules && a.route == b.route && a.remarks == b.remarks &&
+            a.rules == b.rules && a.route == b.route && a.remarks == b.remarks && a.livery == b.livery &&
             a.gear == b.gear && a.flaps == b.flaps &&
             a.lightNav == b.lightNav && a.lightBeacon == b.lightBeacon &&
             a.lightLanding == b.lightLanding && a.lightTaxi == b.lightTaxi && a.lightStrobe == b.lightStrobe &&
@@ -286,6 +287,7 @@ namespace JoinFS
             rules    = s.rules,
             route    = s.route,
             remarks  = s.remarks,
+            livery   = s.livery,
             gear     = s.gear,
             flaps    = Math.Round(s.flaps, 3),
             lights   = new { nav = s.lightNav, beacon = s.lightBeacon, landing = s.lightLanding, taxi = s.lightTaxi, strobe = s.lightStrobe },

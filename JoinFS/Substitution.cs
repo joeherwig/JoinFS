@@ -300,6 +300,12 @@ namespace JoinFS
             /// </summary>
             public string icaoAirline = "";
             /// <summary>
+            /// Registration/tail number baked into the livery's aircraft.cfg atc_id, e.g. "D-AJOE" -
+            /// often empty (many liveries leave it blank, relying on MSFS's live in-sim customization
+            /// instead), in which case matching falls back to a substring search in title/variation
+            /// </summary>
+            public string atcId = "";
+            /// <summary>
             /// True when icaoType came from FS2024's best-effort title guess rather than an exact/live read
             /// </summary>
             public bool icaoGuessed = false;
@@ -312,7 +318,7 @@ namespace JoinFS
             public bool classCodeConfirmed = false;
 
             public Model(string title, string manufacturer, string type, string variation, int index, string typerole, string smoke, string folder,
-                string icaoType = "", string wtc = "", string icaoAirline = "", string classCode = "", bool classCodeConfirmed = false)
+                string icaoType = "", string wtc = "", string icaoAirline = "", string classCode = "", bool classCodeConfirmed = false, string atcId = "")
             {
                 this.title = title;
                 this.manufacturer = manufacturer;
@@ -330,6 +336,7 @@ namespace JoinFS
                 this.icaoAirline = icaoAirline;
                 this.classCode = classCode;
                 this.classCodeConfirmed = classCodeConfirmed;
+                this.atcId = atcId;
             }
 
             /// <summary>
@@ -840,6 +847,7 @@ namespace JoinFS
         string scanModel = "";
         string scanTexture = "";
         string scanIcaoAirline = "";
+        string scanAtcId = "";
 
         /// <summary>
         /// Submit the current scanned names
@@ -849,6 +857,12 @@ namespace JoinFS
             // check for valid block and title
             if (scanBlock && scanTitle.Length > 0)
             {
+                // brief lock around the actual models mutation only - Scan() itself deliberately
+                // does NOT hold this lock for its whole (potentially many-seconds) duration, so
+                // other conch-protected readers/writers (Match/Save/UI dialogs) only ever wait a
+                // few microseconds per model found, not the whole scan
+                lock (main.conch)
+                {
                 // check for quotes
                 if (scanTitle.StartsWith('\"'))
                 {
@@ -959,6 +973,7 @@ namespace JoinFS
 #endif
                     model.folder = scanFolder;
                     model.icaoAirline = scanIcaoAirline;
+                    model.atcId = scanAtcId;
 #if FS2024
                     if (model.icaoType.Length == 0 && guessedIcaoType.Length > 0)
                     {
@@ -971,7 +986,7 @@ namespace JoinFS
                 else
                 {
                     // add the model
-                    Model newModel = new(scanTitle, scanManufacturer, scanType, scanVariation, scanIndex, scanTyperole, "0", scanFolder, "", "", scanIcaoAirline);
+                    Model newModel = new(scanTitle, scanManufacturer, scanType, scanVariation, scanIndex, scanTyperole, "0", scanFolder, "", "", scanIcaoAirline, atcId: scanAtcId);
 #if FS2024
                     if (guessedIcaoType.Length > 0)
                     {
@@ -981,6 +996,7 @@ namespace JoinFS
                     }
 #endif
                     models.Add(newModel);
+                }
                 }
             }
 
@@ -996,6 +1012,7 @@ namespace JoinFS
             scanTexture = "";
             scanFolder = "";
             scanIcaoAirline = "";
+            scanAtcId = "";
         }
 
 
@@ -1246,7 +1263,10 @@ namespace JoinFS
                     }
 
                     // clear current models
-                    models.Clear();
+                    lock (main.conch)
+                    {
+                        models.Clear();
+                    }
 
 #if XPLANE || CONSOLE
                     // create path list
@@ -1497,6 +1517,13 @@ namespace JoinFS
                             {
                                 // get ICAO airline operator code - per-livery, e.g. "AEE"
                                 scanIcaoAirline = TrimQuotes(line[12..]);
+                            }
+                            else if (line.StartsWith("atc_id", StringComparison.OrdinalIgnoreCase) &&
+                                (line.Length == 6 || (line[6] != '_' && !char.IsLetterOrDigit(line[6]))))
+                            {
+                                // get registration/tail number - per-livery, e.g. "D-AJOE" - the length/char
+                                // check excludes atc_id_enable/atc_id_color/atc_id_font, which share the prefix
+                                scanAtcId = TrimQuotes(line[6..]);
                             }
                             else if (line.StartsWith("category", StringComparison.OrdinalIgnoreCase))
                             {
@@ -1916,6 +1943,8 @@ namespace JoinFS
                         string[] lines = File.ReadAllLines(filename);
                         string[] separator = [ "|" ];
                         // for all lines
+                        lock (main.conch)
+                        {
                         foreach (string line in lines)
                         {
                             // ignore comments (comment lines begin with a #)
@@ -1982,6 +2011,7 @@ namespace JoinFS
                                     models.Add(model);
                                 }
                             }
+                        }
                         }
 
                         // message
@@ -3190,67 +3220,111 @@ namespace JoinFS
         }
 
         /// <summary>
-        /// Which rule inside PreferByOperator actually chose the candidate
+        /// Strip everything but letters/digits, for comparing registrations/callsigns against installed
+        /// titles/variations regardless of how dashes/underscores/spaces are used in either one
+        /// (e.g. "D-AJOE" vs. a livery folder named "DAJOE_Eurowings_Europapark").
         /// </summary>
-        enum PreferReason
+        static string AlnumOnly(string s)
         {
-            ExactOperator,
-            LiveryWordOverlap,
-            FirstAvailable
+            if (string.IsNullOrEmpty(s)) return "";
+            Span<char> buf = stackalloc char[s.Length];
+            int n = 0;
+            foreach (char c in s)
+            {
+                if (char.IsLetterOrDigit(c)) buf[n++] = c;
+            }
+            return new string(buf[..n]);
         }
 
         /// <summary>
-        /// Prefer a same-operator livery among candidates sharing an ICAO type or category: an exact
-        /// icao_airline match first, then plain text overlap between livery names, else the first
-        /// available candidate (scan order). Not color/visual matching - that data doesn't exist.
+        /// Score every candidate sharing an ICAO type or category by how many independent signals it
+        /// matches - ICAO airline operator (exact code match, weighted highest), aircraft registration
+        /// (an exact match against the candidate's own scanned aircraft.cfg atc_id when it has one, else
+        /// a weaker textual match against the installed title/variation - many special/one-off livery
+        /// packages embed the tail number in their name, e.g. a "D-AJOE Eurowings Europa-Park" livery,
+        /// which works across sims even when the livery *title* SimConnect reports doesn't line up at
+        /// all), and livery-name word overlap (weakest signal, existing behavior). More matching signals
+        /// wins; ties keep scan order. Not color/visual matching - that data doesn't exist.
         /// </summary>
-        static Model PreferByOperator(List<Model> candidates, string remoteIcaoAirline, string remoteLivery, out PreferReason reason, out string reasonDetail)
+        static Model PreferByOperator(List<Model> candidates, string remoteIcaoAirline, string remoteRegistration, string remoteLivery, out List<MatchAttribute> decisiveAttrs, out string reasonText)
         {
-            if (remoteIcaoAirline.Length > 0)
-            {
-                Model exact = candidates.Find(m => m.icaoAirline.Length > 0 && m.icaoAirline.Equals(remoteIcaoAirline, StringComparison.OrdinalIgnoreCase));
-                if (exact != null)
-                {
-                    reason = PreferReason.ExactOperator;
-                    reasonDetail = remoteIcaoAirline;
-                    return exact;
-                }
-            }
+            string remoteRegistrationAlnum = AlnumOnly(remoteRegistration);
 
-            if (remoteLivery.Length > 0)
+            Model best = candidates[0];
+            int bestScore = 0;
+            List<MatchAttribute> bestAttrs = [];
+            List<string> bestDetails = [];
+
+            foreach (var candidate in candidates)
             {
-                string[] remoteWords = remoteLivery.Split([' ', '-', '_'], StringSplitOptions.RemoveEmptyEntries);
-                foreach (var word in remoteWords)
+                int score = 0;
+                List<MatchAttribute> attrs = [];
+                List<string> details = [];
+
+                // most important (after ICAO type/category, which already narrowed the candidate list)
+                if (remoteIcaoAirline.Length > 0 && candidate.icaoAirline.Length > 0 &&
+                    candidate.icaoAirline.Equals(remoteIcaoAirline, StringComparison.OrdinalIgnoreCase))
                 {
-                    if (word.Length < 4) continue;
-                    Model candidate = candidates.Find(m => m.variation.Contains(word, StringComparison.OrdinalIgnoreCase));
-                    if (candidate != null)
+                    score += 100;
+                    attrs.Add(MatchAttribute.IcaoAirline);
+                    details.Add($"ICAO airline '{remoteIcaoAirline}'");
+                }
+
+                // next - only "if possible", i.e. when the remote actually reported one. Prefer an exact
+                // match against the candidate's own scanned atc_id when it has one (much more reliable -
+                // it's the actual tail number baked into that specific livery); only fall back to a
+                // substring search in title/variation when the candidate has no scanned atc_id at all.
+                if (remoteRegistrationAlnum.Length > 0)
+                {
+                    string candidateAtcIdAlnum = AlnumOnly(candidate.atcId);
+                    if (candidateAtcIdAlnum.Length > 0)
                     {
-                        reason = PreferReason.LiveryWordOverlap;
-                        reasonDetail = word;
-                        return candidate;
+                        if (candidateAtcIdAlnum.Equals(remoteRegistrationAlnum, StringComparison.OrdinalIgnoreCase))
+                        {
+                            score += 50;
+                            attrs.Add(MatchAttribute.Registration);
+                            details.Add($"registration '{remoteRegistration}' (exact atc_id match)");
+                        }
+                    }
+                    else if (AlnumOnly(candidate.variation).Contains(remoteRegistrationAlnum, StringComparison.OrdinalIgnoreCase) ||
+                             AlnumOnly(candidate.title).Contains(remoteRegistrationAlnum, StringComparison.OrdinalIgnoreCase))
+                    {
+                        score += 10;
+                        attrs.Add(MatchAttribute.Registration);
+                        details.Add($"registration '{remoteRegistration}' (title/variation match)");
                     }
                 }
+
+                // weakest signal - loose word overlap between livery names
+                if (remoteLivery.Length > 0)
+                {
+                    foreach (var word in remoteLivery.Split([' ', '-', '_'], StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        if (word.Length < 4) continue;
+                        if (candidate.variation.Contains(word, StringComparison.OrdinalIgnoreCase))
+                        {
+                            score += 1;
+                            attrs.Add(MatchAttribute.Livery);
+                            details.Add($"livery word '{word}'");
+                            break;
+                        }
+                    }
+                }
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    best = candidate;
+                    bestAttrs = attrs;
+                    bestDetails = details;
+                }
             }
 
-            // no operator/textual match found - fall back to first available
-            reason = PreferReason.FirstAvailable;
-            reasonDetail = "";
-            return candidates[0];
-        }
-
-        /// <summary>
-        /// Human-readable explanation of why PreferByOperator picked its candidate, for Explain Match
-        /// </summary>
-        static string PreferReasonText(PreferReason reason, string reasonDetail, Model chosen)
-        {
-            return reason switch
-            {
-                PreferReason.ExactOperator => $"Picked '{chosen.title}' / '{chosen.variation}' because its ICAO airline code exactly matches the requested operator '{reasonDetail}'.",
-                PreferReason.LiveryWordOverlap => $"Picked '{chosen.title}' / '{chosen.variation}' because its livery name contains the word '{reasonDetail}', which also appears in the requested livery name.",
-                PreferReason.FirstAvailable => $"No operator or livery-name match among the candidates; picked '{chosen.title}' / '{chosen.variation}' as the first one found during scanning.",
-                _ => ""
-            };
+            decisiveAttrs = bestAttrs;
+            reasonText = bestScore > 0
+                ? $"Picked '{best.title}' / '{best.variation}' - matched {string.Join(" + ", bestDetails)}."
+                : $"No operator/registration/livery-name match among the candidates; picked '{best.title}' / '{best.variation}' as the first one found during scanning.";
+            return best;
         }
 
         /// <summary>
@@ -3392,46 +3466,35 @@ namespace JoinFS
                 string remoteLivery = "";
 #endif
 
-                // same ICAO type - prefer same operator, else first available
+                // same ICAO type - prefer same operator/registration/livery signal, else first available
                 if (icaoIndex.TryGetValue(icaoType, out var icaoCandidates) && icaoCandidates.Count > 0)
                 {
-                    model = PreferByOperator(icaoCandidates, icaoAirline, remoteLivery, out var preferReason, out var preferDetail);
+                    model = PreferByOperator(icaoCandidates, icaoAirline, registration, remoteLivery, out var decisiveSignals, out var preferDetail);
                     type = Type.Icao;
-                    trace.steps.Add($"Icao: {icaoCandidates.Count} installed model(s) share ICAO type designator '{icaoType}'. {PreferReasonText(preferReason, preferDetail, model)}");
-                    Finalize(model, preferReason switch
-                    {
-                        PreferReason.ExactOperator => [MatchAttribute.IcaoType, MatchAttribute.IcaoAirline],
-                        PreferReason.LiveryWordOverlap => [MatchAttribute.IcaoType, MatchAttribute.Livery],
-                        _ => new[] { MatchAttribute.IcaoType }
-                    });
+                    trace.steps.Add($"Icao: {icaoCandidates.Count} installed model(s) share ICAO type designator '{icaoType}'. {preferDetail}");
+                    Finalize(model, [MatchAttribute.IcaoType, .. decisiveSignals]);
                     return (model, type, trace);
                 }
 
-                // same category - exact classCode, then loose platform+engine-type; same operator preference within each
+                // same category - exact classCode, then loose platform+engine-type; same operator/registration/livery preference within each
                 if (doc8643Lookup.TryGetValue(icaoType, out var remoteEntry) && remoteEntry.classCode?.Length > 0)
                 {
                     if (classCodeIndex.TryGetValue(remoteEntry.classCode, out var classCandidates) && classCandidates.Count > 0)
                     {
-                        model = PreferByOperator(classCandidates, icaoAirline, remoteLivery, out var preferReason, out var preferDetail);
+                        model = PreferByOperator(classCandidates, icaoAirline, registration, remoteLivery, out var decisiveSignals, out var preferDetail);
                         type = Type.Category;
-                        trace.steps.Add($"Category: no exact ICAO type match, but {classCandidates.Count} installed model(s) share Doc8643 class code '{remoteEntry.classCode}'. {PreferReasonText(preferReason, preferDetail, model)}");
-                        List<MatchAttribute> decisive = [MatchAttribute.ClassCode];
-                        if (preferReason == PreferReason.ExactOperator) decisive.Add(MatchAttribute.IcaoAirline);
-                        else if (preferReason == PreferReason.LiveryWordOverlap) decisive.Add(MatchAttribute.Livery);
-                        Finalize(model, [.. decisive]);
+                        trace.steps.Add($"Category: no exact ICAO type match, but {classCandidates.Count} installed model(s) share Doc8643 class code '{remoteEntry.classCode}'. {preferDetail}");
+                        Finalize(model, [MatchAttribute.ClassCode, .. decisiveSignals]);
                         return (model, type, trace);
                     }
 
                     string looseKey = remoteEntry.classCode.Length == 3 ? remoteEntry.classCode[0] + "*" + remoteEntry.classCode[2] : "";
                     if (looseKey.Length > 0 && categoryIndex.TryGetValue(looseKey, out var looseCandidates) && looseCandidates.Count > 0)
                     {
-                        model = PreferByOperator(looseCandidates, icaoAirline, remoteLivery, out var preferReason, out var preferDetail);
+                        model = PreferByOperator(looseCandidates, icaoAirline, registration, remoteLivery, out var decisiveSignals, out var preferDetail);
                         type = Type.Category;
-                        trace.steps.Add($"Category: no exact class code match, but {looseCandidates.Count} installed model(s) share the same platform+engine-type category ('{looseKey}'). {PreferReasonText(preferReason, preferDetail, model)}");
-                        List<MatchAttribute> decisive = [MatchAttribute.ClassCode];
-                        if (preferReason == PreferReason.ExactOperator) decisive.Add(MatchAttribute.IcaoAirline);
-                        else if (preferReason == PreferReason.LiveryWordOverlap) decisive.Add(MatchAttribute.Livery);
-                        Finalize(model, [.. decisive]);
+                        trace.steps.Add($"Category: no exact class code match, but {looseCandidates.Count} installed model(s) share the same platform+engine-type category ('{looseKey}'). {preferDetail}");
+                        Finalize(model, [MatchAttribute.ClassCode, .. decisiveSignals]);
                         return (model, type, trace);
                     }
 
