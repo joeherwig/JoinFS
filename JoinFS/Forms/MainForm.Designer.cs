@@ -189,8 +189,9 @@
             // dynamic repositioning that keeps it glued to that row under NO_CREATE/NO_JOIN)
             //
             this.Button_FlightPlan.Location = new System.Drawing.Point(8, 112);
+            // width/gap chosen so Button_SimBrief lines up with Button_Create/Button_Join's column (x=214, width=57)
             this.Button_FlightPlan.Name = "Button_FlightPlan";
-            this.Button_FlightPlan.Size = new System.Drawing.Size(213, 25);
+            this.Button_FlightPlan.Size = new System.Drawing.Size(198, 25);
             this.Button_FlightPlan.TabIndex = 30;
             this.Button_FlightPlan.Text = "Flight plan";
             this.Button_FlightPlan.UseVisualStyleBackColor = true;
@@ -201,9 +202,9 @@
             this.Button_SimBrief.BackColor = System.Drawing.Color.FromArgb(79, 79, 79);
             this.Button_SimBrief.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.Button_SimBrief.ImageAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            this.Button_SimBrief.Location = new System.Drawing.Point(227, 112);
+            this.Button_SimBrief.Location = new System.Drawing.Point(214, 112);
             this.Button_SimBrief.Name = "Button_SimBrief";
-            this.Button_SimBrief.Size = new System.Drawing.Size(44, 25);
+            this.Button_SimBrief.Size = new System.Drawing.Size(57, 25);
             this.Button_SimBrief.TabIndex = 31;
             this.Button_SimBrief.UseVisualStyleBackColor = false;
             this.Button_SimBrief.Click += new System.EventHandler(this.Button_SimBrief_Click);

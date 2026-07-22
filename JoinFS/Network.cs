@@ -1681,10 +1681,10 @@ namespace JoinFS
             message.Write(simObject.simTime);
             // add position and velocity
             Sim.Write(message, ref positionVelocity);
-#if FS2024
+            // livery/ICAO type/airline - unconditional; livery is only ever populated on FS2024 (the
+            // only sim that reports a real livery name via SimConnect), but other builds still relay
+            // whatever a peer sends them, same reasoning as ICAO data mattering for FS2020 too
             message.Write(simObject.ownerLivery);
-#endif
-            // ICAO type/airline - unconditional, ICAO data matters for FS2020 too
             message.Write(simObject is Sim.Aircraft aircraftObj ? aircraftObj.flightPlan.icaoType : "");
             message.Write(simObject is Sim.Aircraft aircraftObj2 ? aircraftObj2.flightPlan.icaoAirline : "");
         }
@@ -1718,10 +1718,10 @@ namespace JoinFS
             message.Write(netTime);
             // add position and velocity
             Sim.Write(message, ref aircraftPosition);
-#if FS2024
+            // livery/ICAO type/airline - unconditional; livery is only ever populated on FS2024 (the
+            // only sim that reports a real livery name via SimConnect), but other builds still relay
+            // whatever a peer sends them, same reasoning as ICAO data mattering for FS2020 too
             message.Write(aircraft.ownerLivery);
-#endif
-            // ICAO type/airline - unconditional, ICAO data matters for FS2020 too
             message.Write(aircraft.flightPlan.icaoType);
             message.Write(aircraft.flightPlan.icaoAirline);
             // registration/flight number - appended at the end so older peers (which stop reading after
@@ -3094,16 +3094,10 @@ namespace JoinFS
                                     Sim.Read(dataVersion, reader, ref positionVelocity);
 
                                     // update position and velocity
-#if FS2024
                                     string variation = (reader.PeekChar() != -1) ? reader.ReadString() : "";
-#endif
                                     string icaoType = (reader.PeekChar() != -1) ? reader.ReadString() : "";
                                     string icaoAirline = (reader.PeekChar() != -1) ? reader.ReadString() : "";
-#if FS2024
                                     Sim.Obj simObject = main.sim?.UpdateObject(nuid, netId, model, variation, icaoType, icaoAirline, typerole, netTime, ref positionVelocity);
-#else
-                                    Sim.Obj simObject = main.sim ?. UpdateObject(nuid, netId, model, icaoType, icaoAirline, typerole, netTime, ref positionVelocity);
-#endif
 
                                     // check for object
                                     if (simObject != null)
@@ -3172,18 +3166,12 @@ namespace JoinFS
                                             // get nickname
                                             string nickname = user ? main.network.GetNodeName(nuid) : "";
                                             // update position and velocity
-#if FS2024
                                             string variation = (reader.PeekChar() != -1) ? reader.ReadString() : "";
-#endif
                                             string icaoType = (reader.PeekChar() != -1) ? reader.ReadString() : "";
                                             string icaoAirline = (reader.PeekChar() != -1) ? reader.ReadString() : "";
                                             string registration = (reader.PeekChar() != -1) ? reader.ReadString() : "";
                                             string flightNumber = (reader.PeekChar() != -1) ? reader.ReadString() : "";
-#if FS2024
                                             Sim.Aircraft aircraft = main.sim?.UpdateAircraft(nuid, netId, user, plane, callsign, registration, nickname, model, variation, icaoType, icaoAirline, flightNumber, typerole, netTime, ref aircraftPosition);
-#else
-                                            Sim.Aircraft aircraft = main.sim ?. UpdateAircraft(nuid, netId, user, plane, callsign, registration, nickname, model, icaoType, icaoAirline, flightNumber, typerole, netTime, ref aircraftPosition);
-#endif
                                             // check for aircraft
                                             if (aircraft != null)
                                             {

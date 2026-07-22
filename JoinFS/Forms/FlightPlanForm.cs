@@ -67,8 +67,8 @@ namespace JoinFS
                 // initialize form
                 Text_Callsign.Text = plan.callsign;
                 Text_Type.Text = plan.icaoType;
-                Text_From.Text = plan.departure;
-                Text_To.Text = plan.destination;
+                Text_From.Text = plan.departure.ToUpperInvariant();
+                Text_To.Text = plan.destination.ToUpperInvariant();
                 Combo_Rules.Items.Add("VFR");
                 Combo_Rules.Items.Add("IFR");
                 Combo_Rules.SelectedIndex = plan.rules == "IFR" ? 1 : 0;
@@ -115,8 +115,8 @@ namespace JoinFS
                     // pre-fill the dialog only - nothing is committed to plan/broadcast until OK is clicked
                     Text_Callsign.Text = imported.callsign;
                     Text_Type.Text = imported.icaoType;
-                    Text_From.Text = imported.departure;
-                    Text_To.Text = imported.destination;
+                    Text_From.Text = imported.departure.ToUpperInvariant();
+                    Text_To.Text = imported.destination.ToUpperInvariant();
                     Combo_Rules.SelectedIndex = imported.rules == "IFR" ? 1 : 0;
                     Text_Route.Text = imported.route;
                     Text_Remarks.Text = imported.remarks;

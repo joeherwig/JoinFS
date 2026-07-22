@@ -5,6 +5,7 @@ using System.Windows.Forms;
 #endif
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Diagnostics;
 using System.IO;
 using System.Drawing;
@@ -986,6 +987,7 @@ namespace JoinFS
         volatile bool scheduleSubstitutionClear = false;
         volatile bool scheduleHeightAdjustmentLoad = false;
         volatile bool scheduleHeightAdjustmentSave = false;
+        volatile bool substitutionLoadRunning = false;
 
         /// <summary>
         /// Schedule substitution load
@@ -1088,19 +1090,34 @@ namespace JoinFS
                         scheduleSubstitutionClear = false;
                     }
 
-                    // check for scheduled model load
-                    if (scheduleSubstitutionLoad)
+                    // check for scheduled model load - dispatched to its own background thread
+                    // rather than run inline here, since Load()/Scan() can take many seconds
+                    // (network fetches plus a full aircraft.cfg directory walk) and running it
+                    // inside this lock would stall network/sim processing for the rest of DoWork,
+                    // and block the UI thread's periodic refresh timers, which take the same lock
+                    if (scheduleSubstitutionLoad && !substitutionLoadRunning)
                     {
-                        // load model matching
-                        substitution?.Load();
-                        // reset
+                        // reset immediately so we don't dispatch this twice
                         scheduleSubstitutionLoad = false;
-                        // Load() calls Scan() when settingsScan is true, and Scan() calls Match()
-                        // If Scan() was not called, we need to call Match() to load matching data from file
-                        if (!settingsScan)
+                        substitutionLoadRunning = true;
+                        Task.Run(() =>
                         {
-                            scheduleSubstitutionMatch = true;
-                        }
+                            try
+                            {
+                                // load model matching
+                                substitution?.Load();
+                            }
+                            finally
+                            {
+                                substitutionLoadRunning = false;
+                            }
+                            // Load() calls Scan() when settingsScan is true, and Scan() calls Match()
+                            // If Scan() was not called, we need to call Match() to load matching data from file
+                            if (!settingsScan)
+                            {
+                                scheduleSubstitutionMatch = true;
+                            }
+                        });
                     }
 
                     // check for scheduled model match

@@ -718,9 +718,7 @@ namespace JoinFS
             public uint netId = uint.MaxValue;
             public uint simId = uint.MaxValue;
             public string ownerModel = "";
-#if FS2024
             public string ownerLivery = "";
-#endif
             public string ownerIcaoType = "";
             public string ownerIcaoAirline = "";
             public Substitution.Model subModel = null;
@@ -758,10 +756,7 @@ namespace JoinFS
             public bool takeControl = false;
 
             public string ModelTitle { get { return subModel != null ? subModel.title : ownerModel; } }
-
-#if FS2024
             public string ModelLivery { get { return subModel != null ? subModel.variation : ownerLivery; } }
-#endif
 
             /// <summary>
             /// Object position
@@ -875,11 +870,7 @@ namespace JoinFS
             // update match
             if (obj.Injected)
             {
-#if FS2024
                 UpdateObject(obj, obj.ownerModel, obj.ownerLivery, obj.ownerIcaoType, obj.ownerIcaoAirline, obj.typerole);
-#else
-                UpdateObject(obj, obj.ownerModel, obj.ownerIcaoType, obj.ownerIcaoAirline, obj.typerole);
-#endif
             }
         }
 
@@ -1175,23 +1166,20 @@ namespace JoinFS
         /// Update the model for an object
         /// </summary>
         /// <param name="model"></param>
-#if FS2024
         public async void UpdateObject(Obj obj, string model, string livery, string icaoType, string icaoAirline, int typerole)
-#else
-        public async void UpdateObject(Obj obj, string model, string icaoType, string icaoAirline, int typerole)
-#endif
         {
             obj.typerole = typerole;
             // update model
             obj.ownerModel = model;
             obj.ownerIcaoType = icaoType;
             obj.ownerIcaoAirline = icaoAirline;
-#if FS2024
             obj.ownerLivery = livery;
-            // model match
+#if FS2024
+            // model match - livery is only meaningful as a matching signal on FS2024, which is the
+            // only sim that reports a real livery name via SimConnect; other builds still carry the
+            // value through (e.g. for network relay) even though they can never populate it locally
             (obj.subModel, obj.subType, obj.subTrace) = await main.substitution?.Match(obj.ownerModel, obj.ownerLivery, obj.ownerIcaoType, obj.ownerIcaoAirline, obj.typerole, (obj as Aircraft)?.flightPlan.registration ?? "");
 #else
-            // model match
             (obj.subModel, obj.subType, obj.subTrace) = await main.substitution ?. Match(obj.ownerModel, obj.ownerIcaoType, obj.ownerIcaoAirline, obj.typerole, (obj as Aircraft)?.flightPlan.registration ?? "");
 #endif
             // reset failed flag
@@ -1336,11 +1324,7 @@ namespace JoinFS
         /// <param name="ownerGuid">Owner of the object</param>
         /// <param name="netId">Owner's sim ID</param>
         /// <param name="engine">Aircraft engine</param>
-#if FS2024
         public Obj UpdateObject(LocalNode.Nuid ownerNuid, uint netId, string model, string livery, string icaoType, string icaoAirline, int typerole, double netTime, ref ObjectPositionVelocity positionVelocity)
-#else
-        public Obj UpdateObject(LocalNode.Nuid ownerNuid, uint netId, string model, string icaoType, string icaoAirline, int typerole, double netTime, ref ObjectPositionVelocity positionVelocity)
-#endif
         {
             // get object
             Obj obj = objectList.Find(o => o.ownerNuid == ownerNuid && o.netId == netId);
@@ -1353,11 +1337,7 @@ namespace JoinFS
                     expireTime = main.ElapsedTime + OBJECT_EXPIRE_TIME
                 };
                 // model
-#if FS2024
                 UpdateObject(obj, model, livery, icaoType, icaoAirline, typerole);
-#else
-                UpdateObject(obj, model, icaoType, icaoAirline, typerole);
-#endif
                 // update position and velocity
                 UpdateObject(obj, netTime, ref positionVelocity);
                 // create variables
@@ -1709,11 +1689,7 @@ namespace JoinFS
             /// </summary>
             /// <param name="simId">SimConnect ID</param>
             /// <param name="simInfo">SimConnect aircraft</param>
-#if FS2024
             public Aircraft(uint simId, string callsign, string icaoType, string model, string livery, string icaoAirline, bool isUser)
-#else
-            public Aircraft(uint simId, string callsign, string icaoType, string model, bool isUser)
-#endif
             {
                 // set sim ID
                 this.simId = simId;
@@ -1725,8 +1701,8 @@ namespace JoinFS
                 flightPlan.registration = callsign;
                 flightPlan.icaoType = icaoType;
                 ownerModel = model;
-#if FS2024
                 ownerLivery = livery;
+#if FS2024
                 flightPlan.icaoAirline = icaoAirline;
 #endif
                 subModel = null;
@@ -1801,22 +1777,13 @@ namespace JoinFS
         /// </summary>
         public class Plane : Aircraft
         {
-            
-#if FS2024
+
             /// <summary>
             /// Constructor
             /// </summary>
             /// <param name="simId">SimConnect ID</param>
             /// <param name="simInfo">SimConnect aircraft</param>
             public Plane(uint simId, string callsign, string type, string model, string livery, string icaoAirline, bool isUser) : base(simId, callsign, type, model, livery, icaoAirline, isUser) { }
-#else
-            /// <summary>
-            /// Constructor
-            /// </summary>
-            /// <param name="simId">SimConnect ID</param>
-            /// <param name="simInfo">SimConnect aircraft</param>
-            public Plane(uint simId, string callsign, string type, string model, bool isUser) : base(simId, callsign, type, model, isUser) { }
-#endif
 
             /// <summary>
             /// Constructor
@@ -1832,21 +1799,12 @@ namespace JoinFS
         public class Helicopter : Aircraft
         {
 
-#if FS2024
             /// <summary>
             /// Constructor
             /// </summary>
             /// <param name="simId">SimConnect ID</param>
             /// <param name="simInfo">SimConnect aircraft</param>
             public Helicopter(uint simId, string callsign, string type, string model, string livery, string icaoAirline, bool isUser) : base(simId, callsign, type, model, livery, icaoAirline, isUser) { }
-#else
-            /// <summary>
-            /// Constructor
-            /// </summary>
-            /// <param name="simId">SimConnect ID</param>
-            /// <param name="simInfo">SimConnect aircraft</param>
-            public Helicopter(uint simId, string callsign, string type, string model, bool isUser) : base(simId, callsign, type, model, isUser) { }
-#endif
 
             /// <summary>
             /// Constructor
@@ -1971,11 +1929,7 @@ namespace JoinFS
         /// <param name="ownerGuid">Owner of the aircraft</param>
         /// <param name="netId">Owner's sim ID</param>
         /// <param name="engine">Aircraft engine</param>
-#if FS2024
         public Aircraft UpdateAircraft(LocalNode.Nuid ownerNuid, uint netId, bool user, bool plane, string callsign, string registration, string nickname, string model, string livery, string icaoType, string icaoAirline, string flightNumber, int typerole, double netTime, ref AircraftPosition aircraftPosition)
-#else
-        public Aircraft UpdateAircraft(LocalNode.Nuid ownerNuid, uint netId, bool user, bool plane, string callsign, string registration, string nickname, string model, string icaoType, string icaoAirline, string flightNumber, int typerole, double netTime, ref AircraftPosition aircraftPosition)
-#endif
         {
             // check for valid aircraft
             if ((objectList.Find(o => o.ownerNuid == ownerNuid && o.netId == netId) is not Aircraft aircraft))
@@ -1997,11 +1951,7 @@ namespace JoinFS
                 aircraft.flightPlan.icaoAirline = icaoAirline;
                 aircraft.flightPlan.flightNumber = flightNumber;
                 // model
-#if FS2024
                 UpdateObject(aircraft, model, livery, icaoType, icaoAirline, typerole);
-#else
-                UpdateObject(aircraft, model, icaoType, icaoAirline, typerole);
-#endif
                 // create variables
                 CreateModelVariables(aircraft);
                 // add aircraft
@@ -3335,7 +3285,7 @@ namespace JoinFS
                 // check category
                 switch (0)
                 {
-                    case 0: obj = new Plane(simId, callsign, icaoType, model, user); break;
+                    case 0: obj = new Plane(simId, callsign, icaoType, model, "", "", user); break;
 //                    default: obj = new Obj(msg.simId, msg.model); break;
                 }
                 // substitution
@@ -3543,7 +3493,7 @@ namespace JoinFS
                                                 } else
                                                 {
 #if !FS2024
-                                                    obj = new Plane(objectId, callsign, type, model, info.isUser != 0);
+                                                    obj = new Plane(objectId, callsign, type, model, "", "", info.isUser != 0);
 #endif
                                                 }
                                                 break;
@@ -3558,7 +3508,7 @@ namespace JoinFS
                                                 } else
                                                 {
 #if !FS2024
-                                                    obj = new Helicopter(objectId, callsign, type, model, info.isUser != 0);
+                                                    obj = new Helicopter(objectId, callsign, type, model, "", "", info.isUser != 0);
 #endif
                                                 }
                                                 break;
@@ -3585,8 +3535,10 @@ namespace JoinFS
                                     {
                                         // set user aircraft
                                         userAircraft = obj as Aircraft;
-                                        // set flight plan
-                                        userFlightPlan = userAircraft.flightPlan;
+                                        // the aircraft adopts the existing userFlightPlan object (not the other way
+                                        // around) so anything already fetched into it - e.g. SimBrief on startup,
+                                        // which can complete before the sim even reports this aircraft - survives
+                                        userAircraft.flightPlan = userFlightPlan;
                                     }
 
                                     // check for aircraft
@@ -5015,7 +4967,7 @@ namespace JoinFS
                     if (creatingObject.simId != uint.MaxValue)
                     {
                         // update model
-                        UpdateObject(creatingObject, creatingObject.ownerModel, creatingObject.ownerIcaoType, creatingObject.ownerIcaoAirline, creatingObject.typerole);
+                        UpdateObject(creatingObject, creatingObject.ownerModel, creatingObject.ownerLivery, creatingObject.ownerIcaoType, creatingObject.ownerIcaoAirline, creatingObject.typerole);
                         // create variables
                         CreateModelVariables(creatingObject);
                         // check for aircraft
@@ -5041,11 +4993,7 @@ namespace JoinFS
                         // set timer
                         creatingObjectExpireTime = main.ElapsedTime + NEW_OBJECT_EXPIRE_TIME;
                         // update model
-#if FS2024
                         UpdateObject(creatingObject, creatingObject.ownerModel, creatingObject.ownerLivery, creatingObject.ownerIcaoType, creatingObject.ownerIcaoAirline, creatingObject.typerole);
-#else
-                        UpdateObject(creatingObject, creatingObject.ownerModel, creatingObject.ownerIcaoType, creatingObject.ownerIcaoAirline, creatingObject.typerole);
-#endif
                         // check for aircraft
                         if (creatingObject is Aircraft)
                         {
