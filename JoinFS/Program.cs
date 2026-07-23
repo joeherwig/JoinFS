@@ -753,6 +753,54 @@ namespace JoinFS
                 network = new Network(this);
 #if !SERVER
                 substitution = new Substitution(this);
+
+                // try to resolve the simulator folder from the simulator's own recorded
+                // install location before ever asking the user - see SimPathDetector
+#if FS2020
+                if (substitution.EnsureFoldersConfigured("Microsoft Flight Simulator 2020", out string fs2020SimName) == false)
+                {
+                    scheduleSimFolderPrompt = true;
+                    pendingSimFolderName = fs2020SimName;
+                }
+                // no eager scan here - the FS2020 addons list isn't loaded until the sim connects
+#elif FS2024
+                if (substitution.EnsureFoldersConfigured("Microsoft Flight Simulator 2024", out string fs2024SimName) == false)
+                {
+                    scheduleSimFolderPrompt = true;
+                    pendingSimFolderName = fs2024SimName;
+                }
+                // no eager scan here - FS2024 community models come from a live SimConnect request
+#elif FSX
+                if (substitution.EnsureFoldersConfigured("Microsoft Flight Simulator X", out string fsxSimName))
+                {
+                    substitution.Scan(false, fsxSimName);
+                }
+                else
+                {
+                    scheduleSimFolderPrompt = true;
+                    pendingSimFolderName = fsxSimName;
+                }
+#elif P3D
+                if (substitution.EnsureFoldersConfigured("Prepar3D v5", out string p3dSimName))
+                {
+                    substitution.Scan(false, p3dSimName);
+                }
+                else
+                {
+                    scheduleSimFolderPrompt = true;
+                    pendingSimFolderName = p3dSimName;
+                }
+#elif XPLANE
+                if (substitution.EnsureFoldersConfigured("X-Plane", out string xplaneSimName))
+                {
+                    substitution.Scan(false, xplaneSimName);
+                }
+                else
+                {
+                    scheduleSimFolderPrompt = true;
+                    pendingSimFolderName = xplaneSimName;
+                }
+#endif
 #endif
                 recorder = new Recorder(this);
                 addressBook = new AddressBook(this);
@@ -1229,6 +1277,8 @@ namespace JoinFS
         public volatile bool scheduleFlightPlan = false;
         public volatile bool scheduleScanForModels = false;
         public volatile bool scheduleAskPlugin = false;
+        public volatile bool scheduleSimFolderPrompt = false;
+        public volatile string pendingSimFolderName = null;
 
         /// <summary>
         /// Show message to the user
