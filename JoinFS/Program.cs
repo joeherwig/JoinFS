@@ -5,6 +5,7 @@ using System.Windows.Forms;
 #endif
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Diagnostics;
 using System.IO;
 using System.Drawing;
@@ -752,6 +753,54 @@ namespace JoinFS
                 network = new Network(this);
 #if !SERVER
                 substitution = new Substitution(this);
+
+                // try to resolve the simulator folder from the simulator's own recorded
+                // install location before ever asking the user - see SimPathDetector
+#if FS2020
+                if (substitution.EnsureFoldersConfigured("Microsoft Flight Simulator 2020", out string fs2020SimName) == false)
+                {
+                    scheduleSimFolderPrompt = true;
+                    pendingSimFolderName = fs2020SimName;
+                }
+                // no eager scan here - the FS2020 addons list isn't loaded until the sim connects
+#elif FS2024
+                if (substitution.EnsureFoldersConfigured("Microsoft Flight Simulator 2024", out string fs2024SimName) == false)
+                {
+                    scheduleSimFolderPrompt = true;
+                    pendingSimFolderName = fs2024SimName;
+                }
+                // no eager scan here - FS2024 community models come from a live SimConnect request
+#elif FSX
+                if (substitution.EnsureFoldersConfigured("Microsoft Flight Simulator X", out string fsxSimName))
+                {
+                    substitution.Scan(false, fsxSimName);
+                }
+                else
+                {
+                    scheduleSimFolderPrompt = true;
+                    pendingSimFolderName = fsxSimName;
+                }
+#elif P3D
+                if (substitution.EnsureFoldersConfigured("Prepar3D v5", out string p3dSimName))
+                {
+                    substitution.Scan(false, p3dSimName);
+                }
+                else
+                {
+                    scheduleSimFolderPrompt = true;
+                    pendingSimFolderName = p3dSimName;
+                }
+#elif XPLANE
+                if (substitution.EnsureFoldersConfigured("X-Plane", out string xplaneSimName))
+                {
+                    substitution.Scan(false, xplaneSimName);
+                }
+                else
+                {
+                    scheduleSimFolderPrompt = true;
+                    pendingSimFolderName = xplaneSimName;
+                }
+#endif
 #endif
                 recorder = new Recorder(this);
                 addressBook = new AddressBook(this);
@@ -760,6 +809,15 @@ namespace JoinFS
                 notes = new Notes(this);
                 stats = new Stats();
                 variableMgr = new VariableMgr(this);
+
+#if !CONSOLE
+                // fetch the pilot's SimBrief flight plan on startup if a username is already saved -
+                // this is a cloud API call independent of the simulator, so it doesn't need to wait for a connection
+                if (string.IsNullOrWhiteSpace(Settings.Default.SimBriefUsername) == false)
+                {
+                    _ = sim.RefreshUserFlightPlanFromSimBriefAsync();
+                }
+#endif
 
                 // check for specified sim folder
                 if (simFolder.Length > 0)
@@ -977,6 +1035,7 @@ namespace JoinFS
         volatile bool scheduleSubstitutionClear = false;
         volatile bool scheduleHeightAdjustmentLoad = false;
         volatile bool scheduleHeightAdjustmentSave = false;
+        volatile bool substitutionLoadRunning = false;
 
         /// <summary>
         /// Schedule substitution load
@@ -1079,19 +1138,34 @@ namespace JoinFS
                         scheduleSubstitutionClear = false;
                     }
 
-                    // check for scheduled model load
-                    if (scheduleSubstitutionLoad)
+                    // check for scheduled model load - dispatched to its own background thread
+                    // rather than run inline here, since Load()/Scan() can take many seconds
+                    // (network fetches plus a full aircraft.cfg directory walk) and running it
+                    // inside this lock would stall network/sim processing for the rest of DoWork,
+                    // and block the UI thread's periodic refresh timers, which take the same lock
+                    if (scheduleSubstitutionLoad && !substitutionLoadRunning)
                     {
-                        // load model matching
-                        substitution?.Load();
-                        // reset
+                        // reset immediately so we don't dispatch this twice
                         scheduleSubstitutionLoad = false;
-                        // Load() calls Scan() when settingsScan is true, and Scan() calls Match()
-                        // If Scan() was not called, we need to call Match() to load matching data from file
-                        if (!settingsScan)
+                        substitutionLoadRunning = true;
+                        Task.Run(() =>
                         {
-                            scheduleSubstitutionMatch = true;
-                        }
+                            try
+                            {
+                                // load model matching
+                                substitution?.Load();
+                            }
+                            finally
+                            {
+                                substitutionLoadRunning = false;
+                            }
+                            // Load() calls Scan() when settingsScan is true, and Scan() calls Match()
+                            // If Scan() was not called, we need to call Match() to load matching data from file
+                            if (!settingsScan)
+                            {
+                                scheduleSubstitutionMatch = true;
+                            }
+                        });
                     }
 
                     // check for scheduled model match
@@ -1203,6 +1277,8 @@ namespace JoinFS
         public volatile bool scheduleFlightPlan = false;
         public volatile bool scheduleScanForModels = false;
         public volatile bool scheduleAskPlugin = false;
+        public volatile bool scheduleSimFolderPrompt = false;
+        public volatile string pendingSimFolderName = null;
 
         /// <summary>
         /// Show message to the user

@@ -32,6 +32,11 @@ namespace JoinFS
         System.Windows.Forms.Timer refreshCommsTimer = new();
 
         /// <summary>
+        /// Tooltip for Button_FlightPlan, whose text changes with the current flight plan
+        /// </summary>
+        readonly ToolTip flightPlanTip = new() { ShowAlways = true, IsBalloon = true, AutomaticDelay = 2000 };
+
+        /// <summary>
         /// Has the current recording been saved
         /// </summary>
         public bool unsaved = false;
@@ -66,6 +71,8 @@ namespace JoinFS
                 Button_Network.Location = new Point(Button_Network.Location.X, Button_Network.Location.Y - 24);
                 Button_Simulator.Location = new Point(Button_Simulator.Location.X, Button_Simulator.Location.Y - 24);
                 Button_Global.Location = new Point(Button_Global.Location.X, Button_Global.Location.Y - 24);
+                Button_FlightPlan.Location = new Point(Button_FlightPlan.Location.X, Button_FlightPlan.Location.Y - 24);
+                Button_SimBrief.Location = new Point(Button_SimBrief.Location.X, Button_SimBrief.Location.Y - 24);
                 Size = new Size(Size.Width, Size.Height - 44);
 #endif
 
@@ -75,6 +82,8 @@ namespace JoinFS
                 Button_Network.Location = new Point(Button_Network.Location.X, Button_Network.Location.Y - 26);
                 Button_Simulator.Location = new Point(Button_Simulator.Location.X, Button_Simulator.Location.Y - 26);
                 Button_Global.Location = new Point(Button_Global.Location.X, Button_Global.Location.Y - 26);
+                Button_FlightPlan.Location = new Point(Button_FlightPlan.Location.X, Button_FlightPlan.Location.Y - 26);
+                Button_SimBrief.Location = new Point(Button_SimBrief.Location.X, Button_SimBrief.Location.Y - 26);
                 Button_Network.Size = new Size(Button_Network.Width, Button_Network.Height + 4);
                 Button_Simulator.Size = new Size(Button_Simulator.Width, Button_Simulator.Height + 4);
                 Button_Global.Size = new Size(Button_Global.Width, Button_Global.Height + 4);
@@ -682,18 +691,20 @@ namespace JoinFS
 #endif
 
 #if !SERVER
-            // check for scheduled nickname
-            if (main.scheduleNickname)
+            // check for scheduled first-time setup (nickname and/or simulator folder)
+            if (main.scheduleNickname || main.scheduleSimFolderPrompt)
             {
-                // reset flag
+                // reset flags
                 main.scheduleNickname = false;
-                // request nickname
-                NicknameForm nicknameForm = new(main);
-                // obtain nickname
-                if (nicknameForm.ShowDialog() == DialogResult.OK)
+                bool folderWasRequested = main.scheduleSimFolderPrompt;
+                main.scheduleSimFolderPrompt = false;
+                // request initial setup
+                InitialSetupForm initialSetupForm = new(main, folderWasRequested);
+                // obtain nickname, SimBrief username and (if needed) simulator folder
+                if (initialSetupForm.ShowDialog() == DialogResult.OK)
                 {
                     // get nickname
-                    main.settingsNickname = nicknameForm.nickname.TrimStart(' ').TrimEnd(' ');
+                    main.settingsNickname = initialSetupForm.nickname.TrimStart(' ').TrimEnd(' ');
                     // check for minimum length
                     if (main.settingsNickname.Length < 2)
                     {
@@ -702,6 +713,30 @@ namespace JoinFS
                     }
                     // get nickname
                     Settings.Default.Nickname = main.settingsNickname;
+
+                    // get SimBrief username
+                    Settings.Default.SimBriefUsername = initialSetupForm.simBriefUsername;
+
+                    // fetch the flight plan right away instead of waiting for the next app
+                    // restart's opportunistic check (Program.cs) or a manual button click -
+                    // that check already ran before this username existed, so without this
+                    // the SimBrief button would sit on its default "not fetched yet" (red X)
+                    // state until the user notices and clicks it themselves
+                    if (initialSetupForm.simBriefUsername.Length > 0)
+                    {
+                        _ = main.sim.RefreshUserFlightPlanFromSimBriefAsync();
+                    }
+
+                    // check if the simulator folder was asked for and provided
+                    if (folderWasRequested && initialSetupForm.simulatorFolder.Length > 0 && main.substitution != null)
+                    {
+                        // save the manually-picked folder, independent of sim connection
+                        main.substitution.SaveManualFolder(main.pendingSimFolderName, initialSetupForm.simulatorFolder);
+#if FSX || P3D || XPLANE
+                        // pure folder scan for these builds - run it right away
+                        main.substitution.Scan(false, main.pendingSimFolderName);
+#endif
+                    }
                 }
             }
 
@@ -883,6 +918,7 @@ namespace JoinFS
 
                 RefreshSim();
                 RefreshNetwork();
+                RefreshFlightPlanButtons();
             }
 
             // refresh is no longer active
@@ -1079,7 +1115,11 @@ namespace JoinFS
                 tip.SetToolTip(Button_Network, Resources.Strings.Tip_NetworkButton);
                 tip.SetToolTip(Button_Simulator, Resources.Strings.Tip_SimulatorButton);
                 tip.SetToolTip(StatusStrip_Main, Resources.Strings.Tip_Status);
+                tip.SetToolTip(Button_SimBrief, "Use SimBrief data as the flight-plan source and re-fetch it now");
             }
+
+            // initial flight-plan button state
+            RefreshFlightPlanButtons();
 
             // refresh address book
             RefreshComboList();
@@ -1503,6 +1543,156 @@ namespace JoinFS
         {
             main.ToggleSimulator();
             RefreshSim();
+        }
+
+        /// <summary>
+        /// Update the flight-plan summary button and SimBrief badge to reflect the current flight plan/source
+        /// </summary>
+        void RefreshFlightPlanButtons()
+        {
+            if (main.sim == null)
+            {
+                return;
+            }
+
+            Sim.FlightPlan plan = main.sim.userFlightPlan;
+            bool hasPlan = plan.departure.Length > 0 || plan.destination.Length > 0;
+
+            Button_FlightPlan.Text = hasPlan ? plan.departure + "   ➜   " + plan.destination : "Flight plan";
+
+            if (Settings.Default.ToolTips)
+            {
+                string tooltip;
+                if (hasPlan)
+                {
+                    tooltip = plan.callsign + "   " + plan.rules + "   " + plan.icaoType + "\n" +
+                              plan.departure + " ➜ " + plan.destination + (plan.alternate.Length > 0 ? "   ALTN " + plan.alternate : "") + "\n" +
+                              "ROUTE: " + plan.route +
+                              (plan.remarks.Length > 0 ? "\nRMK: " + plan.remarks : "");
+                }
+                else
+                {
+                    tooltip = "Click to create your flight plan, if you'd like to have one assigned.";
+                }
+                flightPlanTip.SetToolTip(Button_FlightPlan, tooltip);
+            }
+
+            Button_SimBrief.Image = GetSimBriefIcon(main.sim.simBriefLastFetchSucceeded);
+        }
+
+        Bitmap simBriefIconCache;
+        bool? simBriefIconCacheOk;
+
+        /// <summary>
+        /// Composite the SimBrief document icon with a green check / red cross status badge in the
+        /// lower-right corner. Cached and only rebuilt when the fetch status actually changes.
+        /// </summary>
+        Bitmap GetSimBriefIcon(bool ok)
+        {
+            if (simBriefIconCache != null && simBriefIconCacheOk == ok)
+            {
+                return simBriefIconCache;
+            }
+
+            simBriefIconCache?.Dispose();
+
+            const int size = 28;
+            Bitmap composited = new(size, size);
+            using (Graphics g = Graphics.FromImage(composited))
+            {
+                g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                g.DrawImage(Properties.Resources.SimBriefIcon, 0, 0, size, size);
+
+                Rectangle badgeRect = new(size - 11, size - 11, 10, 10);
+                Color badgeColor = ok ? Color.FromArgb(46, 204, 64) : Color.FromArgb(224, 64, 58);
+                using (Brush badgeBrush = new SolidBrush(badgeColor))
+                {
+                    g.FillEllipse(badgeBrush, badgeRect);
+                }
+                using (Pen badgeOutline = new(Color.White, 1))
+                {
+                    g.DrawEllipse(badgeOutline, badgeRect);
+                }
+                using (Font badgeFont = new("Segoe UI", 6f, FontStyle.Bold))
+                using (Brush textBrush = new SolidBrush(Color.White))
+                {
+                    string glyph = ok ? "✓" : "✕";
+                    SizeF textSize = g.MeasureString(glyph, badgeFont);
+                    g.DrawString(glyph, badgeFont, textBrush,
+                        badgeRect.X + (badgeRect.Width - textSize.Width) / 2,
+                        badgeRect.Y + (badgeRect.Height - textSize.Height) / 2);
+                }
+            }
+
+            simBriefIconCache = composited;
+            simBriefIconCacheOk = ok;
+            return composited;
+        }
+
+        void CommitUserFlightPlanChange()
+        {
+            // bump flight plan version, same as the scheduled flight-plan-form flow
+            if (main.sim.userAircraft != null)
+            {
+                main.sim.userAircraft.flightPlanVersion++;
+                if (main.sim.userAircraft.flightPlanVersion == 0) main.sim.userAircraft.flightPlanVersion = 1;
+            }
+            RefreshFlightPlanButtons();
+        }
+
+        void BroadcastUserFlightPlanNow()
+        {
+            // main-screen source buttons commit and broadcast immediately - no dialog/Save step
+            if (main.sim.userAircraft != null)
+            {
+                main.network.SendFlightPlanMessage(main.network.localNode.GetLocalNuid(), main.sim.userAircraft.netId, main.sim.userFlightPlan);
+            }
+        }
+
+        private void Button_FlightPlan_Click(object sender, EventArgs e)
+        {
+            if (main.sim == null)
+            {
+                return;
+            }
+
+            if (new FlightPlanForm(main, main.sim.userFlightPlan).ShowDialog() == DialogResult.OK)
+            {
+                CommitUserFlightPlanChange();
+            }
+        }
+
+        private async void Button_SimBrief_Click(object sender, EventArgs e)
+        {
+            if (main.sim == null)
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(Settings.Default.SimBriefUsername))
+            {
+                // nothing configured yet - land the pilot on the field where they'd set it
+                if (new FlightPlanForm(main, main.sim.userFlightPlan) { FocusSimBriefUsername = true }.ShowDialog() == DialogResult.OK)
+                {
+                    CommitUserFlightPlanChange();
+                }
+                return;
+            }
+
+            Button_SimBrief.Enabled = false;
+            try
+            {
+                bool ok = await main.sim.RefreshUserFlightPlanFromSimBriefAsync();
+                CommitUserFlightPlanChange();
+                if (ok)
+                {
+                    BroadcastUserFlightPlanNow();
+                }
+            }
+            finally
+            {
+                Button_SimBrief.Enabled = true;
+            }
         }
 
         public void ToggleNetwork()

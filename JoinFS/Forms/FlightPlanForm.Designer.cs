@@ -45,6 +45,11 @@
             this.label7 = new System.Windows.Forms.Label();
             this.Button_Cancel = new System.Windows.Forms.Button();
             this.Button_OK = new System.Windows.Forms.Button();
+            this.label8 = new System.Windows.Forms.Label();
+            this.Text_SimBriefUsername = new System.Windows.Forms.TextBox();
+            this.Button_ImportSimBrief = new System.Windows.Forms.Button();
+            this.Label_SimBriefStatus = new System.Windows.Forms.Label();
+            this.Button_Clear = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // label1
@@ -77,16 +82,18 @@
             // 
             resources.ApplyResources(this.Text_From, "Text_From");
             this.Text_From.Name = "Text_From";
-            // 
+            this.Text_From.CharacterCasing = System.Windows.Forms.CharacterCasing.Upper;
+            //
             // label4
-            // 
+            //
             resources.ApplyResources(this.label4, "label4");
             this.label4.Name = "label4";
-            // 
+            //
             // Text_To
-            // 
+            //
             resources.ApplyResources(this.Text_To, "Text_To");
             this.Text_To.Name = "Text_To";
+            this.Text_To.CharacterCasing = System.Windows.Forms.CharacterCasing.Upper;
             // 
             // label5
             // 
@@ -126,21 +133,79 @@
             this.Button_Cancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
             this.Button_Cancel.Name = "Button_Cancel";
             this.Button_Cancel.UseVisualStyleBackColor = true;
+            // moved down to make room for the SimBrief row below Remarks
+            this.Button_Cancel.Location = new System.Drawing.Point(222, 213);
             // 
             // Button_OK
-            // 
+            //
             resources.ApplyResources(this.Button_OK, "Button_OK");
             this.Button_OK.DialogResult = System.Windows.Forms.DialogResult.OK;
             this.Button_OK.Name = "Button_OK";
             this.Button_OK.UseVisualStyleBackColor = true;
             this.Button_OK.Click += new System.EventHandler(this.Button_OK_Click);
-            // 
+            // moved down to make room for the SimBrief row below Remarks (not resx-driven, no
+            // localized layout exists yet for these new controls)
+            this.Button_OK.Location = new System.Drawing.Point(127, 213);
+            //
+            // label8
+            //
+            this.label8.AutoSize = true;
+            this.label8.Location = new System.Drawing.Point(9, 167);
+            this.label8.Name = "label8";
+            this.label8.Size = new System.Drawing.Size(52, 15);
+            this.label8.TabIndex = 7;
+            this.label8.Text = "SimBrief";
+            //
+            // Text_SimBriefUsername
+            //
+            this.Text_SimBriefUsername.Location = new System.Drawing.Point(74, 164);
+            this.Text_SimBriefUsername.Name = "Text_SimBriefUsername";
+            this.Text_SimBriefUsername.Size = new System.Drawing.Size(140, 23);
+            this.Text_SimBriefUsername.TabIndex = 7;
+            //
+            // Button_ImportSimBrief
+            //
+            this.Button_ImportSimBrief.Location = new System.Drawing.Point(220, 163);
+            this.Button_ImportSimBrief.Name = "Button_ImportSimBrief";
+            this.Button_ImportSimBrief.Size = new System.Drawing.Size(90, 25);
+            this.Button_ImportSimBrief.TabIndex = 8;
+            this.Button_ImportSimBrief.Text = "Import";
+            this.Button_ImportSimBrief.UseVisualStyleBackColor = true;
+            this.Button_ImportSimBrief.Click += new System.EventHandler(this.Button_ImportSimBrief_Click);
+            //
+            // Label_SimBriefStatus
+            //
+            this.Label_SimBriefStatus.AutoSize = true;
+            this.Label_SimBriefStatus.Location = new System.Drawing.Point(9, 192);
+            this.Label_SimBriefStatus.Name = "Label_SimBriefStatus";
+            this.Label_SimBriefStatus.Size = new System.Drawing.Size(305, 15);
+            this.Label_SimBriefStatus.TabIndex = 9;
+            //
+            // Button_Clear
+            // (clears route/remarks/departure/destination only - callsign/type/rules are already
+            // sourced live from the sim and untouched by this)
+            //
+            this.Button_Clear.Location = new System.Drawing.Point(9, 213);
+            this.Button_Clear.Name = "Button_Clear";
+            this.Button_Clear.Size = new System.Drawing.Size(75, 27);
+            this.Button_Clear.TabIndex = 10;
+            this.Button_Clear.Text = "Clear";
+            this.Button_Clear.UseVisualStyleBackColor = true;
+            this.Button_Clear.Click += new System.EventHandler(this.Button_Clear_Click);
+            //
             // FlightPlanForm
-            // 
+            //
             this.AcceptButton = this.Button_OK;
             resources.ApplyResources(this, "$this");
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.CancelButton = this.Button_Cancel;
+            // grown to fit the SimBrief row added below Remarks; overrides the resx-driven size above
+            this.ClientSize = new System.Drawing.Size(323, 253);
+            this.Controls.Add(this.Button_Clear);
+            this.Controls.Add(this.Label_SimBriefStatus);
+            this.Controls.Add(this.Button_ImportSimBrief);
+            this.Controls.Add(this.Text_SimBriefUsername);
+            this.Controls.Add(this.label8);
             this.Controls.Add(this.Button_OK);
             this.Controls.Add(this.Button_Cancel);
             this.Controls.Add(this.label7);
@@ -186,5 +251,10 @@
         private System.Windows.Forms.Label label7;
         private System.Windows.Forms.Button Button_Cancel;
         private System.Windows.Forms.Button Button_OK;
+        private System.Windows.Forms.Label label8;
+        private System.Windows.Forms.TextBox Text_SimBriefUsername;
+        private System.Windows.Forms.Button Button_ImportSimBrief;
+        private System.Windows.Forms.Label Label_SimBriefStatus;
+        private System.Windows.Forms.Button Button_Clear;
     }
 }

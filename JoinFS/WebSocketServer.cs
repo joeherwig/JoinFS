@@ -39,10 +39,11 @@ namespace JoinFS
         struct AircraftSnapshot
         {
             public string callsign, nickname, guid;
+            public string registration, icaoAirline, flightNumber;
             public double altitude, speed, latitude, longitude;
             public int heading;
             public string com1, com2, squawk;
-            public string icaoType, from, to, rules, route, remarks;
+            public string icaoType, from, to, rules, route, remarks, livery;
             public int gear;
             public double flaps;
             public int lightNav, lightBeacon, lightLanding, lightTaxi, lightStrobe;
@@ -172,6 +173,9 @@ namespace JoinFS
             var snap = new AircraftSnapshot();
             snap.guid = main.network.GetNodeGuid(aircraft.ownerNuid).ToString();
             snap.callsign = aircraft.flightPlan.callsign;
+            snap.registration = aircraft.flightPlan.registration;
+            snap.icaoAirline = aircraft.flightPlan.icaoAirline;
+            snap.flightNumber = aircraft.flightPlan.flightNumber;
             snap.nickname = main.network.GetNodeName(aircraft.ownerNuid);
 
             var pos = aircraft.Position;
@@ -193,6 +197,7 @@ namespace JoinFS
             snap.rules    = aircraft.flightPlan.rules;
             snap.route    = aircraft.flightPlan.route;
             snap.remarks  = aircraft.flightPlan.remarks;
+            snap.livery   = aircraft.ModelLivery;
 
             if (aircraft.variableSet != null)
             {
@@ -222,6 +227,9 @@ namespace JoinFS
             var snap = new AircraftSnapshot();
             snap.guid     = user.guid.ToString();
             snap.callsign = user.flightPlan.callsign;
+            snap.registration = user.flightPlan.registration;
+            snap.icaoAirline = user.flightPlan.icaoAirline;
+            snap.flightNumber = user.flightPlan.flightNumber;
             snap.nickname = user.nickname;
             snap.latitude  = user.latitude;
             snap.longitude = user.longitude;
@@ -244,12 +252,13 @@ namespace JoinFS
 
         static bool SnapshotsEqual(in AircraftSnapshot a, in AircraftSnapshot b) =>
             a.callsign == b.callsign && a.nickname == b.nickname &&
+            a.registration == b.registration && a.icaoAirline == b.icaoAirline && a.flightNumber == b.flightNumber &&
             a.altitude == b.altitude && a.speed == b.speed &&
             a.latitude == b.latitude && a.longitude == b.longitude &&
             a.heading == b.heading &&
             a.com1 == b.com1 && a.com2 == b.com2 && a.squawk == b.squawk &&
             a.icaoType == b.icaoType && a.from == b.from && a.to == b.to &&
-            a.rules == b.rules && a.route == b.route && a.remarks == b.remarks &&
+            a.rules == b.rules && a.route == b.route && a.remarks == b.remarks && a.livery == b.livery &&
             a.gear == b.gear && a.flaps == b.flaps &&
             a.lightNav == b.lightNav && a.lightBeacon == b.lightBeacon &&
             a.lightLanding == b.lightLanding && a.lightTaxi == b.lightTaxi && a.lightStrobe == b.lightStrobe &&
@@ -259,6 +268,9 @@ namespace JoinFS
         static object ToJson(in AircraftSnapshot s) => new
         {
             callsign = s.callsign,
+            registration = s.registration,
+            icaoAirline = s.icaoAirline,
+            flightNumber = s.flightNumber,
             nickname = s.nickname,
             guid     = s.guid,
             altitude = Math.Round(s.altitude, 0),
@@ -275,6 +287,7 @@ namespace JoinFS
             rules    = s.rules,
             route    = s.route,
             remarks  = s.remarks,
+            livery   = s.livery,
             gear     = s.gear,
             flaps    = Math.Round(s.flaps, 3),
             lights   = new { nav = s.lightNav, beacon = s.lightBeacon, landing = s.lightLanding, taxi = s.lightTaxi, strobe = s.lightStrobe },
