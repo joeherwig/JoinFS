@@ -3489,9 +3489,10 @@ namespace JoinFS
 #else
                 Add(MatchAttribute.Livery, "", matched?.variation ?? "");
 #endif
-                // sourced from SimConnect's "ATC ID" (tail number) via the aircraft's flight plan - installed
-                // models have no registration of their own, so the Matched side is always blank here
-                Add(MatchAttribute.Registration, registration, "");
+                // requested side is sourced from SimConnect's "ATC ID" (tail number) via the
+                // aircraft's flight plan; matched side is the winning model's scanned aircraft.cfg
+                // atc_id (Model.atcId), when PreferByOperator had one to match against
+                Add(MatchAttribute.Registration, registration, matched?.atcId ?? "");
                 Add(MatchAttribute.IcaoType, icaoType, matched?.icaoType ?? "");
                 Add(MatchAttribute.IcaoAirline, icaoAirline, matched?.icaoAirline ?? "");
                 Add(MatchAttribute.ClassCode, remoteClassCode, matched?.classCode ?? "");
