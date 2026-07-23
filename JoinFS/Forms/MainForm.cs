@@ -691,18 +691,20 @@ namespace JoinFS
 #endif
 
 #if !SERVER
-            // check for scheduled nickname
-            if (main.scheduleNickname)
+            // check for scheduled first-time setup (nickname and/or simulator folder)
+            if (main.scheduleNickname || main.scheduleSimFolderPrompt)
             {
-                // reset flag
+                // reset flags
                 main.scheduleNickname = false;
-                // request nickname
-                NicknameForm nicknameForm = new(main);
-                // obtain nickname
-                if (nicknameForm.ShowDialog() == DialogResult.OK)
+                bool folderWasRequested = main.scheduleSimFolderPrompt;
+                main.scheduleSimFolderPrompt = false;
+                // request initial setup
+                InitialSetupForm initialSetupForm = new(main, folderWasRequested);
+                // obtain nickname, SimBrief username and (if needed) simulator folder
+                if (initialSetupForm.ShowDialog() == DialogResult.OK)
                 {
                     // get nickname
-                    main.settingsNickname = nicknameForm.nickname.TrimStart(' ').TrimEnd(' ');
+                    main.settingsNickname = initialSetupForm.nickname.TrimStart(' ').TrimEnd(' ');
                     // check for minimum length
                     if (main.settingsNickname.Length < 2)
                     {
@@ -711,6 +713,30 @@ namespace JoinFS
                     }
                     // get nickname
                     Settings.Default.Nickname = main.settingsNickname;
+
+                    // get SimBrief username
+                    Settings.Default.SimBriefUsername = initialSetupForm.simBriefUsername;
+
+                    // fetch the flight plan right away instead of waiting for the next app
+                    // restart's opportunistic check (Program.cs) or a manual button click -
+                    // that check already ran before this username existed, so without this
+                    // the SimBrief button would sit on its default "not fetched yet" (red X)
+                    // state until the user notices and clicks it themselves
+                    if (initialSetupForm.simBriefUsername.Length > 0)
+                    {
+                        _ = main.sim.RefreshUserFlightPlanFromSimBriefAsync();
+                    }
+
+                    // check if the simulator folder was asked for and provided
+                    if (folderWasRequested && initialSetupForm.simulatorFolder.Length > 0 && main.substitution != null)
+                    {
+                        // save the manually-picked folder, independent of sim connection
+                        main.substitution.SaveManualFolder(main.pendingSimFolderName, initialSetupForm.simulatorFolder);
+#if FSX || P3D || XPLANE
+                        // pure folder scan for these builds - run it right away
+                        main.substitution.Scan(false, main.pendingSimFolderName);
+#endif
+                    }
                 }
             }
 

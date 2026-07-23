@@ -1148,15 +1148,22 @@ namespace JoinFS
         }
 
         /// <summary>
-        /// Scan simulator folders for models
+        /// Scan simulator folders for models. <paramref name="simulatorNameOverride"/> lets
+        /// this run before the simulator is connected (e.g. right after first-install
+        /// auto-detection), for builds where scanning is pure disk I/O and doesn't
+        /// otherwise depend on a live connection.
         /// </summary>
-        public bool Scan(bool interactive)
+        public bool Scan(bool interactive, string simulatorNameOverride = null)
         {
+            // name to branch on below - the real connected name, unless overridden by a caller
+            // that already knows it (because the sim isn't connected yet)
+            string simulatorName = simulatorNameOverride ?? (main.sim != null ? main.sim.GetSimulatorName() : "");
+
             // check if simulator is not connected
 #if XPLANE || CONSOLE
             if (main.sim != null)
 #else
-            if (main.sim != null && main.sim.Connected)
+            if (main.sim != null && (simulatorNameOverride != null || main.sim.Connected))
 #endif
             {
                 // message
@@ -1206,7 +1213,7 @@ namespace JoinFS
 
                     // we do this for MNSFS2020 only. MSFS2024 delievers the community
                     // models via the simulator as well as the default models
-                    if (main.sim.GetSimulatorName() == "Microsoft Flight Simulator 2020")
+                    if (simulatorName == "Microsoft Flight Simulator 2020")
                     {
                         // add folder to list
                         scanFolders.Add(simFolder);
@@ -1242,7 +1249,7 @@ namespace JoinFS
 #endif
 
                     // check for P3D
-                    if (main.sim.GetSimulatorName().Contains("Prepar3D"))
+                    if (simulatorName.Contains("Prepar3D"))
                     {
                         // create path list
                         List<string> simobjectsList = [];
@@ -1417,7 +1424,7 @@ namespace JoinFS
                                 // search for all aircraft.cfg in SimObjects
                                 SearchForFiles(folder, "aircraft.cfg", pathList, 0);
                                 // not for MSF
-                                if (main.sim.GetSimulatorName() != "Microsoft Flight Simulator 2020")
+                                if (simulatorName != "Microsoft Flight Simulator 2020")
                                 {
                                     // search for all sim.cfg in Rotorcraft
                                     SearchForFiles(folder, "sim.cfg", pathList, 0);
@@ -1581,7 +1588,7 @@ namespace JoinFS
                     // rebuild ICAO indexes now that models[] has been populated by the scan
                     MakeIcaoIndex();
 
-                    if (main.sim.GetSimulatorName() == "Microsoft Flight Simulator 2020")
+                    if (simulatorName == "Microsoft Flight Simulator 2020")
                     {
                         if ((AddonsFileContents[0] != ""))
                         {
@@ -1625,7 +1632,7 @@ namespace JoinFS
                         }
                     }
                     // check for MSFS2024
-                    if (main.sim.GetSimulatorName() == "Microsoft Flight Simulator 2024")
+                    if (simulatorName == "Microsoft Flight Simulator 2024")
                     {
                         // check for initial addons
                         if (initialAddOns.Length > 0)
@@ -2504,25 +2511,135 @@ namespace JoinFS
             if (main.sim != null && main.sim.Connected)
 #endif
             {
-                try
-                {
-                    // folders file
-                    string foldersFile = Path.Combine(main.storagePath, "folders - " + main.sim.GetSimulatorName() + ".txt");
-                    // open models file
-                    StreamWriter writer = new(foldersFile);
-                    // write folders
-                    writer.WriteLine(simFolder);
-                    writer.WriteLine(initialScanFolders);
-                    writer.WriteLine(initialAddOns);
-                    writer.WriteLine(initialAdditionals);
-                    // close file
-                    writer.Close();
-                }
-                catch (Exception ex)
-                {
-                    main.ShowMessage(ex.Message);
-                }
+                WriteFoldersFile(main.sim.GetSimulatorName());
             }
+        }
+
+        /// <summary>
+        /// Write the current folder settings to "folders - &lt;simulatorName&gt;.txt",
+        /// independent of whether the simulator is connected yet.
+        /// </summary>
+        void WriteFoldersFile(string simulatorName)
+        {
+            try
+            {
+                // folders file
+                string foldersFile = Path.Combine(main.storagePath, "folders - " + simulatorName + ".txt");
+                // open models file
+                StreamWriter writer = new(foldersFile);
+                // write folders
+                writer.WriteLine(simFolder);
+                writer.WriteLine(initialScanFolders);
+                writer.WriteLine(initialAddOns);
+                writer.WriteLine(initialAdditionals);
+                // close file
+                writer.Close();
+            }
+            catch (Exception ex)
+            {
+                main.ShowMessage(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// On first install, try to resolve the simulator folder from the simulator's own
+        /// recorded install location (UserCfg.opt / registry / x-plane_install_*.txt)
+        /// instead of requiring the user to browse for it. Safe to call before the
+        /// simulator is connected. Returns true if a folders file now exists (either it
+        /// already did, or detection succeeded and it was just written); false means the
+        /// caller should prompt the user to pick the folder manually.
+        /// </summary>
+        public bool EnsureFoldersConfigured(string fallbackSimulatorName, out string resolvedSimulatorName)
+        {
+            resolvedSimulatorName = fallbackSimulatorName;
+            string detected = null;
+
+#if P3D
+            detected = SimPathDetector.TryDetect(out string detectedVersion);
+            if (detected != null)
+            {
+                resolvedSimulatorName = detectedVersion;
+            }
+#elif FS2020 || FS2024 || FSX || XPLANE
+            detected = SimPathDetector.TryDetect();
+#endif
+
+            // folders file
+            string foldersFile = Path.Combine(main.storagePath, "folders - " + resolvedSimulatorName + ".txt");
+            // check if already configured with a real folder (whether from a previous run,
+            // or manually) - a file can exist but still have a blank first line, e.g. from an
+            // earlier ScanForm session the user opened and left empty, or an older version
+            // that created the file before a folder was ever chosen. Treat that the same as
+            // "not configured" so detection still gets a chance to fill it in.
+            if (File.Exists(foldersFile) && FoldersFileHasFolder(foldersFile))
+            {
+                return true;
+            }
+
+            // check if detection succeeded
+            if (detected != null)
+            {
+                // use the detected folder, with no add-on/additional-folder selection yet
+                simFolder = detected;
+                initialScanFolders = "";
+                initialAddOns = DefaultAddOns();
+                initialAdditionals = "";
+                WriteFoldersFile(resolvedSimulatorName);
+                return true;
+            }
+
+            // caller should prompt the user
+            return false;
+        }
+
+        /// <summary>
+        /// True if a "folders - &lt;sim&gt;.txt" file exists and its first line (simFolder)
+        /// is non-blank.
+        /// </summary>
+        static bool FoldersFileHasFolder(string foldersFile)
+        {
+            try
+            {
+                using StreamReader reader = new(foldersFile);
+                string firstLine = reader.ReadLine();
+                return string.IsNullOrWhiteSpace(firstLine) == false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Save a folder the user picked manually in the first-run setup dialog. Unlike
+        /// <see cref="EnsureFoldersConfigured"/>, this always overwrites, and does not
+        /// require the simulator to be connected.
+        /// </summary>
+        public void SaveManualFolder(string simulatorName, string folder)
+        {
+            simFolder = folder;
+            initialScanFolders = "";
+            initialAddOns = DefaultAddOns();
+            initialAdditionals = "";
+            WriteFoldersFile(simulatorName);
+        }
+
+        /// <summary>
+        /// "My MSFS 2024" isn't a folder at all - it's the checkbox name Scan() looks for
+        /// (Substitution.cs, "check for MSFS2024" branch) to decide whether to ask the
+        /// running sim directly for its aircraft/livery list via SimConnect
+        /// (ScanSimForModels -&gt; main.sim.RequestSimulatorModels()). Without it selected,
+        /// FS2024's community models are never fetched even with a correct folder saved -
+        /// so auto-detection and manual folder entry both need to turn it on by default,
+        /// the same as if the user had ticked it in Scan For Models.
+        /// </summary>
+        static string DefaultAddOns()
+        {
+#if FS2024
+            return "My MSFS 2024";
+#else
+            return "";
+#endif
         }
 
         /// <summary>
