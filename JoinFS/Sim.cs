@@ -253,6 +253,8 @@ namespace JoinFS
 #if FS2024
             [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
             public String livery;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
+            public String liveryFolder;
             [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)]
             public String airline;
 #endif
@@ -3466,12 +3468,26 @@ namespace JoinFS
                                     // convert the long hyphen
                                     model = model.Replace("â€“", "–");
 
-                                    // learn this model's real ICAO type/airline/classCode from SimConnect now that
+                                    // learn this model's real ICAO type/airline/classCode/registration now that
                                     // it's actually instantiated - closes the gap for aircraft a title guess can't
-                                    // tag, and for add-ons whose reported type doesn't match any Doc8643 designator
+                                    // tag, and for add-ons whose reported type doesn't match any Doc8643 designator.
+                                    // Confidence hierarchy (highest first): (1) real aircraft.cfg/livery.cfg data,
+                                    // located via LIVERY FOLDER - FS2024 only, same reliability tier non-FS2024
+                                    // builds already get from their upfront folder scan; (2) DeriveLiveClassCode
+                                    // (category/engine simvars) when no config file can be found/parsed; (3) a
+                                    // title-text guess (handled elsewhere), for a model never yet instantiated.
                                     Substitution.DeriveLiveClassCode(info.category, info.engineType, info.numEngines, out string liveClassCode, out string liveWtc);
 #if FS2024
-                                    string resolvedIcaoAirline = main.substitution?.LearnIcaoFromLiveObject(model, info.livery, type, info.airline, liveClassCode, liveWtc) ?? "";
+                                    string configIcaoType = "", configWtc = "", configIcaoAirline = "", configAtcId = "", configClassCode = "";
+                                    bool configConfirmed = main.substitution != null && main.substitution.TryReadConfigFromLiveryFolder(
+                                        info.liveryFolder, model, out configIcaoType, out configWtc,
+                                        out configIcaoAirline, out configAtcId, out configClassCode);
+                                    string learnIcaoType = configConfirmed ? configIcaoType : type;
+                                    string learnClassCode = configConfirmed ? configClassCode : liveClassCode;
+                                    string learnWtc = configConfirmed && configWtc.Length > 0 ? configWtc : liveWtc;
+                                    string learnIcaoAirline = configConfirmed && configIcaoAirline.Length > 0 ? configIcaoAirline : info.airline;
+                                    string learnAtcId = configConfirmed ? configAtcId : "";
+                                    string resolvedIcaoAirline = main.substitution?.LearnIcaoFromLiveObject(model, info.livery, learnIcaoType, learnIcaoAirline, learnClassCode, learnWtc, learnAtcId, configConfirmed) ?? "";
 #else
                                     string resolvedIcaoAirline = main.substitution?.LearnIcaoFromLiveObject(model, "", type, "", liveClassCode, liveWtc) ?? "";
 #endif

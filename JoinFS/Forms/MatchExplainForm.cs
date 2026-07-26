@@ -49,15 +49,22 @@ namespace JoinFS
             };
         }
 
-        static string ModelSourceDescription()
+        string ModelSourceDescription()
         {
+            string description;
 #if FS2024
-            return "Model source (this build): SimConnect live aircraft/livery enumeration, requested via File ▸ Scan For Models ▸ Scan (or automatically at connect if \"Scan at launch\" is enabled).";
+            description = "Model source (this build): SimConnect live aircraft/livery enumeration, requested via File ▸ Scan For Models ▸ Scan (or automatically at connect if \"Scan at launch\" is enabled).";
 #elif XPLANE
-            return "Model source (this build): X-Plane CSL definitions parsed from xsb_aircraft.txt during a folder scan (File ▸ Scan For Models ▸ Scan).";
+            description = "Model source (this build): X-Plane CSL definitions parsed from xsb_aircraft.txt during a folder scan (File ▸ Scan For Models ▸ Scan).";
 #else
-            return "Model source (this build): folder scan of aircraft.cfg/sim.cfg under the simulator's aircraft folders (File ▸ Scan For Models ▸ Scan).";
+            description = "Model source (this build): folder scan of aircraft.cfg/sim.cfg under the simulator's aircraft folders (File ▸ Scan For Models ▸ Scan).";
 #endif
+            int banned = main.substitution?.lastBanExclusionCount ?? 0;
+            if (banned > 0)
+            {
+                description += " " + banned + " non-flyable model(s) (scenery props, static display liveries, etc.) were excluded by the ban list during the last scan.";
+            }
+            return description;
         }
 
         void RefreshWindow()
@@ -96,11 +103,19 @@ namespace JoinFS
                 Label_IcaoGuessed.Visible = false;
             }
 
-            // attribute comparison grid
+            // attribute comparison grid - the matched-value cell gets a "(+N)" score-contribution
+            // suffix (and a "guessed" note when downweighted) for any attribute that actually
+            // contributed to the winning candidate's score, so the scoring reasoning is visible
+            // right next to the value it's about, not just in the trace text below
             Grid_Attributes.Rows.Clear();
             foreach (var comparison in trace.attributes)
             {
-                int index = Grid_Attributes.Rows.Add(AttributeLabel(comparison.attribute), comparison.requested, comparison.matched);
+                string matchedDisplay = comparison.matched;
+                if (comparison.scoreContribution > 0)
+                {
+                    matchedDisplay += " (+" + comparison.scoreContribution + (comparison.wasDownweighted ? ", guessed" : "") + ")";
+                }
+                int index = Grid_Attributes.Rows.Add(AttributeLabel(comparison.attribute), comparison.requested, matchedDisplay);
                 if (comparison.decisive)
                 {
                     Grid_Attributes.Rows[index].DefaultCellStyle.BackColor = Properties.Settings.Default.ColourActiveBackground;
@@ -113,6 +128,17 @@ namespace JoinFS
             if (aircraft.subModel != null && aircraft.subModel.classCodeConfirmed)
             {
                 steps.Add("Note: the matched model's Class Code/WTC/Typerole were confirmed directly from live simulator data (category/engine type/engine count) the last time it was flown locally, rather than looked up from the bundled Doc8643 reference by ICAO type.");
+            }
+            if (trace.topCandidates.Count > 1)
+            {
+                steps.Add("");
+                steps.Add("Other candidates considered (top " + trace.topCandidates.Count + " by score):");
+                foreach (var candidate in trace.topCandidates)
+                {
+                    string label = "'" + candidate.title + "'" + (candidate.variation.Length > 0 ? " / '" + candidate.variation + "'" : "");
+                    string why = candidate.contributions.Count > 0 ? string.Join(" + ", candidate.contributions) : "no positive signals";
+                    steps.Add("  " + candidate.totalScore + " pts - " + label + " - " + why);
+                }
             }
             Text_Trace.Text = string.Join(Environment.NewLine, steps);
 
@@ -137,8 +163,8 @@ namespace JoinFS
 
             sb.AppendLine("## Attribute comparison");
             sb.AppendLine();
-            sb.AppendLine("| Attribute | Requested | Matched Model | Decisive |");
-            sb.AppendLine("|---|---|---|---|");
+            sb.AppendLine("| Attribute | Requested | Matched Model | Score | Decisive |");
+            sb.AppendLine("|---|---|---|---|---|");
             if (trace != null)
             {
                 foreach (var comparison in trace.attributes)
@@ -146,11 +172,12 @@ namespace JoinFS
                     string requested = comparison.requested.Length > 0 ? comparison.requested : "-";
                     string matched = comparison.matched.Length > 0 ? comparison.matched : "-";
                     string label = AttributeLabel(comparison.attribute);
+                    string score = comparison.scoreContribution > 0 ? "+" + comparison.scoreContribution + (comparison.wasDownweighted ? " (guessed)" : "") : "-";
                     if (comparison.decisive)
                     {
                         label = "**" + label + "**";
                     }
-                    sb.AppendLine($"| {label} | {requested} | {matched} | {(comparison.decisive ? "**Yes**" : "No")} |");
+                    sb.AppendLine($"| {label} | {requested} | {matched} | {score} | {(comparison.decisive ? "**Yes**" : "No")} |");
                 }
             }
             sb.AppendLine();
@@ -171,6 +198,20 @@ namespace JoinFS
                 }
             }
             sb.AppendLine();
+
+            if (trace != null && trace.topCandidates.Count > 1)
+            {
+                sb.AppendLine("## Other candidates considered");
+                sb.AppendLine();
+                sb.AppendLine("| Score | Title | Variation | Why |");
+                sb.AppendLine("|---|---|---|---|");
+                foreach (var candidate in trace.topCandidates)
+                {
+                    string why = candidate.contributions.Count > 0 ? string.Join(" + ", candidate.contributions) : "no positive signals";
+                    sb.AppendLine($"| {candidate.totalScore} | {candidate.title} | {candidate.variation} | {why} |");
+                }
+                sb.AppendLine();
+            }
 
             sb.AppendLine("## Model source");
             sb.AppendLine();
