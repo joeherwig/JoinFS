@@ -3478,7 +3478,7 @@ namespace JoinFS
             }
             else
             {
-                MessageBox.Show("The model list is empty. Use 'File|Scan For Models...' to generate a list.", Main.Name + ": Model Matching");
+                MessageBox.Show(Resources.Strings.MatchingForm_EmptyModelList, Main.Name + ": Model Matching");
             }
 #endif
                                 return false;
@@ -3551,7 +3551,7 @@ namespace JoinFS
             }
             else
             {
-                MessageBox.Show("The model list is empty. Use 'File|Scan For Models...' to generate a list.", Main.Name + ": Model Masquerading");
+                MessageBox.Show(Resources.Strings.MatchingForm_EmptyModelList, Main.Name + ": Model Masquerading");
             }
 #endif
                                 return false;
@@ -3618,7 +3618,7 @@ namespace JoinFS
             }
             else
             {
-                MessageBox.Show("The model list is empty. Use 'File|Scan For Models...' to generate a list.", Main.Name + ": Model Masquerading");
+                MessageBox.Show(Resources.Strings.MatchingForm_EmptyModelList, Main.Name + ": Model Masquerading");
             }
 #endif
             return false;
@@ -3846,15 +3846,28 @@ namespace JoinFS
         /// <param name="model">Model to check</param>
         /// <returns>Matched model</returns>
 #if FS2024
-        public async Task<(Model model, Type type, MatchTrace trace)> Match(string title, string livery, string icaoType, string icaoAirline, int typerole, string registration = "")
+        public async Task<(Model model, Type type, MatchTrace trace)> Match(string title, string livery, string icaoType, string icaoAirline, string classCode, string wtc, bool classCodeConfirmed, int typerole, string registration = "")
         // in MSFS2024 aircraft livery is the model variation
 #else
-        public async Task<(Model model, Type type, MatchTrace trace)> Match(string title, string icaoType, string icaoAirline, int typerole, string registration = "")
+        public async Task<(Model model, Type type, MatchTrace trace)> Match(string title, string icaoType, string icaoAirline, string classCode, string wtc, bool classCodeConfirmed, int typerole, string registration = "")
 #endif
         {
             Model model;
             Type type;
             MatchTrace trace = new();
+
+            // the remote's classCode/wtc: prefer whatever the sender's own JoinFS already resolved and
+            // sent directly (classCodeConfirmed - config-confirmed or live-derived, never a guess) over
+            // re-deriving from icaoType via the local bundled Doc8643 table, which fails whenever icaoType
+            // is a bogus/non-standard string that isn't a real Doc8643 designator. Older peers that don't
+            // send classCode/wtc at all (classCode.Length == 0) transparently fall back to re-derivation,
+            // same behavior as before this was added.
+            string remoteClassCode = classCode, remoteWtc = wtc;
+            if (remoteClassCode.Length == 0 && icaoType.Length > 0 && doc8643Lookup.TryGetValue(icaoType, out var remoteDocEntryFallback))
+            {
+                remoteClassCode = remoteDocEntryFallback.classCode;
+                remoteWtc = remoteDocEntryFallback.wtc;
+            }
 
             // build the requested-vs-matched attribute comparison for Explain Match. When attributeScores
             // is supplied (the unified scorer's per-attribute breakdown for the winning candidate), score
@@ -3863,12 +3876,6 @@ namespace JoinFS
             // old boolean way, with no score to show.
             void Finalize(Model matched, Dictionary<MatchAttribute, int> attributeScores = null, params MatchAttribute[] decisiveAttrs)
             {
-                string remoteClassCode = "", remoteWtc = "";
-                if (icaoType.Length > 0 && doc8643Lookup.TryGetValue(icaoType, out var entry))
-                {
-                    remoteClassCode = entry.classCode;
-                    remoteWtc = entry.wtc;
-                }
                 string requestedTyperoleName = typeroleNames.TryGetValue(typerole, out var tn) ? tn : typerole.ToString();
                 string matchedTyperoleName = matched != null && typeroleNames.TryGetValue(matched.typerole, out var mtn) ? mtn : "";
                 bool matchedIsGuessed = matched != null && matched.icaoGuessed;
@@ -3992,12 +3999,7 @@ namespace JoinFS
 #else
                 string remoteLivery = "";
 #endif
-                string remoteClassCode = "", remoteWtc = "";
-                if (icaoType.Length > 0 && doc8643Lookup.TryGetValue(icaoType, out var remoteDocEntry))
-                {
-                    remoteClassCode = remoteDocEntry.classCode;
-                    remoteWtc = remoteDocEntry.wtc;
-                }
+                // remoteClassCode/remoteWtc resolved once, outer scope - see comment above Finalize()
                 string remoteRegistrationAlnum = AlnumOnly(registration);
 
                 HashSet<Model> candidatePool = [];
@@ -4075,21 +4077,15 @@ namespace JoinFS
             // check for a fine-grained (typerole, classCode, wtc) default first - falls back to the
             // coarse per-typerole default below when none is configured for this exact combination
             string requestedTyperoleName = typeroleNames.TryGetValue(typerole, out var requestedTyperoleNameValue) ? requestedTyperoleNameValue : typerole.ToString();
-            string defaultRemoteClassCode = "", defaultRemoteWtc = "";
-            if (icaoType.Length > 0 && doc8643Lookup.TryGetValue(icaoType, out var defaultDocEntry))
-            {
-                defaultRemoteClassCode = defaultDocEntry.classCode;
-                defaultRemoteWtc = defaultDocEntry.wtc;
-            }
-            if (defaultRemoteClassCode.Length == 3 && defaultRemoteWtc.Length > 0 &&
-                fineDefaultModels.TryGetValue((typerole, defaultRemoteClassCode, defaultRemoteWtc), out string fineDefault) &&
+            if (remoteClassCode.Length == 3 && remoteWtc.Length > 0 &&
+                fineDefaultModels.TryGetValue((typerole, remoteClassCode, remoteWtc), out string fineDefault) &&
                 matches.TryGetValue(fineDefault, out var fineMatch))
             {
                 model = GetModel(fineMatch.title);
                 if (model != null)
                 {
                     type = Type.Default;
-                    trace.steps.Add($"Default: using the fine-grained default model for '{requestedTyperoleName}' / class '{defaultRemoteClassCode}' / WTC '{defaultRemoteWtc}' -> '{model.title}'.");
+                    trace.steps.Add($"Default: using the fine-grained default model for '{requestedTyperoleName}' / class '{remoteClassCode}' / WTC '{remoteWtc}' -> '{model.title}'.");
                     Finalize(model, null, MatchAttribute.Typerole, MatchAttribute.ClassCode, MatchAttribute.Wtc);
                     return (model, type, trace);
                 }

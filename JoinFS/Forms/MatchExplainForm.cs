@@ -36,15 +36,15 @@ namespace JoinFS
         {
             return attribute switch
             {
-                Substitution.MatchAttribute.Title => "Title",
-                Substitution.MatchAttribute.Livery => "Livery / Variation",
-                Substitution.MatchAttribute.Registration => "Registration",
-                Substitution.MatchAttribute.IcaoType => "ICAO Type",
-                Substitution.MatchAttribute.IcaoAirline => "ICAO Airline",
-                Substitution.MatchAttribute.ClassCode => "Class Code",
-                Substitution.MatchAttribute.Wtc => "WTC",
-                Substitution.MatchAttribute.Typerole => "Typerole",
-                Substitution.MatchAttribute.Folder => "Folder",
+                Substitution.MatchAttribute.Title => Resources.Strings.MatchAttr_Title,
+                Substitution.MatchAttribute.Livery => Resources.Strings.MatchAttr_Livery,
+                Substitution.MatchAttribute.Registration => Resources.Strings.MatchAttr_Registration,
+                Substitution.MatchAttribute.IcaoType => Resources.Strings.MatchAttr_IcaoType,
+                Substitution.MatchAttribute.IcaoAirline => Resources.Strings.MatchAttr_IcaoAirline,
+                Substitution.MatchAttribute.ClassCode => Resources.Strings.MatchAttr_ClassCode,
+                Substitution.MatchAttribute.Wtc => Resources.Strings.MatchAttr_Wtc,
+                Substitution.MatchAttribute.Typerole => Resources.Strings.MatchAttr_Typerole,
+                Substitution.MatchAttribute.Folder => Resources.Strings.MatchAttr_Folder,
                 _ => attribute.ToString()
             };
         }
@@ -53,16 +53,16 @@ namespace JoinFS
         {
             string description;
 #if FS2024
-            description = "Model source (this build): SimConnect live aircraft/livery enumeration, requested via File ▸ Scan For Models ▸ Scan (or automatically at connect if \"Scan at launch\" is enabled).";
+            description = Resources.Strings.MatchExplain_ModelSource_FS2024;
 #elif XPLANE
-            description = "Model source (this build): X-Plane CSL definitions parsed from xsb_aircraft.txt during a folder scan (File ▸ Scan For Models ▸ Scan).";
+            description = Resources.Strings.MatchExplain_ModelSource_XPlane;
 #else
-            description = "Model source (this build): folder scan of aircraft.cfg/sim.cfg under the simulator's aircraft folders (File ▸ Scan For Models ▸ Scan).";
+            description = Resources.Strings.MatchExplain_ModelSource_Other;
 #endif
             int banned = main.substitution?.lastBanExclusionCount ?? 0;
             if (banned > 0)
             {
-                description += " " + banned + " non-flyable model(s) (scenery props, static display liveries, etc.) were excluded by the ban list during the last scan.";
+                description += string.Format(Resources.Strings.MatchExplain_BanExclusionNote, banned);
             }
             return description;
         }
@@ -72,15 +72,15 @@ namespace JoinFS
             Substitution.MatchTrace trace = aircraft.subTrace;
             if (trace == null)
             {
-                Label_Outcome.Text = "No match has been computed yet for this aircraft.";
+                Label_Outcome.Text = Resources.Strings.MatchExplain_NoMatchYet;
                 return;
             }
 
             // outcome headline
-            string outcomeText = "Result: " + aircraft.subType;
+            string outcomeText = string.Format(Resources.Strings.MatchExplain_ResultPrefix, aircraft.subType);
             if (aircraft.subModel != null)
             {
-                outcomeText += " match -> '" + aircraft.subModel.title + "'";
+                outcomeText += string.Format(Resources.Strings.MatchExplain_ResultMatchSuffix, aircraft.subModel.title);
                 if (aircraft.subModel.variation.Length > 0)
                 {
                     outcomeText += " / '" + aircraft.subModel.variation + "'";
@@ -88,14 +88,14 @@ namespace JoinFS
             }
             else
             {
-                outcomeText += " - no model could be chosen (nothing installed/scanned).";
+                outcomeText += Resources.Strings.MatchExplain_ResultNoModel;
             }
             Label_Outcome.Text = outcomeText;
 
             // ICAO-guessed warning
             if (aircraft.subModel != null && aircraft.subModel.icaoGuessed)
             {
-                Label_IcaoGuessed.Text = "Note: the matched model's ICAO type designator was inferred by JoinFS from its title text, not confirmed via live simulator data. Verify this is correct if the match looks wrong.";
+                Label_IcaoGuessed.Text = Resources.Strings.MatchExplain_IcaoGuessedWarning;
                 Label_IcaoGuessed.Visible = true;
             }
             else
@@ -127,12 +127,12 @@ namespace JoinFS
             List<string> steps = new(trace.steps);
             if (aircraft.subModel != null && aircraft.subModel.classCodeConfirmed)
             {
-                steps.Add("Note: the matched model's Class Code/WTC/Typerole were confirmed directly from live simulator data (category/engine type/engine count) the last time it was flown locally, rather than looked up from the bundled Doc8643 reference by ICAO type.");
+                steps.Add(Resources.Strings.MatchExplain_ClassCodeConfirmedNote);
             }
             if (trace.topCandidates.Count > 1)
             {
                 steps.Add("");
-                steps.Add("Other candidates considered (top " + trace.topCandidates.Count + " by score):");
+                steps.Add(string.Format(Resources.Strings.MatchExplain_OtherCandidatesHeader, trace.topCandidates.Count));
                 foreach (var candidate in trace.topCandidates)
                 {
                     string label = "'" + candidate.title + "'" + (candidate.variation.Length > 0 ? " / '" + candidate.variation + "'" : "");
@@ -153,15 +153,15 @@ namespace JoinFS
 
             sb.AppendLine("# Match Report - " + aircraft.flightPlan.callsign);
             sb.AppendLine();
-            sb.AppendLine("**Outcome:** " + Label_Outcome.Text);
+            sb.AppendLine("**" + Resources.Strings.MatchExplain_ReportOutcome + "** " + Label_Outcome.Text);
             if (Label_IcaoGuessed.Visible)
             {
                 sb.AppendLine();
-                sb.AppendLine("**Note:** " + Label_IcaoGuessed.Text);
+                sb.AppendLine("**" + Resources.Strings.MatchExplain_ReportNote + "** " + Label_IcaoGuessed.Text);
             }
             sb.AppendLine();
 
-            sb.AppendLine("## Attribute comparison");
+            sb.AppendLine("## " + Resources.Strings.MatchExplain_ReportAttrHeader);
             sb.AppendLine();
             sb.AppendLine("| Attribute | Requested | Matched Model | Score | Decisive |");
             sb.AppendLine("|---|---|---|---|---|");
@@ -182,7 +182,7 @@ namespace JoinFS
             }
             sb.AppendLine();
 
-            sb.AppendLine("## Matching steps");
+            sb.AppendLine("## " + Resources.Strings.MatchExplain_ReportStepsHeader);
             sb.AppendLine();
             if (trace != null)
             {
@@ -194,14 +194,14 @@ namespace JoinFS
                 }
                 if (aircraft.subModel != null && aircraft.subModel.classCodeConfirmed)
                 {
-                    sb.AppendLine($"{step}. Note: the matched model's Class Code/WTC/Typerole were confirmed directly from live simulator data (category/engine type/engine count) the last time it was flown locally, rather than looked up from the bundled Doc8643 reference by ICAO type.");
+                    sb.AppendLine($"{step}. {Resources.Strings.MatchExplain_ClassCodeConfirmedNote}");
                 }
             }
             sb.AppendLine();
 
             if (trace != null && trace.topCandidates.Count > 1)
             {
-                sb.AppendLine("## Other candidates considered");
+                sb.AppendLine("## " + Resources.Strings.MatchExplain_ReportOtherCandidatesHeader);
                 sb.AppendLine();
                 sb.AppendLine("| Score | Title | Variation | Why |");
                 sb.AppendLine("|---|---|---|---|");
@@ -213,7 +213,7 @@ namespace JoinFS
                 sb.AppendLine();
             }
 
-            sb.AppendLine("## Model source");
+            sb.AppendLine("## " + Resources.Strings.MatchExplain_ReportSourceHeader);
             sb.AppendLine();
             sb.AppendLine(ModelSourceDescription());
 
@@ -230,7 +230,7 @@ namespace JoinFS
             string filename = main.substitution?.MakeModelsFilename();
             if (string.IsNullOrEmpty(filename) || File.Exists(filename) == false)
             {
-                MessageBox.Show("No known-models file was found yet. Run File ▸ Scan For Models ▸ Scan first.", Main.Name + ": Explain Match");
+                MessageBox.Show(Resources.Strings.MatchExplain_NoModelsFile, Main.Name + ": Explain Match");
                 return;
             }
 
@@ -240,7 +240,7 @@ namespace JoinFS
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Could not open '" + filename + "': " + ex.Message, Main.Name + ": Explain Match");
+                MessageBox.Show(string.Format(Resources.Strings.MatchExplain_CouldNotOpen, filename, ex.Message), Main.Name + ": Explain Match");
             }
         }
 
@@ -278,7 +278,7 @@ namespace JoinFS
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Could not create debug bundle: " + ex.Message, Main.Name + ": Explain Match");
+                MessageBox.Show(string.Format(Resources.Strings.MatchExplain_CouldNotCreateBundle, ex.Message), Main.Name + ": Explain Match");
             }
         }
 
