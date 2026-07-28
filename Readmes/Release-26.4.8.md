@@ -8,6 +8,10 @@
 - **Network protocol extended** (`Sim.VERSION` 21006→21007): peers now also broadcast their own resolved class code/WTC directly, so receiving clients use the sender's best-available classification instead of each independently re-deriving it from ICAO type - which previously failed whenever ICAO type was a bogus/non-standard string. Purely additive; older peers are unaffected.
 - **Explain Match dialog extended.** Shows per-attribute score contributions inline, an "other candidates considered" panel (what almost won and why), and a ban-list exclusion count - both in the dialog and the exported Markdown report.
 - Fixed the Explain Match table always showing a blank matched registration, even when a registration match was the decisive signal.
+- Fixed the Flight Plan dialog's ICAO type/airline fields (and what gets broadcast for your own aircraft) never being auto-filled from the simulator, unless a SimBrief import had already set them.
+- Fixed `LIVERY FOLDER`-based config reading (see above) silently finding nothing for the many FS2024 add-ons that ship a single `aircraft.cfg` with no separate `livery.cfg` - these now resolve via a title-based lookup against your installed packages instead.
+- Fixed a `base_container` resolution bug where a variation package's real config data could be discarded if that package had no `livery.cfg` of its own.
+- Fixed the installed-package index used by the two fixes above missing every package when your configured simulator folder is the sim's base install directory rather than a `Community`-style folder directly - it now looks one level deeper to find the actual package folders.
 
 ## Localization
 
