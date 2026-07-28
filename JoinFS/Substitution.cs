@@ -734,36 +734,82 @@ namespace JoinFS
         /// base_container references that a plain relative-path lookup can't reach, since MSFS merges
         /// package content into one virtual namespace rather than nesting them physically on disk.
         /// </summary>
-        Dictionary<string, string> packageFolderIndex;
+        readonly Dictionary<string, string> packageFolderIndex = new(StringComparer.OrdinalIgnoreCase);
+        /// <summary>True once a build has actually succeeded (found a valid sim folder) - distinct from
+        /// packageFolderIndex being empty, so a failed attempt (sim folder not set yet) can retry on the
+        /// next call instead of being stuck empty for the rest of the session.</summary>
+        bool packageFolderIndexBuilt = false;
 
         void BuildPackageFolderIndexIfNeeded()
         {
-            if (packageFolderIndex != null) return;
-            packageFolderIndex = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (packageFolderIndexBuilt) return;
 
+            if (Directory.Exists(simFolder) == false)
+            {
+                if (packageFolderIndexDiagLogged.Add(simFolder ?? ""))
+                {
+                    main.MonitorEvent("DIAG: package folder index not built - configured sim folder '" + simFolder + "' does not exist (or isn't set yet). Will retry next time it's needed.");
+                }
+                return;
+            }
+
+            int packageFolderCount = 0;
             try
             {
-                if (Directory.Exists(simFolder) == false) return;
-                foreach (var packageFolder in Directory.GetDirectories(simFolder))
+                // simFolder is the sim's base install folder (e.g. "H:\MSFS2024"), which itself only
+                // contains grouping folders like "Community"/"Official2024"/"Official2020" - the actual
+                // installed packages (each with its own SimObjects\Airplanes|Rotorcraft) are one level
+                // further down inside those. Index both this level and one level down, so a package
+                // folder is found whether simFolder points at the base install or directly at a
+                // grouping folder like Community.
+                foreach (var groupFolder in Directory.GetDirectories(simFolder))
                 {
-                    foreach (var kind in new[] { "Airplanes", "Rotorcraft" })
-                    {
-                        string simObjectsPath = Path.Combine(packageFolder, "SimObjects", kind);
-                        if (Directory.Exists(simObjectsPath) == false) continue;
+                    packageFolderCount += IndexPackageFolder(groupFolder);
 
-                        foreach (var modelFolder in Directory.GetDirectories(simObjectsPath))
+                    try
+                    {
+                        foreach (var packageFolder in Directory.GetDirectories(groupFolder))
                         {
-                            string name = Path.GetFileName(modelFolder);
-                            packageFolderIndex.TryAdd(name, modelFolder);
+                            packageFolderCount += IndexPackageFolder(packageFolder);
                         }
+                    }
+                    catch (Exception ex)
+                    {
+                        // one inaccessible/unusual group folder (e.g. a locked system-managed cache)
+                        // shouldn't abort indexing the rest of the sim install
+                        main.MonitorEvent("Error indexing package folder '" + groupFolder + "': " + ex.Message);
                     }
                 }
             }
             catch (Exception ex)
             {
                 main.MonitorEvent("Error building package folder index: " + ex.Message);
+                return;
             }
+
+            main.MonitorEvent("DIAG: package folder index built from sim folder '" + simFolder + "' - " + packageFolderCount + " candidate package folder(s) scanned, " + packageFolderIndex.Count + " installed aircraft/rotorcraft folder(s) indexed.");
+            packageFolderIndexBuilt = true;
         }
+
+        /// <summary>Indexes a single package folder's SimObjects\Airplanes|Rotorcraft subfolders, if any. Returns 1 (counted as scanned) so the caller can tally how many folders were checked.</summary>
+        int IndexPackageFolder(string packageFolder)
+        {
+            foreach (var kind in new[] { "Airplanes", "Rotorcraft" })
+            {
+                string simObjectsPath = Path.Combine(packageFolder, "SimObjects", kind);
+                if (Directory.Exists(simObjectsPath) == false) continue;
+
+                foreach (var modelFolder in Directory.GetDirectories(simObjectsPath))
+                {
+                    string name = Path.GetFileName(modelFolder);
+                    packageFolderIndex.TryAdd(name, modelFolder);
+                }
+            }
+            return 1;
+        }
+
+        /// <summary>Distinct simFolder values already logged as missing, so a permanently-unset folder doesn't spam the log on every spawn.</summary>
+        readonly HashSet<string> packageFolderIndexDiagLogged = new(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
         /// Resolve a [VARIATION] base_container reference to an absolute folder, trying the literal
@@ -916,25 +962,78 @@ namespace JoinFS
             out string icaoType, out string wtc, out string icaoAirline, out string atcId, out string classCode)
         {
             icaoType = ""; wtc = ""; icaoAirline = ""; atcId = ""; classCode = "";
-            if (string.IsNullOrWhiteSpace(liveryFolder)) return false;
+
+            string resolvedFolder = null;
+            if (string.IsNullOrWhiteSpace(liveryFolder))
+            {
+                // LIVERY FOLDER is documented as "folder where livery.cfg is stored" - confirmed against
+                // a real installed aircraft that it comes back genuinely blank for classic all-liveries-
+                // in-one-aircraft.cfg packages that never had a livery.cfg at all (still very common
+                // among freeware/community add-ons). Fall back to a lazily-built title->folder index
+                // instead of giving up, since the real aircraft.cfg is still on disk somewhere.
+                if (liveryFolderDiagLogged.Add("<blank:" + modelTitle + ">"))
+                {
+                    main.MonitorEvent("DIAG: LIVERY FOLDER was blank/not reported by SimConnect for model '" + modelTitle + "' - trying the title->folder index instead.");
+                }
+            }
+            else
+            {
+                try
+                {
+                    resolvedFolder = ResolveLiveryFolder(liveryFolder);
+                }
+                catch (Exception ex)
+                {
+                    main.MonitorEvent("Error resolving LIVERY FOLDER '" + liveryFolder + "': " + ex.Message);
+                }
+
+                if (resolvedFolder == null && liveryFolderDiagLogged.Add(liveryFolder))
+                {
+                    main.MonitorEvent("DIAG: could not resolve LIVERY FOLDER '" + liveryFolder + "' to an existing directory (tried as-is, relative to the configured sim folder '" + simFolder + "', and by leaf folder name) - trying the title->folder index instead.");
+                }
+                else if (resolvedFolder != null && liveryFolderDiagLogged.Add(liveryFolder))
+                {
+                    main.MonitorEvent("DIAG: LIVERY FOLDER '" + liveryFolder + "' resolved to '" + resolvedFolder + "'.");
+                }
+            }
+
+            if (resolvedFolder == null)
+            {
+                BuildTitleFolderIndexIfNeeded();
+                if (titleFolderIndex.TryGetValue(modelTitle, out resolvedFolder) == false)
+                {
+                    return false;
+                }
+                if (liveryFolderDiagLogged.Add("<titleindex:" + modelTitle + ">"))
+                {
+                    main.MonitorEvent("DIAG: title->folder index resolved model '" + modelTitle + "' to '" + resolvedFolder + "'.");
+                }
+            }
 
             try
             {
-                if (Directory.Exists(liveryFolder) == false) return false;
-
-                bool found = TryParseAircraftConfigFile(Path.Combine(liveryFolder, "aircraft.cfg"), modelTitle,
+                bool found = TryParseAircraftConfigFile(Path.Combine(resolvedFolder, "aircraft.cfg"), modelTitle,
                     ref icaoType, ref wtc, ref icaoAirline, ref atcId, ref classCode, out string baseContainer);
                 if (found == false)
                 {
-                    found = TryParseAircraftConfigFile(Path.Combine(liveryFolder, "livery.cfg"), modelTitle,
-                        ref icaoType, ref wtc, ref icaoAirline, ref atcId, ref classCode, out baseContainer);
+                    // TryParseAircraftConfigFile always resets its own out baseContainer to "" as its
+                    // first line (even when the file doesn't exist) - don't let a missing/base_container-
+                    // less livery.cfg wipe out a real base_container the aircraft.cfg parse already found
+                    // (e.g. a pure [VARIATION] overlay with no [GENERAL] section of its own at all, which
+                    // legitimately has no icaoType to report but does have the reference to follow)
+                    found = TryParseAircraftConfigFile(Path.Combine(resolvedFolder, "livery.cfg"), modelTitle,
+                        ref icaoType, ref wtc, ref icaoAirline, ref atcId, ref classCode, out string liveryBaseContainer);
+                    if (baseContainer.Length == 0)
+                    {
+                        baseContainer = liveryBaseContainer;
+                    }
                 }
 
                 // some real fields (most commonly icao_WTC) only live in the base package's own file -
                 // resolve and merge in whatever this file's own read left blank
                 if ((icaoType.Length == 0 || wtc.Length == 0) && baseContainer.Length > 0)
                 {
-                    string baseFolder = ResolveBaseContainer(liveryFolder, baseContainer);
+                    string baseFolder = ResolveBaseContainer(resolvedFolder, baseContainer);
                     if (baseFolder != null)
                     {
                         TryParseAircraftConfigFile(Path.Combine(baseFolder, "aircraft.cfg"), modelTitle,
@@ -946,9 +1045,117 @@ namespace JoinFS
             }
             catch (Exception ex)
             {
-                main.MonitorEvent("Error reading config via LIVERY FOLDER '" + liveryFolder + "': " + ex.Message);
+                main.MonitorEvent("Error reading config from '" + resolvedFolder + "': " + ex.Message);
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Lazily-built index of every installed model's title -> containing folder, built by scanning
+        /// every aircraft.cfg found under the same installed-package tree BuildPackageFolderIndexIfNeeded()
+        /// already walks. Only built (and only needed) the first time LIVERY FOLDER comes back blank or
+        /// unresolvable for some model - the common case (a real LIVERY FOLDER value) never touches this.
+        /// </summary>
+        Dictionary<string, string> titleFolderIndex;
+
+        void BuildTitleFolderIndexIfNeeded()
+        {
+            if (titleFolderIndex != null) return;
+            titleFolderIndex = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            BuildPackageFolderIndexIfNeeded();
+            foreach (var folder in packageFolderIndex.Values)
+            {
+                string cfgPath = Path.Combine(folder, "aircraft.cfg");
+                if (File.Exists(cfgPath) == false) continue;
+
+                try
+                {
+                    foreach (var title in QuickExtractTitles(cfgPath))
+                    {
+                        titleFolderIndex.TryAdd(title, folder);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    main.MonitorEvent("Error indexing '" + cfgPath + "': " + ex.Message);
+                }
+            }
+
+            main.MonitorEvent("Indexed " + titleFolderIndex.Count + " model title(s) from " + packageFolderIndex.Count + " installed aircraft folder(s), for use when LIVERY FOLDER doesn't resolve.");
+        }
+
+        /// <summary>
+        /// Cheap single-pass extraction of every [FLTSIM.N] "title" value in an aircraft.cfg, without the
+        /// full field parsing TryParseAircraftConfigFile does - this only needs to build the title->folder
+        /// index, not read every model's classCode/wtc/etc. up front.
+        /// </summary>
+        static IEnumerable<string> QuickExtractTitles(string path)
+        {
+            string section = "";
+            foreach (var rawLine in File.ReadLines(path))
+            {
+                string line = rawLine.Trim();
+                if (line.Length == 0 || line.StartsWith(';') || line.StartsWith("//")) continue;
+
+                if (line[0] == '[')
+                {
+                    int end = line.IndexOf(']');
+                    section = end > 0 ? line[1..end].ToUpperInvariant() : "";
+                    continue;
+                }
+                if (section.StartsWith("FLTSIM") == false) continue;
+
+                int eq = line.IndexOf('=');
+                if (eq < 0) continue;
+                string key = line[..eq].Trim();
+                if (key.Equals("title", StringComparison.OrdinalIgnoreCase) == false) continue;
+
+                string value = line[(eq + 1)..].Trim();
+                int semi = value.IndexOf(';');
+                if (semi >= 0) value = value[..semi].Trim();
+                value = value.Trim('"');
+                if (value.Length > 0) yield return value;
+            }
+        }
+
+        /// <summary>
+        /// Distinct raw LIVERY FOLDER values already logged once (success or failure), so the
+        /// diagnostic doesn't repeat on every single spawn of the same model within a session.
+        /// </summary>
+        readonly HashSet<string> liveryFolderDiagLogged = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Resolve SimConnect's LIVERY FOLDER value to an existing directory. The exact format this
+        /// simvar returns wasn't verifiable without a live session when this was first written, so this
+        /// tries progressively looser interpretations: the raw value as an absolute path, the raw value
+        /// joined against the configured sim folder (in case it's package-relative), and finally a lookup
+        /// by leaf folder name against the same installed-package index base_container resolution uses
+        /// (in case it's neither of the above - e.g. just a bare folder/package name).
+        /// </summary>
+        string ResolveLiveryFolder(string liveryFolder)
+        {
+            string trimmed = liveryFolder.Trim();
+
+            try
+            {
+                if (Directory.Exists(trimmed)) return trimmed;
+            }
+            catch { }
+
+            try
+            {
+                string combined = Path.GetFullPath(Path.Combine(simFolder, trimmed));
+                if (Directory.Exists(combined)) return combined;
+            }
+            catch { }
+
+            BuildPackageFolderIndexIfNeeded();
+            string leafName = trimmed.TrimEnd('/', '\\');
+            int lastSep = leafName.LastIndexOfAny(['/', '\\']);
+            if (lastSep >= 0) leafName = leafName[(lastSep + 1)..];
+
+            return leafName.Length > 0 && packageFolderIndex.TryGetValue(leafName, out var folder) ? folder : null;
         }
 #endif
 

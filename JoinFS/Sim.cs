@@ -3593,6 +3593,21 @@ namespace JoinFS
                                         aircraft.flightPlan.flightNumber = info.flightNumber;
                                         // prefer a synthesized real callsign (ICAO airline + flight number) over the tail number
                                         aircraft.flightPlan.callsign = ResolveCallsign(resolvedIcaoAirline, info.flightNumber, tailNumber);
+                                        // fill in ICAO type/airline from the live-resolved data (learnIcaoType/
+                                        // resolvedIcaoAirline - see the confidence hierarchy above), but only when
+                                        // not already set - this was never populated here at all before, leaving
+                                        // the Flight Plan dialog's Type field blank and never broadcasting an ICAO
+                                        // type for the user's own aircraft unless a SimBrief import had already
+                                        // filled it in; a prior SimBrief-sourced value still takes precedence,
+                                        // matching the "userFlightPlan survives" intent right above
+                                        if (aircraft.flightPlan.icaoType.Length == 0 && learnIcaoType.Length > 0)
+                                        {
+                                            aircraft.flightPlan.icaoType = learnIcaoType;
+                                        }
+                                        if (aircraft.flightPlan.icaoAirline.Length == 0 && resolvedIcaoAirline.Length > 0)
+                                        {
+                                            aircraft.flightPlan.icaoAirline = resolvedIcaoAirline;
+                                        }
                                         // message
 #if FS2024
                                         main.MonitorEvent("Listing aircraft '" + aircraft.flightPlan.callsign + "' User 'Me' - ID '" + obj.simId + "' - Model '" + obj.ownerModel + "' Livery '" + info.livery + "'");
