@@ -3493,17 +3493,17 @@ namespace JoinFS
                                     // title-text guess (handled elsewhere), for a model never yet instantiated.
                                     Substitution.DeriveLiveClassCode(info.category, info.engineType, info.numEngines, out string liveClassCode, out string liveWtc);
 #if FS2024
-                                    string configIcaoType = "", configWtc = "", configIcaoAirline = "", configAtcId = "", configClassCode = "";
+                                    string configIcaoType = "", configWtc = "", configIcaoAirline = "", configAtcId = "", configClassCode = "", configIcaoResolutionNote = "";
                                     bool configConfirmed = main.substitution != null && main.substitution.TryReadConfigFromLiveryFolder(
                                         info.liveryFolder, model, out configIcaoType, out configWtc,
-                                        out configIcaoAirline, out configAtcId, out configClassCode);
+                                        out configIcaoAirline, out configAtcId, out configClassCode, out configIcaoResolutionNote);
                                     string learnIcaoType = configConfirmed ? configIcaoType : type;
                                     string learnClassCode = configConfirmed ? configClassCode : liveClassCode;
                                     string learnWtc = configConfirmed && configWtc.Length > 0 ? configWtc : liveWtc;
                                     string learnIcaoAirline = configConfirmed && configIcaoAirline.Length > 0 ? configIcaoAirline : info.airline;
                                     string learnAtcId = configConfirmed ? configAtcId : "";
                                     bool learnClassCodeConfirmed = configConfirmed || liveClassCode.Length > 0;
-                                    string resolvedIcaoAirline = main.substitution?.LearnIcaoFromLiveObject(model, info.livery, learnIcaoType, learnIcaoAirline, learnClassCode, learnWtc, learnAtcId, configConfirmed) ?? "";
+                                    string resolvedIcaoAirline = main.substitution?.LearnIcaoFromLiveObject(model, info.livery, learnIcaoType, learnIcaoAirline, learnClassCode, learnWtc, learnAtcId, configConfirmed, configConfirmed ? configIcaoResolutionNote : "") ?? "";
 #else
                                     string learnIcaoType = type;
                                     string learnClassCode = liveClassCode;

@@ -645,6 +645,27 @@
   <data name="MatchExplain_IcaoGuessedWarning" xml:space="preserve">
     <value>Note: the matched model's ICAO type was inferred by JoinFS from its title text, not confirmed via live simulator data or its real configuration file - this signal is downweighted in scoring. Verify this is correct if the match looks wrong.</value>
   </data>
+  <data name="MatchExplain_IcaoResolution_IcaoModelFallback" xml:space="preserve">
+    <value>Note: this model's configuration file declares icao_type_designator='{0}', which is not a recognized ICAO type - JoinFS used its icao_model field instead, which correctly names a real type ('{1}').</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_IcaoModelOnly" xml:space="preserve">
+    <value>Note: this model's configuration file does not declare an ICAO type designator - JoinFS used its icao_model field instead, which correctly names a real type ('{0}').</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuess" xml:space="preserve">
+    <value>Note: this model's configuration file declares icao_type_designator='{0}', which is not a recognized ICAO type - JoinFS guessed '{1}' instead from the model's title text. Verify this is correct if the match looks wrong.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuessBlank" xml:space="preserve">
+    <value>Note: this model's configuration file does not declare an ICAO type designator - JoinFS guessed '{0}' instead from the model's title text. Verify this is correct if the match looks wrong.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuessCorroborated" xml:space="preserve">
+    <value>Note: this model's configuration file declares icao_type_designator='{0}', which is not a recognized ICAO type - JoinFS guessed '{1}' instead from the model's title text, corroborated by its class code/wake turbulence category derived from the same configuration file.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuessCorroboratedBlank" xml:space="preserve">
+    <value>Note: this model's configuration file does not declare an ICAO type designator - JoinFS guessed '{0}' instead from the model's title text, corroborated by its class code/wake turbulence category derived from the same configuration file.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_Unresolved" xml:space="preserve">
+    <value>Note: this model's configuration file declares icao_type_designator='{0}', which is not a recognized ICAO type, and JoinFS could not find a better match from the title text or class code either - reporting it as declared.</value>
+  </data>
   <data name="MatchExplain_ClassCodeConfirmedNote" xml:space="preserve">
     <value>Note: the matched model's Class Code/WTC/Typerole were confirmed directly from live simulator data or its real configuration file the last time it was flown locally, rather than looked up from the bundled Doc8643 reference by ICAO type.</value>
   </data>

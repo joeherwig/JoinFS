@@ -1602,6 +1602,48 @@ namespace JoinFS.Resources {
             }
         }
 
+        internal static string MatchExplain_IcaoResolution_IcaoModelFallback {
+            get {
+                return ResourceManager.GetString("MatchExplain_IcaoResolution_IcaoModelFallback", resourceCulture);
+            }
+        }
+
+        internal static string MatchExplain_IcaoResolution_IcaoModelOnly {
+            get {
+                return ResourceManager.GetString("MatchExplain_IcaoResolution_IcaoModelOnly", resourceCulture);
+            }
+        }
+
+        internal static string MatchExplain_IcaoResolution_TitleGuess {
+            get {
+                return ResourceManager.GetString("MatchExplain_IcaoResolution_TitleGuess", resourceCulture);
+            }
+        }
+
+        internal static string MatchExplain_IcaoResolution_TitleGuessBlank {
+            get {
+                return ResourceManager.GetString("MatchExplain_IcaoResolution_TitleGuessBlank", resourceCulture);
+            }
+        }
+
+        internal static string MatchExplain_IcaoResolution_TitleGuessCorroborated {
+            get {
+                return ResourceManager.GetString("MatchExplain_IcaoResolution_TitleGuessCorroborated", resourceCulture);
+            }
+        }
+
+        internal static string MatchExplain_IcaoResolution_TitleGuessCorroboratedBlank {
+            get {
+                return ResourceManager.GetString("MatchExplain_IcaoResolution_TitleGuessCorroboratedBlank", resourceCulture);
+            }
+        }
+
+        internal static string MatchExplain_IcaoResolution_Unresolved {
+            get {
+                return ResourceManager.GetString("MatchExplain_IcaoResolution_Unresolved", resourceCulture);
+            }
+        }
+
         internal static string MatchExplain_ClassCodeConfirmedNote {
             get {
                 return ResourceManager.GetString("MatchExplain_ClassCodeConfirmedNote", resourceCulture);

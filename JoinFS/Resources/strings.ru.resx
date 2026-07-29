@@ -639,6 +639,27 @@
   <data name="MatchExplain_IcaoGuessedWarning" xml:space="preserve">
     <value>Примечание: тип ICAO подобранной модели был определён JoinFS по тексту названия, а не подтверждён данными симулятора в реальном времени или её настоящим файлом конфигурации - этот сигнал получает пониженный вес при подсчёте очков. Проверьте правильность подбора, если он выглядит неверным.</value>
   </data>
+  <data name="MatchExplain_IcaoResolution_IcaoModelFallback" xml:space="preserve">
+    <value>Примечание: файл конфигурации этой модели указывает icao_type_designator='{0}', что не является распознанным типом ICAO - вместо этого JoinFS использовал поле icao_model, которое правильно указывает реальный тип ('{1}').</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_IcaoModelOnly" xml:space="preserve">
+    <value>Примечание: файл конфигурации этой модели не указывает icao_type_designator - вместо этого JoinFS использовал поле icao_model, которое правильно указывает реальный тип ('{0}').</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuessBlank" xml:space="preserve">
+    <value>Примечание: файл конфигурации этой модели не указывает icao_type_designator - вместо этого JoinFS определил '{0}' по тексту названия модели. Проверьте правильность подбора, если он выглядит неверным.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuessCorroboratedBlank" xml:space="preserve">
+    <value>Примечание: файл конфигурации этой модели не указывает icao_type_designator - вместо этого JoinFS определил '{0}' по тексту названия модели, что подтверждается кодом класса/категорией спутной турбулентности, полученными из того же файла конфигурации.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuess" xml:space="preserve">
+    <value>Примечание: файл конфигурации этой модели указывает icao_type_designator='{0}', что не является распознанным типом ICAO - вместо этого JoinFS определил '{1}' по тексту названия модели. Проверьте правильность подбора, если он выглядит неверным.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuessCorroborated" xml:space="preserve">
+    <value>Примечание: файл конфигурации этой модели указывает icao_type_designator='{0}', что не является распознанным типом ICAO - вместо этого JoinFS определил '{1}' по тексту названия модели, что подтверждается кодом класса/категорией спутной турбулентности, полученными из того же файла конфигурации.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_Unresolved" xml:space="preserve">
+    <value>Примечание: файл конфигурации этой модели указывает icao_type_designator='{0}', что не является распознанным типом ICAO, и JoinFS также не смог найти лучшее соответствие по названию или коду класса - значение сообщается как указано.</value>
+  </data>
   <data name="MatchExplain_ClassCodeConfirmedNote" xml:space="preserve">
     <value>Примечание: классификационный код/WTC/роль типа подобранной модели были подтверждены напрямую данными симулятора в реальном времени или её настоящим файлом конфигурации при последнем локальном полёте, а не найдены по типу ICAO во встроенном справочнике Doc8643.</value>
   </data>

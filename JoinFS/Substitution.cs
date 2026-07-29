@@ -266,6 +266,40 @@ namespace JoinFS
         }
 
         /// <summary>
+        /// Same platform+engine-count+engine-type -&gt; classCode logic as DeriveLiveClassCode, but reading
+        /// the textual Category/icao_engine_type/icao_engine_count values straight out of an aircraft.cfg
+        /// [GENERAL] section (per the MSFS SDK's documented allowed values) instead of the numeric live
+        /// SimConnect ENGINE TYPE simvar. Used to corroborate/guess an ICAO type designator when
+        /// icao_type_designator itself can't be trusted - see ResolveConfirmedIcaoType.
+        /// </summary>
+        static void DeriveClassCodeFromConfig(string category, string engineTypeText, int engineCount, out string classCode, out string wtc)
+        {
+            classCode = "";
+            wtc = "";
+
+            char platform;
+            if (category.Equals("Airplane", StringComparison.OrdinalIgnoreCase)) platform = 'L';
+            else if (category.Equals("Helicopter", StringComparison.OrdinalIgnoreCase)) platform = 'H';
+            else return;
+
+            char engine = engineTypeText.Trim().ToUpperInvariant() switch
+            {
+                "PISTON" => 'P',
+                "JET" => 'J',
+                "TURBOPROP/TURBOSHAFT" => 'T',
+                _ => '\0'
+            };
+            if (engine == '\0' || engineCount < 1 || engineCount > 9) return;
+
+            classCode = "" + platform + engineCount + engine;
+
+            if (platform == 'L' && engine == 'J')
+            {
+                wtc = "M";
+            }
+        }
+
+        /// <summary>
         /// type roles names
         /// </summary>
         public readonly Dictionary<int, string> defaultModels = [];
@@ -339,6 +373,14 @@ namespace JoinFS
             /// folder scan other builds already get. Implies classCodeConfirmed.
             /// </summary>
             public bool configConfirmed = false;
+            /// <summary>
+            /// Set only when a config-confirmed icao_type_designator wasn't a recognized Doc8643 designator
+            /// and had to be corrected - see ResolveConfirmedIcaoType. Format "&lt;Reason&gt;:&lt;declaredValue&gt;",
+            /// e.g. "IcaoModelFallback:500E" (icao_model held the real code instead) or
+            /// "TitleGuessCorroborated:500E" (guessed from title text, corroborated by classCode/WTC).
+            /// Empty when icao_type_designator needed no correction. Surfaced in Explain Match.
+            /// </summary>
+            public string icaoResolutionNote = "";
 
             public Model(string title, string manufacturer, string type, string variation, int index, string typerole, string smoke, string folder,
                 string icaoType = "", string wtc = "", string icaoAirline = "", string classCode = "", bool classCodeConfirmed = false, string atcId = "")
@@ -447,6 +489,13 @@ namespace JoinFS
                 main.MonitorEvent("Error parsing Doc8643 dataset: " + ex.Message);
             }
         }
+
+        /// <summary>
+        /// True when icaoType is a real, recognized Doc8643 designator - used to sanity-check a config-
+        /// confirmed icao_type_designator before trusting it outright. Some add-ons put a made-up value
+        /// there instead of a real designator (see ResolveConfirmedIcaoType for a concrete real-world case).
+        /// </summary>
+        static bool IsRecognizedIcaoType(string icaoType) => icaoType.Length > 0 && doc8643Lookup.ContainsKey(icaoType);
 
         /// <summary>
         /// ICAO airline operator code -> airline name, e.g. "CFG" -> "condor" (bundled from opennav.com)
@@ -609,8 +658,15 @@ namespace JoinFS
         /// against Doc8643 model names. Used only as a fallback when SimConnect's model enumeration
         /// (title + livery only) gives us no other way to tag a model before it has ever been flown.
         /// Prefers the longest matching model name to reduce false positives.
+        ///
+        /// Optionally corroborated by an independently-derived classCode/WTC (e.g. from
+        /// icao_engine_type/icao_engine_count/Category in the same aircraft.cfg, when
+        /// icao_type_designator itself couldn't be trusted - see ResolveConfirmedIcaoType). When a
+        /// candidate row's own classCode/WTC agrees with the corroborating value, a much shorter/weaker
+        /// text match is trusted that would otherwise be rejected as too ambiguous - two independent
+        /// signals agreeing sharply cuts the false-positive risk the length thresholds guard against.
         /// </summary>
-        static string GuessIcaoTypeFromTitle(string title)
+        static string GuessIcaoTypeFromTitle(string title, string corroboratingClassCode = "", string corroboratingWtc = "")
         {
             // Only dashes are stripped (common in titles like "A-320" for designator "A320"); spaces are
             // kept so real word boundaries survive - see ContainsToken for why that matters.
@@ -644,15 +700,69 @@ namespace JoinFS
             (string icaoType, int matchLength) best = ("", 0);
             foreach (var row in doc8643Rows)
             {
+                bool classCorroborated = corroboratingClassCode.Length > 0 && row.classCode == corroboratingClassCode
+                    && (corroboratingWtc.Length == 0 || row.wtc == corroboratingWtc);
+
                 string needle = row.modelName.Replace("-", "");
-                if (needle.Length < 6 || needle.Length <= best.matchLength) continue;
+                int minNeedleLength = classCorroborated ? 3 : 6;
+                if (needle.Length < minNeedleLength || needle.Length <= best.matchLength) continue;
                 if (ContainsToken(haystack, needle) == false) continue;
-                if (needle.Length < 8 && ContainsToken(haystack, row.manufacturer) == false) continue;
+                if (classCorroborated == false && needle.Length < 8 && ContainsToken(haystack, row.manufacturer) == false) continue;
 
                 best = (row.icaoType, needle.Length);
             }
 
             return best.icaoType;
+        }
+
+        /// <summary>
+        /// Resolves the most trustworthy ICAO type designator from a real aircraft.cfg/livery.cfg [GENERAL]
+        /// section. Per the MSFS SDK, icao_type_designator is meant to hold the real ICAO code and icao_model
+        /// a separate, descriptive-only model name - but some add-ons swap that intent (or simply leave
+        /// icao_type_designator blank, also common). Confirmed against a real package: CowanSim's MD500E
+        /// ships icao_type_designator="500E" (not a real designator at all) with the actual code "H500"
+        /// sitting in icao_model instead. Tries, in order: (1) the declared icao_type_designator, if it's a
+        /// real recognized designator; (2) icao_model, if THAT is a real recognized designator instead
+        /// (whether icao_type_designator was wrong or simply blank); (3) guessing from the title text,
+        /// corroborated by classCode/WTC derived from icao_engine_type/icao_engine_count/Category in the
+        /// same file (see DeriveClassCodeFromConfig/GuessIcaoTypeFromTitle) so a much weaker text match can
+        /// be trusted when it independently agrees with the aircraft's actual category/engine class; (4)
+        /// finally, trusting the raw unrecognized declared value as a last resort when there was one - the
+        /// SDK does permit custom values for experimental/unlisted aircraft, and an unrecognized-but-
+        /// consistent value can still match exactly between two users of the same add-on even though it
+        /// won't resolve a classCode/WTC.
+        ///
+        /// Returns a resolution note alongside the resolved type, formatted "&lt;Reason&gt;:&lt;declaredValue&gt;"
+        /// (empty when the declared value needed no correction) so callers can explain what happened and
+        /// why - see LearnIcaoFromLiveObject/Model.icaoResolutionNote and MatchExplainForm's use of it. The
+        /// reason gets a "Blank" suffix when icao_type_designator wasn't merely wrong but entirely absent -
+        /// there's nothing invalid to report in that case, just nothing declared, so the wording differs.
+        /// </summary>
+        static (string icaoType, string resolutionNote) ResolveConfirmedIcaoType(string configuredIcaoType, string configuredIcaoModel, string modelTitle, string corroboratingClassCode, string corroboratingWtc)
+        {
+            if (IsRecognizedIcaoType(configuredIcaoType)) return (configuredIcaoType, "");
+
+            bool declaredButInvalid = configuredIcaoType.Length > 0;
+
+            if (IsRecognizedIcaoType(configuredIcaoModel))
+            {
+                string reason = declaredButInvalid ? "IcaoModelFallback" : "IcaoModelOnly";
+                return (configuredIcaoModel, reason + ":" + configuredIcaoType);
+            }
+
+            string guessed = GuessIcaoTypeFromTitle(modelTitle, corroboratingClassCode, corroboratingWtc);
+            if (guessed.Length > 0)
+            {
+                string reason = corroboratingClassCode.Length > 0
+                    ? (declaredButInvalid ? "TitleGuessCorroborated" : "TitleGuessCorroboratedBlank")
+                    : (declaredButInvalid ? "TitleGuess" : "TitleGuessBlank");
+                return (guessed, reason + ":" + configuredIcaoType);
+            }
+
+            // nothing better found - if a value was declared (even if invalid), still report it and
+            // explain why; if it was simply blank there's nothing wrong to explain, just no data found,
+            // so no note is needed at all
+            return (configuredIcaoType, declaredButInvalid ? "Unresolved:" + configuredIcaoType : "");
         }
 #endif
 
@@ -664,7 +774,7 @@ namespace JoinFS
         /// only way to correctly classify an aircraft whose reported ATC MODEL/type doesn't match any
         /// Doc8643 designator at all (e.g. an add-on shipping a non-standard type string).
         /// </summary>
-        public string LearnIcaoFromLiveObject(string title, string variation, string icaoType, string icaoAirline, string classCode, string wtc, string atcId = "", bool configConfirmed = false)
+        public string LearnIcaoFromLiveObject(string title, string variation, string icaoType, string icaoAirline, string classCode, string wtc, string atcId = "", bool configConfirmed = false, string icaoResolutionNote = "")
         {
 #if FS2024
             Model model = GetModel(title, variation);
@@ -678,8 +788,12 @@ namespace JoinFS
             if (icaoType.Length > 0 && model.icaoType != icaoType)
             {
                 model.icaoType = icaoType;
-                // now confirmed from a real config file or live SimConnect data, not a text guess
-                model.icaoGuessed = false;
+                // A recognized designator read straight from icao_type_designator, or (when that field
+                // held something else - see ResolveConfirmedIcaoType) from icao_model instead, is still
+                // fully confirmed. Only a title-guess/unresolved fallback is genuinely a guess and should
+                // keep the lower-confidence tag (and its ×GuessedSignalMultiplier downweight in scoring).
+                model.icaoGuessed = icaoResolutionNote.StartsWith("TitleGuess") || icaoResolutionNote.StartsWith("Unresolved");
+                model.icaoResolutionNote = icaoResolutionNote;
                 changed = true;
             }
 
@@ -835,15 +949,18 @@ namespace JoinFS
         }
 
         /// <summary>
-        /// Parse one aircraft.cfg/livery.cfg file for [GENERAL] icao_type_designator/icao_WTC (shared
-        /// across every [FLTSIM.N] block in the file), [VARIATION] base_container, and the specific
-        /// [FLTSIM.N] block's atc_id/icao_airline for modelTitle (falling back to the first/only block
-        /// found, since most livery folders - the common case - contain exactly one). Merges into the
-        /// ref parameters rather than overwriting, so a second call (e.g. resolving base_container) can
-        /// fill in only what the first call left blank.
+        /// Parse one aircraft.cfg/livery.cfg file for [GENERAL] icao_type_designator/icao_model/icao_WTC/
+        /// icao_engine_type/icao_engine_count/Category (shared across every [FLTSIM.N] block in the file -
+        /// see ResolveConfirmedIcaoType for why all of these are read, not just icao_type_designator),
+        /// [VARIATION] base_container, and the specific [FLTSIM.N] block's atc_id/icao_airline for
+        /// modelTitle (falling back to the first/only block found, since most livery folders - the common
+        /// case - contain exactly one). Merges into the ref parameters rather than overwriting, so a
+        /// second call (e.g. resolving base_container) can fill in only what the first call left blank.
+        /// icaoResolutionNote is set only when icao_type_designator needed correcting - see
+        /// ResolveConfirmedIcaoType.
         /// </summary>
         bool TryParseAircraftConfigFile(string path, string modelTitle, ref string icaoType, ref string wtc,
-            ref string icaoAirline, ref string atcId, ref string classCode, out string baseContainer)
+            ref string icaoAirline, ref string atcId, ref string classCode, ref string icaoResolutionNote, out string baseContainer)
         {
             baseContainer = "";
             if (File.Exists(path) == false) return false;
@@ -856,7 +973,8 @@ namespace JoinFS
                 string matchedAtcId = "", matchedIcaoAirline = "";
                 bool haveFirst = false;
                 bool matched = false;
-                string fileIcaoType = "", fileWtc = "";
+                string fileIcaoType = "", fileIcaoModel = "", fileWtc = "", fileCategory = "", fileEngineType = "";
+                int fileEngineCount = 0;
 
                 void FinishBlock()
                 {
@@ -900,11 +1018,15 @@ namespace JoinFS
                     if (section == "GENERAL")
                     {
                         if (key.Equals("icao_type_designator", StringComparison.OrdinalIgnoreCase)) fileIcaoType = value;
+                        else if (key.Equals("icao_model", StringComparison.OrdinalIgnoreCase)) fileIcaoModel = value;
                         else if (key.Equals("icao_WTC", StringComparison.OrdinalIgnoreCase))
                         {
                             int slash = value.IndexOf('/');
                             fileWtc = slash >= 0 ? value[..slash] : value;
                         }
+                        else if (key.Equals("icao_engine_type", StringComparison.OrdinalIgnoreCase)) fileEngineType = value;
+                        else if (key.Equals("icao_engine_count", StringComparison.OrdinalIgnoreCase)) int.TryParse(value, out fileEngineCount);
+                        else if (key.Equals("Category", StringComparison.OrdinalIgnoreCase)) fileCategory = value;
                     }
                     else if (section == "VARIATION")
                     {
@@ -919,7 +1041,17 @@ namespace JoinFS
                 }
                 FinishBlock();
 
-                if (icaoType.Length == 0 && fileIcaoType.Length > 0) icaoType = fileIcaoType;
+                // resolve even when icao_type_designator itself is blank (a very common case - see the
+                // wiki's "left them blank" note) as long as icao_model or the title gives something to
+                // try instead; only truly give up when neither field has anything at all
+                if (icaoType.Length == 0 && (fileIcaoType.Length > 0 || fileIcaoModel.Length > 0))
+                {
+                    DeriveClassCodeFromConfig(fileCategory, fileEngineType, fileEngineCount, out string derivedClassCode, out string derivedWtc);
+                    string corroboratingWtc = fileWtc.Length > 0 ? fileWtc : derivedWtc;
+                    var (resolvedIcaoType, note) = ResolveConfirmedIcaoType(fileIcaoType, fileIcaoModel, modelTitle, derivedClassCode, corroboratingWtc);
+                    icaoType = resolvedIcaoType;
+                    if (icaoResolutionNote.Length == 0 && note.Length > 0) icaoResolutionNote = note;
+                }
                 if (wtc.Length == 0 && fileWtc.Length > 0) wtc = fileWtc;
                 if (matched)
                 {
@@ -957,11 +1089,13 @@ namespace JoinFS
         /// source for FS2024 - the same tier of confidence non-FS2024 builds already get from their
         /// upfront folder scan - ahead of DeriveLiveClassCode (category/engine simvars) and title-
         /// guessing, both of which stay as fallbacks for when this can't find/parse a config file.
+        /// icaoResolutionNote is set only when the file's own icao_type_designator wasn't a recognized
+        /// designator and had to be corrected - see ResolveConfirmedIcaoType.
         /// </summary>
         public bool TryReadConfigFromLiveryFolder(string liveryFolder, string modelTitle,
-            out string icaoType, out string wtc, out string icaoAirline, out string atcId, out string classCode)
+            out string icaoType, out string wtc, out string icaoAirline, out string atcId, out string classCode, out string icaoResolutionNote)
         {
-            icaoType = ""; wtc = ""; icaoAirline = ""; atcId = ""; classCode = "";
+            icaoType = ""; wtc = ""; icaoAirline = ""; atcId = ""; classCode = ""; icaoResolutionNote = "";
 
             string resolvedFolder = null;
             if (string.IsNullOrWhiteSpace(liveryFolder))
@@ -1013,7 +1147,7 @@ namespace JoinFS
             try
             {
                 bool found = TryParseAircraftConfigFile(Path.Combine(resolvedFolder, "aircraft.cfg"), modelTitle,
-                    ref icaoType, ref wtc, ref icaoAirline, ref atcId, ref classCode, out string baseContainer);
+                    ref icaoType, ref wtc, ref icaoAirline, ref atcId, ref classCode, ref icaoResolutionNote, out string baseContainer);
                 if (found == false)
                 {
                     // TryParseAircraftConfigFile always resets its own out baseContainer to "" as its
@@ -1022,7 +1156,7 @@ namespace JoinFS
                     // (e.g. a pure [VARIATION] overlay with no [GENERAL] section of its own at all, which
                     // legitimately has no icaoType to report but does have the reference to follow)
                     found = TryParseAircraftConfigFile(Path.Combine(resolvedFolder, "livery.cfg"), modelTitle,
-                        ref icaoType, ref wtc, ref icaoAirline, ref atcId, ref classCode, out string liveryBaseContainer);
+                        ref icaoType, ref wtc, ref icaoAirline, ref atcId, ref classCode, ref icaoResolutionNote, out string liveryBaseContainer);
                     if (baseContainer.Length == 0)
                     {
                         baseContainer = liveryBaseContainer;
@@ -1037,7 +1171,7 @@ namespace JoinFS
                     if (baseFolder != null)
                     {
                         TryParseAircraftConfigFile(Path.Combine(baseFolder, "aircraft.cfg"), modelTitle,
-                            ref icaoType, ref wtc, ref icaoAirline, ref atcId, ref classCode, out _);
+                            ref icaoType, ref wtc, ref icaoAirline, ref atcId, ref classCode, ref icaoResolutionNote, out _);
                     }
                 }
 
@@ -1963,6 +2097,7 @@ namespace JoinFS
 
                         // [GENERAL] section values - apply once per file to every model found in it
                         string generalIcaoType = "";
+                        string generalIcaoModel = "";
                         string generalWtc = "";
                         string generalCategory = "";
 
@@ -2022,6 +2157,14 @@ namespace JoinFS
                             {
                                 // get ICAO type designator, e.g. "EC45"
                                 generalIcaoType = TrimQuotes(line[20..]);
+                            }
+                            else if (line.StartsWith("icao_model", StringComparison.OrdinalIgnoreCase))
+                            {
+                                // descriptive-only model name per the MSFS SDK, not meant for matching -
+                                // read anyway as a fallback for add-ons that put the real designator here
+                                // instead of in icao_type_designator (see ResolveConfirmedIcaoType/
+                                // IsRecognizedIcaoType below)
+                                generalIcaoModel = TrimQuotes(line[10..]);
                             }
                             else if (line.StartsWith("icao_WTC", StringComparison.OrdinalIgnoreCase))
                             {
@@ -2088,7 +2231,11 @@ namespace JoinFS
                                 models[index].smokeCount = smokeCount;
                                 if (generalIcaoType.Length > 0)
                                 {
-                                    models[index].icaoType = generalIcaoType;
+                                    // some add-ons put the real designator in icao_model instead of
+                                    // icao_type_designator - prefer whichever field is actually recognized
+                                    models[index].icaoType = IsRecognizedIcaoType(generalIcaoType) ? generalIcaoType
+                                        : IsRecognizedIcaoType(generalIcaoModel) ? generalIcaoModel
+                                        : generalIcaoType;
                                     if (generalWtc.Length > 0) models[index].wtc = generalWtc;
                                     models[index].RefreshIcaoDerived(doc8643Lookup);
                                 }

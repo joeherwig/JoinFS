@@ -639,6 +639,27 @@
   <data name="MatchExplain_IcaoGuessedWarning" xml:space="preserve">
     <value>Nota: el tipo ICAO del modelo asignado fue inferido por JoinFS a partir del texto del título, no confirmado mediante datos en vivo del simulador ni su archivo de configuración real - esta señal se penaliza en la puntuación. Verifique que sea correcto si la coincidencia parece errónea.</value>
   </data>
+  <data name="MatchExplain_IcaoResolution_IcaoModelFallback" xml:space="preserve">
+    <value>Nota: el archivo de configuración de este modelo declara icao_type_designator='{0}', que no es un tipo ICAO reconocido - JoinFS usó en su lugar el campo icao_model, que nombra correctamente un tipo real ('{1}').</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_IcaoModelOnly" xml:space="preserve">
+    <value>Nota: el archivo de configuración de este modelo no declara ningún icao_type_designator - JoinFS usó en su lugar el campo icao_model, que nombra correctamente un tipo real ('{0}').</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuessBlank" xml:space="preserve">
+    <value>Nota: el archivo de configuración de este modelo no declara ningún icao_type_designator - JoinFS adivinó '{0}' a partir del texto del título del modelo. Verifique que sea correcto si la coincidencia parece errónea.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuessCorroboratedBlank" xml:space="preserve">
+    <value>Nota: el archivo de configuración de este modelo no declara ningún icao_type_designator - JoinFS adivinó '{0}' a partir del texto del título del modelo, corroborado por el código de clase/categoría de estela derivado del mismo archivo de configuración.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuess" xml:space="preserve">
+    <value>Nota: el archivo de configuración de este modelo declara icao_type_designator='{0}', que no es un tipo ICAO reconocido - JoinFS adivinó '{1}' a partir del texto del título del modelo. Verifique que sea correcto si la coincidencia parece errónea.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuessCorroborated" xml:space="preserve">
+    <value>Nota: el archivo de configuración de este modelo declara icao_type_designator='{0}', que no es un tipo ICAO reconocido - JoinFS adivinó '{1}' a partir del texto del título del modelo, corroborado por el código de clase/categoría de estela derivado del mismo archivo de configuración.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_Unresolved" xml:space="preserve">
+    <value>Nota: el archivo de configuración de este modelo declara icao_type_designator='{0}', que no es un tipo ICAO reconocido, y JoinFS tampoco pudo encontrar una coincidencia mejor a partir del título o del código de clase - se informa tal como está declarado.</value>
+  </data>
   <data name="MatchExplain_ClassCodeConfirmedNote" xml:space="preserve">
     <value>Nota: el código de clase/WTC/rol de tipo del modelo asignado se confirmaron directamente a partir de datos en vivo del simulador o de su archivo de configuración real la última vez que se voló localmente, en lugar de buscarse por tipo ICAO en la referencia Doc8643 incluida.</value>
   </data>

@@ -67,6 +67,38 @@ namespace JoinFS
             return description;
         }
 
+        /// <summary>
+        /// Explains a corrected ICAO type designator, if any - see Model.icaoResolutionNote, set when a
+        /// config-confirmed icao_type_designator wasn't a recognized Doc8643 designator (wrong or entirely
+        /// blank) and JoinFS had to find the real one another way (icao_model, a title guess, or a title
+        /// guess corroborated by classCode/WTC - see ResolveConfirmedIcaoType). Returns "" when nothing
+        /// needed correcting.
+        /// </summary>
+        string IcaoResolutionExplanation()
+        {
+            string note = aircraft.subModel?.icaoResolutionNote ?? "";
+            if (note.Length == 0) return "";
+
+            int colon = note.IndexOf(':');
+            string reason = colon >= 0 ? note[..colon] : note;
+            string declaredValue = colon >= 0 ? note[(colon + 1)..] : "";
+            string resolvedValue = aircraft.subModel.icaoType;
+
+            // "Blank" variants mean icao_type_designator wasn't merely wrong but entirely absent - those
+            // messages take only the resolved value, since there's no invalid declared value to reference
+            return reason switch
+            {
+                "IcaoModelFallback" => string.Format(Resources.Strings.MatchExplain_IcaoResolution_IcaoModelFallback, declaredValue, resolvedValue),
+                "IcaoModelOnly" => string.Format(Resources.Strings.MatchExplain_IcaoResolution_IcaoModelOnly, resolvedValue),
+                "TitleGuessCorroborated" => string.Format(Resources.Strings.MatchExplain_IcaoResolution_TitleGuessCorroborated, declaredValue, resolvedValue),
+                "TitleGuessCorroboratedBlank" => string.Format(Resources.Strings.MatchExplain_IcaoResolution_TitleGuessCorroboratedBlank, resolvedValue),
+                "TitleGuess" => string.Format(Resources.Strings.MatchExplain_IcaoResolution_TitleGuess, declaredValue, resolvedValue),
+                "TitleGuessBlank" => string.Format(Resources.Strings.MatchExplain_IcaoResolution_TitleGuessBlank, resolvedValue),
+                "Unresolved" => string.Format(Resources.Strings.MatchExplain_IcaoResolution_Unresolved, declaredValue, resolvedValue),
+                _ => ""
+            };
+        }
+
         void RefreshWindow()
         {
             Substitution.MatchTrace trace = aircraft.subTrace;
@@ -92,8 +124,16 @@ namespace JoinFS
             }
             Label_Outcome.Text = outcomeText;
 
-            // ICAO-guessed warning
-            if (aircraft.subModel != null && aircraft.subModel.icaoGuessed)
+            // ICAO-guessed / ICAO-corrected warning - a resolution note (see Model.icaoResolutionNote)
+            // takes priority since it explains specifically what happened; falls back to the generic
+            // guessed warning for the older upfront-scan title guess path, which doesn't track a note
+            string resolutionText = IcaoResolutionExplanation();
+            if (resolutionText.Length > 0)
+            {
+                Label_IcaoGuessed.Text = resolutionText;
+                Label_IcaoGuessed.Visible = true;
+            }
+            else if (aircraft.subModel != null && aircraft.subModel.icaoGuessed)
             {
                 Label_IcaoGuessed.Text = Resources.Strings.MatchExplain_IcaoGuessedWarning;
                 Label_IcaoGuessed.Visible = true;

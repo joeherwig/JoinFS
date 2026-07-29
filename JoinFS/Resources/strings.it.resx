@@ -639,6 +639,27 @@
   <data name="MatchExplain_IcaoGuessedWarning" xml:space="preserve">
     <value>Nota: il tipo ICAO del modello abbinato è stato dedotto da JoinFS dal testo del titolo, non confermato tramite dati live del simulatore o il suo vero file di configurazione - questo segnale viene penalizzato nel punteggio. Verificare che sia corretto se la corrispondenza sembra errata.</value>
   </data>
+  <data name="MatchExplain_IcaoResolution_IcaoModelFallback" xml:space="preserve">
+    <value>Nota: il file di configurazione di questo modello dichiara icao_type_designator='{0}', che non è un tipo ICAO riconosciuto - JoinFS ha usato invece il campo icao_model, che indica correttamente un tipo reale ('{1}').</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_IcaoModelOnly" xml:space="preserve">
+    <value>Nota: il file di configurazione di questo modello non dichiara alcun icao_type_designator - JoinFS ha usato invece il campo icao_model, che indica correttamente un tipo reale ('{0}').</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuessBlank" xml:space="preserve">
+    <value>Nota: il file di configurazione di questo modello non dichiara alcun icao_type_designator - JoinFS ha dedotto '{0}' dal testo del titolo del modello. Verificare che sia corretto se la corrispondenza sembra errata.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuessCorroboratedBlank" xml:space="preserve">
+    <value>Nota: il file di configurazione di questo modello non dichiara alcun icao_type_designator - JoinFS ha dedotto '{0}' dal testo del titolo del modello, corroborato dal codice di classe/categoria di turbolenza di scia derivato dallo stesso file di configurazione.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuess" xml:space="preserve">
+    <value>Nota: il file di configurazione di questo modello dichiara icao_type_designator='{0}', che non è un tipo ICAO riconosciuto - JoinFS ha dedotto '{1}' dal testo del titolo del modello. Verificare che sia corretto se la corrispondenza sembra errata.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuessCorroborated" xml:space="preserve">
+    <value>Nota: il file di configurazione di questo modello dichiara icao_type_designator='{0}', che non è un tipo ICAO riconosciuto - JoinFS ha dedotto '{1}' dal testo del titolo del modello, corroborato dal codice di classe/categoria di turbolenza di scia derivato dallo stesso file di configurazione.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_Unresolved" xml:space="preserve">
+    <value>Nota: il file di configurazione di questo modello dichiara icao_type_designator='{0}', che non è un tipo ICAO riconosciuto, e JoinFS non è riuscito a trovare una corrispondenza migliore nemmeno dal titolo o dal codice di classe - il valore viene riportato così come dichiarato.</value>
+  </data>
   <data name="MatchExplain_ClassCodeConfirmedNote" xml:space="preserve">
     <value>Nota: il codice di classe/WTC/ruolo tipo del modello abbinato sono stati confermati direttamente da dati live del simulatore o dal suo vero file di configurazione l'ultima volta che è stato pilotato localmente, anziché ricercati tramite il tipo ICAO nel riferimento Doc8643 incluso.</value>
   </data>
