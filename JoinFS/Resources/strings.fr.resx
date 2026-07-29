@@ -639,6 +639,27 @@
   <data name="MatchExplain_IcaoGuessedWarning" xml:space="preserve">
     <value>Remarque : le type OACI du modèle correspondant a été déduit par JoinFS à partir du texte du titre, non confirmé par des données en direct du simulateur ni par son véritable fichier de configuration - ce signal est déprécié dans le calcul du score. Vérifiez que cela est correct si la correspondance semble erronée.</value>
   </data>
+  <data name="MatchExplain_IcaoResolution_IcaoModelFallback" xml:space="preserve">
+    <value>Remarque : le fichier de configuration de ce modèle déclare icao_type_designator='{0}', qui n'est pas un type OACI reconnu - JoinFS a utilisé à la place le champ icao_model, qui nomme correctement un type réel ('{1}').</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_IcaoModelOnly" xml:space="preserve">
+    <value>Remarque : le fichier de configuration de ce modèle ne déclare aucun icao_type_designator - JoinFS a utilisé à la place le champ icao_model, qui nomme correctement un type réel ('{0}').</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuessBlank" xml:space="preserve">
+    <value>Remarque : le fichier de configuration de ce modèle ne déclare aucun icao_type_designator - JoinFS a déduit '{0}' à partir du texte du titre du modèle. Vérifiez que cela est correct si la correspondance semble erronée.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuessCorroboratedBlank" xml:space="preserve">
+    <value>Remarque : le fichier de configuration de ce modèle ne déclare aucun icao_type_designator - JoinFS a déduit '{0}' à partir du texte du titre du modèle, corroboré par le code de classe/catégorie de turbulence de sillage dérivé du même fichier de configuration.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuess" xml:space="preserve">
+    <value>Remarque : le fichier de configuration de ce modèle déclare icao_type_designator='{0}', qui n'est pas un type OACI reconnu - JoinFS a déduit '{1}' à partir du texte du titre du modèle. Vérifiez que cela est correct si la correspondance semble erronée.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuessCorroborated" xml:space="preserve">
+    <value>Remarque : le fichier de configuration de ce modèle déclare icao_type_designator='{0}', qui n'est pas un type OACI reconnu - JoinFS a déduit '{1}' à partir du texte du titre du modèle, corroboré par le code de classe/catégorie de turbulence de sillage dérivé du même fichier de configuration.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_Unresolved" xml:space="preserve">
+    <value>Remarque : le fichier de configuration de ce modèle déclare icao_type_designator='{0}', qui n'est pas un type OACI reconnu, et JoinFS n'a pas non plus trouvé de meilleure correspondance à partir du titre ou du code de classe - la valeur est signalée telle quelle.</value>
+  </data>
   <data name="MatchExplain_ClassCodeConfirmedNote" xml:space="preserve">
     <value>Remarque : le code de classe/WTC/rôle de type du modèle correspondant ont été confirmés directement à partir de données en direct du simulateur ou de son véritable fichier de configuration lors du dernier vol local, plutôt que déduits du type OACI via la référence Doc8643 fournie.</value>
   </data>

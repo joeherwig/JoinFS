@@ -639,6 +639,27 @@
   <data name="MatchExplain_IcaoGuessedWarning" xml:space="preserve">
     <value>Opmerking: het ICAO-type van het gekoppelde model is door JoinFS afgeleid uit de titeltekst, niet bevestigd via live simulatorgegevens of het echte configuratiebestand - dit signaal wordt lager gewaardeerd bij de score. Controleer of dit klopt als de match er verkeerd uitziet.</value>
   </data>
+  <data name="MatchExplain_IcaoResolution_IcaoModelFallback" xml:space="preserve">
+    <value>Opmerking: het configuratiebestand van dit model geeft icao_type_designator='{0}' op, wat geen erkend ICAO-type is - JoinFS heeft in plaats daarvan het veld icao_model gebruikt, dat correct een echt type ('{1}') aangeeft.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_IcaoModelOnly" xml:space="preserve">
+    <value>Opmerking: het configuratiebestand van dit model geeft geen icao_type_designator op - JoinFS heeft in plaats daarvan het veld icao_model gebruikt, dat correct een echt type ('{0}') aangeeft.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuessBlank" xml:space="preserve">
+    <value>Opmerking: het configuratiebestand van dit model geeft geen icao_type_designator op - JoinFS heeft in plaats daarvan '{0}' afgeleid uit de titeltekst van het model. Controleer of dit klopt als de match er verkeerd uitziet.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuessCorroboratedBlank" xml:space="preserve">
+    <value>Opmerking: het configuratiebestand van dit model geeft geen icao_type_designator op - JoinFS heeft in plaats daarvan '{0}' afgeleid uit de titeltekst van het model, bevestigd door de klassecode/zogturbulentiecategorie die uit hetzelfde configuratiebestand is afgeleid.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuess" xml:space="preserve">
+    <value>Opmerking: het configuratiebestand van dit model geeft icao_type_designator='{0}' op, wat geen erkend ICAO-type is - JoinFS heeft in plaats daarvan '{1}' afgeleid uit de titeltekst van het model. Controleer of dit klopt als de match er verkeerd uitziet.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuessCorroborated" xml:space="preserve">
+    <value>Opmerking: het configuratiebestand van dit model geeft icao_type_designator='{0}' op, wat geen erkend ICAO-type is - JoinFS heeft in plaats daarvan '{1}' afgeleid uit de titeltekst van het model, bevestigd door de klassecode/zog­turbulentiecategorie die uit hetzelfde configuratiebestand is afgeleid.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_Unresolved" xml:space="preserve">
+    <value>Opmerking: het configuratiebestand van dit model geeft icao_type_designator='{0}' op, wat geen erkend ICAO-type is, en JoinFS kon ook geen betere overeenkomst vinden op basis van de titel of klassecode - de waarde wordt gerapporteerd zoals opgegeven.</value>
+  </data>
   <data name="MatchExplain_ClassCodeConfirmedNote" xml:space="preserve">
     <value>Opmerking: klassecode/WTC/typerol van het gekoppelde model zijn de laatste keer dat lokaal is gevlogen rechtstreeks bevestigd via live simulatorgegevens of het echte configuratiebestand, in plaats van opgezocht via het ICAO-type in de meegeleverde Doc8643-referentie.</value>
   </data>

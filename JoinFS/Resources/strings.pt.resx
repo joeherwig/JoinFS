@@ -639,6 +639,27 @@
   <data name="MatchExplain_IcaoGuessedWarning" xml:space="preserve">
     <value>Nota: o tipo ICAO do modelo correspondido foi inferido pelo JoinFS a partir do texto do título, não confirmado por dados ao vivo do simulador ou pelo seu arquivo de configuração real - este sinal é penalizado na pontuação. Verifique se está correto caso a correspondência pareça errada.</value>
   </data>
+  <data name="MatchExplain_IcaoResolution_IcaoModelFallback" xml:space="preserve">
+    <value>Nota: o arquivo de configuração deste modelo declara icao_type_designator='{0}', que não é um tipo ICAO reconhecido - o JoinFS usou em vez disso o campo icao_model, que nomeia corretamente um tipo real ('{1}').</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_IcaoModelOnly" xml:space="preserve">
+    <value>Nota: o arquivo de configuração deste modelo não declara nenhum icao_type_designator - o JoinFS usou em vez disso o campo icao_model, que nomeia corretamente um tipo real ('{0}').</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuessBlank" xml:space="preserve">
+    <value>Nota: o arquivo de configuração deste modelo não declara nenhum icao_type_designator - o JoinFS deduziu '{0}' a partir do texto do título do modelo. Verifique se está correto caso a correspondência pareça errada.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuessCorroboratedBlank" xml:space="preserve">
+    <value>Nota: o arquivo de configuração deste modelo não declara nenhum icao_type_designator - o JoinFS deduziu '{0}' a partir do texto do título do modelo, corroborado pelo código de classe/categoria de esteira de turbulência derivado do mesmo arquivo de configuração.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuess" xml:space="preserve">
+    <value>Nota: o arquivo de configuração deste modelo declara icao_type_designator='{0}', que não é um tipo ICAO reconhecido - o JoinFS deduziu '{1}' a partir do texto do título do modelo. Verifique se está correto caso a correspondência pareça errada.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuessCorroborated" xml:space="preserve">
+    <value>Nota: o arquivo de configuração deste modelo declara icao_type_designator='{0}', que não é um tipo ICAO reconhecido - o JoinFS deduziu '{1}' a partir do texto do título do modelo, corroborado pelo código de classe/categoria de esteira de turbulência derivado do mesmo arquivo de configuração.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_Unresolved" xml:space="preserve">
+    <value>Nota: o arquivo de configuração deste modelo declara icao_type_designator='{0}', que não é um tipo ICAO reconhecido, e o JoinFS também não conseguiu encontrar uma correspondência melhor a partir do título ou do código de classe - o valor é reportado como declarado.</value>
+  </data>
   <data name="MatchExplain_ClassCodeConfirmedNote" xml:space="preserve">
     <value>Nota: o código de classe/WTC/função de tipo do modelo correspondido foram confirmados diretamente a partir de dados ao vivo do simulador ou do seu arquivo de configuração real na última vez em que foi pilotado localmente, em vez de consultados pelo tipo ICAO na referência Doc8643 incluída.</value>
   </data>

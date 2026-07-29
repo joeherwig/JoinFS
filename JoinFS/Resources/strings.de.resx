@@ -639,6 +639,27 @@
   <data name="MatchExplain_IcaoGuessedWarning" xml:space="preserve">
     <value>Hinweis: Der ICAO-Typ des zugeordneten Modells wurde von JoinFS anhand des Titeltexts vermutet, nicht durch Live-Simulatordaten oder seine echte Konfigurationsdatei bestätigt - dieses Signal wird bei der Bewertung abgewertet. Bitte prüfen, ob der Abgleich korrekt ist, falls er falsch erscheint.</value>
   </data>
+  <data name="MatchExplain_IcaoResolution_IcaoModelFallback" xml:space="preserve">
+    <value>Hinweis: Die Konfigurationsdatei dieses Modells gibt icao_type_designator='{0}' an, was kein anerkannter ICAO-Typ ist - JoinFS hat stattdessen das Feld icao_model verwendet, das korrekt einen echten Typ ('{1}') benennt.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_IcaoModelOnly" xml:space="preserve">
+    <value>Hinweis: Die Konfigurationsdatei dieses Modells gibt keinen icao_type_designator an - JoinFS hat stattdessen das Feld icao_model verwendet, das korrekt einen echten Typ ('{0}') benennt.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuessBlank" xml:space="preserve">
+    <value>Hinweis: Die Konfigurationsdatei dieses Modells gibt keinen icao_type_designator an - JoinFS hat stattdessen '{0}' aus dem Titeltext des Modells vermutet. Bitte prüfen, ob der Abgleich korrekt ist, falls er falsch erscheint.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuessCorroboratedBlank" xml:space="preserve">
+    <value>Hinweis: Die Konfigurationsdatei dieses Modells gibt keinen icao_type_designator an - JoinFS hat stattdessen '{0}' aus dem Titeltext des Modells vermutet, bestätigt durch die aus derselben Konfigurationsdatei abgeleitete Klassenkennung/Wirbelschleppenkategorie.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuess" xml:space="preserve">
+    <value>Hinweis: Die Konfigurationsdatei dieses Modells gibt icao_type_designator='{0}' an, was kein anerkannter ICAO-Typ ist - JoinFS hat stattdessen '{1}' aus dem Titeltext des Modells vermutet. Bitte prüfen, ob der Abgleich korrekt ist, falls er falsch erscheint.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_TitleGuessCorroborated" xml:space="preserve">
+    <value>Hinweis: Die Konfigurationsdatei dieses Modells gibt icao_type_designator='{0}' an, was kein anerkannter ICAO-Typ ist - JoinFS hat stattdessen '{1}' aus dem Titeltext des Modells vermutet, bestätigt durch die aus derselben Konfigurationsdatei abgeleitete Klassenkennung/Wirbelschleppenkategorie.</value>
+  </data>
+  <data name="MatchExplain_IcaoResolution_Unresolved" xml:space="preserve">
+    <value>Hinweis: Die Konfigurationsdatei dieses Modells gibt icao_type_designator='{0}' an, was kein anerkannter ICAO-Typ ist, und JoinFS konnte auch anhand des Titeltexts oder der Klassenkennung keine bessere Übereinstimmung finden - der Wert wird wie angegeben gemeldet.</value>
+  </data>
   <data name="MatchExplain_ClassCodeConfirmedNote" xml:space="preserve">
     <value>Hinweis: Klassencode/WTC/Typrolle des zugeordneten Modells wurden beim letzten lokalen Flug direkt aus Live-Simulatordaten oder seiner echten Konfigurationsdatei bestätigt, statt anhand des ICAO-Typs in der mitgelieferten Doc8643-Referenz nachgeschlagen.</value>
   </data>

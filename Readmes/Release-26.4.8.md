@@ -12,6 +12,7 @@
 - Fixed `LIVERY FOLDER`-based config reading (see above) silently finding nothing for the many FS2024 add-ons that ship a single `aircraft.cfg` with no separate `livery.cfg` - these now resolve via a title-based lookup against your installed packages instead.
 - Fixed a `base_container` resolution bug where a variation package's real config data could be discarded if that package had no `livery.cfg` of its own.
 - Fixed the installed-package index used by the two fixes above missing every package when your configured simulator folder is the sim's base install directory rather than a `Community`-style folder directly - it now looks one level deeper to find the actual package folders.
+- **ICAO type designator is now validated, not trusted blindly.** A config-confirmed `icao_type_designator` is checked against the official ICAO Doc8643 reference list; if it's missing or isn't a real designator (a real, confirmed add-on authoring mistake: `icao_type_designator="500E"`, not a real code, with the actual designator sitting in the separate `icao_model` field instead), JoinFS now tries the `icao_model` field, then a title-text guess corroborated by a class code/WTC derived from that same file's engine/category fields, before finally falling back to the raw value. Explain Match shows exactly what was declared and what was used instead, and why.
 
 ## Localization
 
