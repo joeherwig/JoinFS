@@ -50,6 +50,19 @@ namespace JoinFS
         }
 
         /// <summary>
+        /// Parse a command-line true/false (also accepting 1/0) argument
+        /// </summary>
+        static bool ParseBoolArg(string value, bool fallback)
+        {
+            return value.Trim().ToLowerInvariant() switch
+            {
+                "true" or "1" => true,
+                "false" or "0" => false,
+                _ => fallback,
+            };
+        }
+
+        /// <summary>
         /// Storage path
         /// </summary>
         public string storagePath = ".";
@@ -107,6 +120,11 @@ namespace JoinFS
         public bool settingsTcas = false;
         public bool settingsScan = false;
         public bool settingsUseAIFeatures = false;
+
+        // elevated platform (helipad/ship deck/rooftop) ground-trust feature - command-line only, not persisted
+        public bool settingsElevatedPlatformRecognition = true;
+        public bool settingsElevatedPlatformHelicoptersOnly = true;
+        public int settingsElevatedPlatformThreshold = 50; // cm
 #if XPLANE || CONSOLE
         public bool settingsGenerateCsl = false;
         public bool settingsSkipCsl = false;
@@ -537,6 +555,36 @@ namespace JoinFS
                                 settingsScan = true;
                                 break;
 
+                            case "-elevatedplatformrecognition":
+                                // next parameter
+                                index++;
+                                // check for parameter
+                                if (index < args.Length)
+                                {
+                                    settingsElevatedPlatformRecognition = ParseBoolArg(args[index], settingsElevatedPlatformRecognition);
+                                }
+                                break;
+
+                            case "-elevatedplatformhelicoptersonly":
+                                // next parameter
+                                index++;
+                                // check for parameter
+                                if (index < args.Length)
+                                {
+                                    settingsElevatedPlatformHelicoptersOnly = ParseBoolArg(args[index], settingsElevatedPlatformHelicoptersOnly);
+                                }
+                                break;
+
+                            case "-elevatedplatformthreshold":
+                                // next parameter
+                                index++;
+                                // check for parameter
+                                if (index < args.Length && Int32.TryParse(args[index], NumberStyles.Number, CultureInfo.InvariantCulture, out int elevatedPlatformThresholdVal))
+                                {
+                                    settingsElevatedPlatformThreshold = elevatedPlatformThresholdVal;
+                                }
+                                break;
+
 #if XPLANE || CONSOLE
                             case "-generatecsl":
                                 settingsGenerateCsl = true;
@@ -623,6 +671,9 @@ namespace JoinFS
                                 Console.WriteLine("  --websocket            Enable WebSocket server broadcasting aircraft data");
                                 Console.WriteLine("  --websocketport <port> WebSocket server port (default 8765)");
                                 Console.WriteLine("  --websocketlog         Log WebSocket events and webhook calls (default false)");
+                                Console.WriteLine("  --elevatedplatformrecognition <true|false>       Trust remote on-ground flag on helipads/ship decks/rooftops instead of local terrain mesh (default true)");
+                                Console.WriteLine("  --elevatedplatformhelicoptersonly <true|false>   Restrict elevated platform recognition to helicopters (default true)");
+                                Console.WriteLine("  --elevatedplatformthreshold <cm>                 Minimum elevation mismatch before elevated platform recognition engages (default 50)");
                                 Console.WriteLine("");
                                 Console.WriteLine("Interactive key commands:");
                                 Console.WriteLine("");

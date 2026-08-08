@@ -315,6 +315,8 @@ namespace JoinFS
             public float pitch;
             public float bank;
             public float heading;
+            /// <summary>Forwarded to SimConnect's "SIM ON GROUND" only when the elevated-platform ground-trust decision applies - see helicopters-on-elevated-platforms feature. Left 0 (unset) for ordinary traffic, unchanged from prior behavior.</summary>
+            public int ground;
 
             public ObjectPositionUpdate(ref ObjectPosition position)
             {
@@ -753,6 +755,8 @@ namespace JoinFS
             public Pos simPosition = new();
             public Pos netPosition = new();
             public Vel netVelocity = new();
+            /// <summary>True when this object's on-ground state should be trusted from the network (elevated platform - helipad/ship deck/rooftop) rather than corrected toward local terrain mesh. See helicopters-on-elevated-platforms feature.</summary>
+            public bool trustingPlatformGround = false;
             public Vector oldEuler;
             public double distance = double.MaxValue;
             public bool paused = false;
@@ -1217,8 +1221,14 @@ namespace JoinFS
             // check for valid object
             if (simconnect != null && obj.Created)
             {
-                // update object position and velocity
-                simconnect.SetData(Definitions.OBJECT_POSITION_UPDATE, obj.simId, new ObjectPositionUpdate(ref position));
+                // update object position and velocity - forward on-ground to the sim's own placement only when the
+                // elevated-platform ground-trust decision applies, so the sim's structure-aware collision/physics can
+                // rest the object on the real helipad/deck/rooftop geometry (see helicopters-on-elevated-platforms feature)
+                ObjectPositionUpdate update = new(ref position)
+                {
+                    ground = obj.trustingPlatformGround ? 1 : 0
+                };
+                simconnect.SetData(Definitions.OBJECT_POSITION_UPDATE, obj.simId, update);
                 // update stored position
                 obj.simPosition = new Pos(ref position);
             }
@@ -1892,8 +1902,30 @@ namespace JoinFS
                 // check for first update and reject old updates
                 if (aircraft.NetValid == false || netTime > aircraft.netStateTime)
                 {
+                    // elevated platform (helipad/ship deck/rooftop) ground-trust check - see helicopters-on-elevated-platforms feature.
+                    // when the sender reports on-ground and its reported height mismatches our local terrain mesh by more than the
+                    // configured threshold, trust the sender's altitude instead of blending toward local mesh - large mismatches mean
+                    // the sender is resting on a platform our local mesh probe has no knowledge of, not just cross-client mesh noise.
+                    bool trustPlatformGround = false;
+                    if (main.settingsElevatedPlatformRecognition && aircraftPosition.ground != 0 && aircraft.SimValid &&
+                        (main.settingsElevatedPlatformHelicoptersOnly == false || aircraft is Helicopter))
+                    {
+                        double senderHeight = aircraftPosition.altitude - aircraftPosition.elevation;
+                        double localHeight = aircraftPosition.altitude - aircraft.simPosition.elevation;
+                        double mismatchCm = Math.Abs(localHeight - senderHeight) * 100.0;
+                        if (mismatchCm >= main.settingsElevatedPlatformThreshold)
+                        {
+                            trustPlatformGround = true;
+                        }
+                        if (trustPlatformGround != aircraft.trustingPlatformGround)
+                        {
+                            main.MonitorNetwork("ElevatedPlatform '" + aircraft.flightPlan.callsign + "' mismatch=" + mismatchCm.ToString("F0") + "cm threshold=" + main.settingsElevatedPlatformThreshold + "cm trust=" + trustPlatformGround);
+                        }
+                    }
+                    aircraft.trustingPlatformGround = trustPlatformGround;
+
                     // check if correction is enabled and local height is valid
-                    if (Settings.Default.ElevationCorrection && aircraft.SimValid)
+                    if (Settings.Default.ElevationCorrection && aircraft.SimValid && trustPlatformGround == false)
                     {
                         // calculate height
                         double height = aircraftPosition.altitude - aircraftPosition.elevation;

@@ -49,6 +49,7 @@ namespace JoinFS
             public int lightNav, lightBeacon, lightLanding, lightTaxi, lightStrobe;
             public bool eng1, eng2, eng3, eng4;
             public double rotorRpm;
+            public bool onGround;
         }
 
         public WebSocketServer(Main main)
@@ -185,6 +186,7 @@ namespace JoinFS
                 snap.longitude = pos.geo.x * (180.0 / Math.PI);
                 snap.altitude  = pos.geo.y * Sim.FEET_PER_METRE;
                 snap.heading   = (int)(pos.angles.y * 180.0 / Math.PI);
+                snap.onGround  = pos.ground != 0;
             }
 
             snap.speed = Math.Sqrt(
@@ -263,7 +265,8 @@ namespace JoinFS
             a.lightNav == b.lightNav && a.lightBeacon == b.lightBeacon &&
             a.lightLanding == b.lightLanding && a.lightTaxi == b.lightTaxi && a.lightStrobe == b.lightStrobe &&
             a.eng1 == b.eng1 && a.eng2 == b.eng2 && a.eng3 == b.eng3 && a.eng4 == b.eng4 &&
-            a.rotorRpm == b.rotorRpm;
+            a.rotorRpm == b.rotorRpm &&
+            a.onGround == b.onGround;
 
         static object ToJson(in AircraftSnapshot s) => new
         {
@@ -292,7 +295,8 @@ namespace JoinFS
             flaps    = Math.Round(s.flaps, 3),
             lights   = new { nav = s.lightNav, beacon = s.lightBeacon, landing = s.lightLanding, taxi = s.lightTaxi, strobe = s.lightStrobe },
             engines  = new { eng1Running = s.eng1, eng2Running = s.eng2, eng3Running = s.eng3, eng4Running = s.eng4 },
-            rotorRpm = Math.Round(s.rotorRpm, 1)
+            rotorRpm = Math.Round(s.rotorRpm, 1),
+            onGround = s.onGround
         };
 
         // Called from DoWork() inside conch lock
