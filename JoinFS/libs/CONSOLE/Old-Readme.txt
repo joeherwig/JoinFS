@@ -36,6 +36,7 @@ Usage: dotnet JoinFS-CONSOLE.dll [options]
   --whazzup-public       Include aircraft from all public hubs in the 'whazzup.txt' file
   --minimize             Launch JoinFS minimized on the Windows task bar. Quiet mode.
   --background           For JoinFS-CONSOLE, run as a background task with no keyboard input.
+  --backgrounddelay <ms> Idle delay for the --background shutdown poll (default 100). Use 0 to poll without sleeping, which costs a fully loaded CPU core. Aircraft syncing is unaffected either way - it runs on a separate work thread.
   --nosim                Do not connect to the simulator at launch.
   --nogui                Run JoinFS as a background process without any windows or UI.
   --multiobjects         Allow this client to receive more than one aircraft from any other client in a session.

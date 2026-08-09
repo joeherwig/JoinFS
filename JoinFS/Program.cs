@@ -115,6 +115,7 @@ namespace JoinFS
 
 #if CONSOLE
         public bool settingsBackground = false;
+        public int settingsBackgroundDelay = 100;
         public string settingsComsWebhookUri = "";
         public string settingsComsWebhookMethod = "PUT";
         public bool settingsWebSocket = false;
@@ -551,6 +552,20 @@ namespace JoinFS
                                 settingsBackground = true;
                                 break;
 
+                            case "-backgrounddelay":
+                                // next parameter
+                                index++;
+                                // check for parameter
+                                if (index < args.Length)
+                                {
+                                    if (int.TryParse(args[index], NumberStyles.Number, CultureInfo.InvariantCulture, out int delay))
+                                    {
+                                        // update background delay, never negative
+                                        settingsBackgroundDelay = Math.Max(0, delay);
+                                    }
+                                }
+                                break;
+
                             case "-comswebhookuri":
                                 index++;
                                 if (index < args.Length) settingsComsWebhookUri = args[index];
@@ -605,6 +620,7 @@ namespace JoinFS
                                 Console.WriteLine("  --whazzup-public       " + Resources.Strings.Tip_WhazzupGlobal);
                                 Console.WriteLine("  --minimize             " + Resources.Strings.Options_Minimize);
                                 Console.WriteLine("  --background           " + Resources.Strings.Options_Background);
+                                Console.WriteLine("  --backgrounddelay <ms> Idle delay of the --background shutdown poll (default 100, 0 to spin)");
                                 Console.WriteLine("  --nosim                " + Resources.Strings.Options_NoSim);
                                 Console.WriteLine("  --nogui                " + Resources.Strings.Options_NoGui);
                                 Console.WriteLine("  --multiobjects         " + Resources.Strings.Tip_MultiObjects);
@@ -2036,6 +2052,18 @@ namespace JoinFS
                         else if (info.Modifiers == ConsoleModifiers.Control && info.Key == ConsoleKey.N) main.ToggleNetwork();
                         else if (info.Modifiers == ConsoleModifiers.Control && info.Key == ConsoleKey.S) main.ToggleSimulator();
                         else if (info.Modifiers == ConsoleModifiers.Control && info.Key == ConsoleKey.Q) main.substitution ?. Scan(true);
+                    }
+                    else
+                    {
+                        // Background mode has no key input to block on, so without a sleep this
+                        // loop spins and pegs a CPU core (30% util down to 3% at the 100ms default).
+                        // Only shutdown responsiveness is affected - aircraft syncing runs on the
+                        // work thread (DoWork) at its own 5ms cadence and is not touched by this.
+                        // Use --backgrounddelay 0 to spin uninterrupted.
+                        if (main.settingsBackgroundDelay > 0)
+                        {
+                            Thread.Sleep(main.settingsBackgroundDelay);
+                        }
                     }
 #else
                     // sleep
