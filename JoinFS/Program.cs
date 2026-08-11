@@ -1206,6 +1206,10 @@ namespace JoinFS
                                 // load model matching
                                 substitution?.Load();
                             }
+                            catch (Exception ex)
+                            {
+                                MonitorEvent("Error during substitution load/scan: " + ex);
+                            }
                             finally
                             {
                                 substitutionLoadRunning = false;
@@ -2145,6 +2149,28 @@ namespace JoinFS
         static void Main()
         {
             Main main = new();
+
+            // log any unhandled exception before the process dies, instead of silently vanishing with
+            // no trace at all - confirmed no handler existed before this. Covers three distinct ways an
+            // exception can otherwise go unlogged: a genuinely fatal unhandled exception on any thread,
+            // one escaping WinForms' UI message loop, and one from a fire-and-forget Task.Run that's
+            // never awaited/observed (which, unlike the other two, doesn't even crash the process by
+            // default - it just silently disappears).
+            AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
+            {
+                main.MonitorEvent("FATAL unhandled exception (terminating=" + e.IsTerminating + "): " + (e.ExceptionObject as Exception)?.ToString());
+            };
+            TaskScheduler.UnobservedTaskException += (sender, e) =>
+            {
+                main.MonitorEvent("Unobserved background task exception: " + e.Exception);
+                e.SetObserved();
+            };
+#if !CONSOLE
+            Application.ThreadException += (sender, e) =>
+            {
+                main.MonitorEvent("Unhandled UI thread exception: " + e.Exception);
+            };
+#endif
 
             // check for gui
             if (main.settingsNoGui)

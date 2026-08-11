@@ -852,11 +852,27 @@ namespace JoinFS
         /// packageFolderIndex being empty, so a failed attempt (sim folder not set yet) can retry on the
         /// next call instead of being stuck empty for the rest of the session.</summary>
         bool packageFolderIndexBuilt = false;
+        /// <summary>Guards packageFolderIndex/titleFolderIndex builds against concurrent mutation - these
+        /// are plain Dictionaries with no synchronization of their own, and unlike their historical sole
+        /// caller (the live LIVERY FOLDER read, always serialized under main.conch on the SimConnect
+        /// message thread), the scan-time pre-warm call runs on a background thread deliberately outside
+        /// main.conch (to avoid stalling it), so both can now race on the same dictionaries without this.
+        /// Intentionally a separate, narrow lock rather than main.conch itself - reusing main.conch here
+        /// would serialize the whole app behind a potentially multi-second index build.</summary>
+        readonly object packageFolderIndexLock = new();
 
         void BuildPackageFolderIndexIfNeeded()
         {
             if (packageFolderIndexBuilt) return;
+            lock (packageFolderIndexLock)
+            {
+                if (packageFolderIndexBuilt) return;
+                BuildPackageFolderIndexLocked();
+            }
+        }
 
+        void BuildPackageFolderIndexLocked()
+        {
             if (Directory.Exists(simFolder) == false)
             {
                 if (packageFolderIndexDiagLogged.Add(simFolder ?? ""))
@@ -1194,28 +1210,37 @@ namespace JoinFS
         void BuildTitleFolderIndexIfNeeded()
         {
             if (titleFolderIndex != null) return;
-            titleFolderIndex = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-            BuildPackageFolderIndexIfNeeded();
-            foreach (var folder in packageFolderIndex.Values)
+            // same dedicated lock as BuildPackageFolderIndexIfNeeded (see packageFolderIndexLock) - this
+            // method also assigns titleFolderIndex before it's fully populated, so without a lock a second
+            // thread's `titleFolderIndex != null` check above could observe a still-being-built dictionary
+            lock (packageFolderIndexLock)
             {
-                string cfgPath = Path.Combine(folder, "aircraft.cfg");
-                if (File.Exists(cfgPath) == false) continue;
+                if (titleFolderIndex != null) return;
+                Dictionary<string, string> newIndex = new(StringComparer.OrdinalIgnoreCase);
 
-                try
+                BuildPackageFolderIndexIfNeeded();
+                foreach (var folder in packageFolderIndex.Values)
                 {
-                    foreach (var title in QuickExtractTitles(cfgPath))
+                    string cfgPath = Path.Combine(folder, "aircraft.cfg");
+                    if (File.Exists(cfgPath) == false) continue;
+
+                    try
                     {
-                        titleFolderIndex.TryAdd(title, folder);
+                        foreach (var title in QuickExtractTitles(cfgPath))
+                        {
+                            newIndex.TryAdd(title, folder);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        main.MonitorEvent("Error indexing '" + cfgPath + "': " + ex.Message);
                     }
                 }
-                catch (Exception ex)
-                {
-                    main.MonitorEvent("Error indexing '" + cfgPath + "': " + ex.Message);
-                }
-            }
 
-            main.MonitorEvent("Indexed " + titleFolderIndex.Count + " model title(s) from " + packageFolderIndex.Count + " installed aircraft folder(s), for use when LIVERY FOLDER doesn't resolve.");
+                main.MonitorEvent("Indexed " + newIndex.Count + " model title(s) from " + packageFolderIndex.Count + " installed aircraft folder(s), for use when LIVERY FOLDER doesn't resolve.");
+                // only publish once fully populated
+                titleFolderIndex = newIndex;
+            }
         }
 
         /// <summary>
@@ -1586,8 +1611,45 @@ namespace JoinFS
                     }
                 }
 
-                // best-effort ICAO type guess from the title, only when not already known - see GuessIcaoTypeFromTitle()
-                string guessedIcaoType = (model == null || model.icaoType.Length == 0) ? GuessIcaoTypeFromTitle(scanTitle) : "";
+                // SimConnect enumeration gives us title/livery only, never real config data - before
+                // falling back to guessing the ICAO type from the title text (which can misfire when an
+                // airline/livery name coincidentally spells out an unrelated real designator, e.g.
+                // "...Smart_Lynx" matching the Lynx helicopter instead of the actual Airbus A320), try
+                // reading the real aircraft.cfg/base_container from disk - same logic the live SimConnect
+                // LIVERY FOLDER read already uses (TryReadConfigFromLiveryFolder), just resolved by title
+                // via titleFolderIndex (BuildTitleFolderIndexIfNeeded, pre-warmed in Scan()) instead of a
+                // live SimConnect value.
+                string guessedIcaoType = "";
+                string diskClassCode = "", diskWtc = "", diskIcaoAirline = "", diskAtcId = "", diskResolutionNote = "";
+                bool diskConfirmed = false;
+                if (model == null || model.icaoType.Length == 0)
+                {
+                    diskConfirmed = TryReadConfigFromLiveryFolder("", scanTitle, out guessedIcaoType, out diskWtc, out diskIcaoAirline, out diskAtcId, out diskClassCode, out diskResolutionNote);
+                    if (diskConfirmed == false)
+                    {
+                        guessedIcaoType = GuessIcaoTypeFromTitle(scanTitle);
+                    }
+                }
+
+                // apply the disk-confirmed or guessed ICAO/class-code result to a model, matching what the
+                // live LIVERY FOLDER read's finalize step (LearnIcaoFromLiveObject) already does for a
+                // disk-confirmed result, so Explain Match shows this as confirmed rather than guessed
+                void ApplyIcaoResult(Model target)
+                {
+                    if (guessedIcaoType.Length == 0) return;
+                    target.icaoType = guessedIcaoType;
+                    target.icaoGuessed = !diskConfirmed;
+                    if (diskConfirmed)
+                    {
+                        target.classCode = diskClassCode;
+                        target.classCodeConfirmed = true;
+                        target.configConfirmed = true;
+                        if (diskWtc.Length > 0) target.wtc = diskWtc;
+                        if (diskIcaoAirline.Length > 0) target.icaoAirline = diskIcaoAirline;
+                        if (diskAtcId.Length > 0) target.atcId = diskAtcId;
+                    }
+                    target.RefreshIcaoDerived(doc8643Lookup);
+                }
 #else
                 Model model = GetModel(scanTitle);
 #endif
@@ -1608,11 +1670,9 @@ namespace JoinFS
                     model.icaoAirline = scanIcaoAirline;
                     model.atcId = scanAtcId;
 #if FS2024
-                    if (model.icaoType.Length == 0 && guessedIcaoType.Length > 0)
+                    if (model.icaoType.Length == 0)
                     {
-                        model.icaoType = guessedIcaoType;
-                        model.icaoGuessed = true;
-                        model.RefreshIcaoDerived(doc8643Lookup);
+                        ApplyIcaoResult(model);
                     }
 #endif
                 }
@@ -1621,12 +1681,7 @@ namespace JoinFS
                     // add the model
                     Model newModel = new(scanTitle, scanManufacturer, scanType, scanVariation, scanIndex, scanTyperole, "0", scanFolder, "", "", scanIcaoAirline, atcId: scanAtcId);
 #if FS2024
-                    if (guessedIcaoType.Length > 0)
-                    {
-                        newModel.icaoType = guessedIcaoType;
-                        newModel.icaoGuessed = true;
-                        newModel.RefreshIcaoDerived(doc8643Lookup);
-                    }
+                    ApplyIcaoResult(newModel);
 #endif
                     models.Add(newModel);
                 }
@@ -1857,6 +1912,19 @@ namespace JoinFS
                         // add folder to list
                         scanFolders.Add(simFolder);
                     }
+#if FS2024
+                    else if (simulatorName == "Microsoft Flight Simulator 2024")
+                    {
+                        // simFolder + "\SimObjects\<folder>" is never a real path in a modern Community/
+                        // Official package-based install - there's an extra package-name folder layer in
+                        // between (e.g. simFolder\Community\<addon>\SimObjects\Airplanes\...), so this old
+                        // flat-layout guess finds nothing here by default. Use packageFolderIndex instead,
+                        // which already walks that layout correctly (see BuildPackageFolderIndexIfNeeded)
+                        // and gives the exact leaf model folders directly - no recursive search even needed.
+                        BuildPackageFolderIndexIfNeeded();
+                        scanFolders.AddRange(packageFolderIndex.Values);
+                    }
+#endif
                     else
                     {
                         // for each folder
@@ -2218,11 +2286,44 @@ namespace JoinFS
                         }
                         else
                         {
+#if FS2024
+                            // consolidate onto the same shared config-reading logic the SimConnect-
+                            // enumeration path (SubmitScan) and the live LIVERY FOLDER read already use,
+                            // instead of the hand-rolled generalIcaoType/generalIcaoModel/generalWtc
+                            // collected above - that never follows base_container and never marks
+                            // classCodeConfirmed/configConfirmed, so even a successfully-found real file
+                            // still showed as guessed/unconfirmed downstream (e.g. Explain Match)
+                            string fileIcaoType = "", fileWtc = "", fileIcaoAirline = "", fileAtcId = "", fileClassCode = "", fileResolutionNote = "";
+                            TryParseAircraftConfigFile(path, "", ref fileIcaoType, ref fileWtc, ref fileIcaoAirline, ref fileAtcId, ref fileClassCode, ref fileResolutionNote, out string fileBaseContainer);
+                            if ((fileIcaoType.Length == 0 || fileWtc.Length == 0) && fileBaseContainer.Length > 0)
+                            {
+                                string baseFolder = ResolveBaseContainer(Path.GetDirectoryName(path), fileBaseContainer);
+                                if (baseFolder != null)
+                                {
+                                    TryParseAircraftConfigFile(Path.Combine(baseFolder, "aircraft.cfg"), "", ref fileIcaoType, ref fileWtc, ref fileIcaoAirline, ref fileAtcId, ref fileClassCode, ref fileResolutionNote, out _);
+                                }
+                            }
+                            bool fileConfirmed = fileIcaoType.Length > 0;
+#endif
                             // for each new model
                             for (int index = startIndex; index < models.Count; index++)
                             {
                                 // set smoke count
                                 models[index].smokeCount = smokeCount;
+#if FS2024
+                                if (models[index].icaoType.Length == 0 && fileConfirmed)
+                                {
+                                    models[index].icaoType = fileIcaoType;
+                                    models[index].icaoGuessed = false;
+                                    models[index].classCode = fileClassCode;
+                                    models[index].classCodeConfirmed = true;
+                                    models[index].configConfirmed = true;
+                                    if (fileWtc.Length > 0) models[index].wtc = fileWtc;
+                                    if (fileIcaoAirline.Length > 0) models[index].icaoAirline = fileIcaoAirline;
+                                    if (fileAtcId.Length > 0) models[index].atcId = fileAtcId;
+                                    models[index].RefreshIcaoDerived(doc8643Lookup);
+                                }
+#else
                                 if (generalIcaoType.Length > 0)
                                 {
                                     // some add-ons put the real designator in icao_model instead of
@@ -2233,6 +2334,7 @@ namespace JoinFS
                                     if (generalWtc.Length > 0) models[index].wtc = generalWtc;
                                     models[index].RefreshIcaoDerived(doc8643Lookup);
                                 }
+#endif
                             }
                         }
                     }
@@ -2286,6 +2388,18 @@ namespace JoinFS
                     // check for MSFS2024
                     if (simulatorName == "Microsoft Flight Simulator 2024")
                     {
+#if FS2024
+                        // pre-warm the title/folder index here so the one-time walk of every installed
+                        // package's aircraft.cfg happens before SimConnect enumeration responses start
+                        // arriving on the locked main thread (ProcessModelList/SubmitScan), which is where
+                        // TryReadConfigFromLiveryFolder would otherwise trigger it lazily and stall that
+                        // thread instead. This only actually runs off the main/UI thread when Scan() got
+                        // here via the auto-on-connect path (main.ScheduleSubstitutionLoad() -> Task.Run,
+                        // Program.cs) - a manual "Scan For Models" (ScanUI() -> Scan(true)) still runs this
+                        // (and the rest of Scan()'s own file walk, pre-existing behavior) on the UI thread,
+                        // same as it already could before this change for a large install.
+                        BuildTitleFolderIndexIfNeeded();
+#endif
                         // check for initial addons
                         if (initialAddOns.Length > 0)
                         {
@@ -2369,6 +2483,12 @@ namespace JoinFS
             // unable to do scan
             return false;
         }
+
+#if !SERVER && !CONSOLE
+        /// <summary>Guards against a second manual "Scan For Models" click firing an overlapping
+        /// background Scan() while one triggered by ScanUI() is already in flight.</summary>
+        volatile bool manualScanRunning = false;
+#endif
 
         /// <summary>
         /// Scan simulator folders for models
@@ -2466,26 +2586,51 @@ namespace JoinFS
                             if (true)
 #endif
                             {
-                                // do model scan
-                                Scan(true);
+                                // Scan() itself can take many seconds (a full aircraft.cfg directory walk,
+                                // plus for FS2024 the per-model disk-config reads added above) - run it and
+                                // its own follow-up off the UI thread so a manual "Scan For Models" doesn't
+                                // freeze the app, matching why the auto-on-connect scan already does this
+                                // (see Program.cs's scheduleSubstitutionLoad dispatch). manualScanRunning
+                                // guards against a second click firing an overlapping scan while one is
+                                // already in flight.
+                                if (manualScanRunning == false)
+                                {
+                                    manualScanRunning = true;
+                                    Task.Run(() =>
+                                    {
+                                        try
+                                        {
+                                            // do model scan
+                                            Scan(true);
 
-                                // reload matches
+                                            // reload matches
 #if FS2024
-                                main.sim.requestModelListIsVerbose = true;
+                                            main.sim.requestModelListIsVerbose = true;
 #else
-                                LoadMatches();
-                                LoadMasquerades();
+                                            LoadMatches();
+                                            LoadMasquerades();
 
-                                // check for models scanned
-                                if (models.Count > 0)
-                                {
-                                    main.scheduleShowMessage = Resources.Strings.FoundPrefix + " " + models.Count.ToString() + " " + Resources.Strings.FoundSuffix;
-                                }
-                                else
-                                {
-                                    main.scheduleShowMessage = "No models found";
-                                }
+                                            // check for models scanned
+                                            if (models.Count > 0)
+                                            {
+                                                main.scheduleShowMessage = Resources.Strings.FoundPrefix + " " + models.Count.ToString() + " " + Resources.Strings.FoundSuffix;
+                                            }
+                                            else
+                                            {
+                                                main.scheduleShowMessage = "No models found";
+                                            }
 #endif
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            main.MonitorEvent("Error during manual model scan: " + ex);
+                                        }
+                                        finally
+                                        {
+                                            manualScanRunning = false;
+                                        }
+                                    });
+                                }
                             }
                         }
                         break;
