@@ -166,7 +166,9 @@
             this.Text_SimBriefUsername.Name = "Text_SimBriefUsername";
             this.Text_SimBriefUsername.Size = new System.Drawing.Size(140, 23);
             this.Text_SimBriefUsername.TabIndex = 7;
-            this.Text_SimBriefUsername.KeyDown += new System.Windows.Forms.KeyEventHandler(this.Text_SimBriefUsername_KeyDown);
+            // Enter-key handling for this field is done via FlightPlanForm.ProcessDialogKey (see
+            // FlightPlanForm.cs) - a single-line TextBox's KeyDown never fires for Enter, since
+            // WinForms routes it straight to the form's AcceptButton before KeyDown would raise
             //
             // Button_ImportSimBrief
             //

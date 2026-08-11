@@ -150,23 +150,30 @@ namespace JoinFS
         }
 
         /// <summary>
-        /// Enter in the username field used to just trigger the form's AcceptButton (OK) directly,
-        /// closing the dialog without ever saving/importing the just-typed username. Instead, save
-        /// and import first, then commit and close - same end result as Import followed by OK.
+        /// Enter in a single-line TextBox never reaches KeyDown at all - a non-multiline TextBox's
+        /// IsInputKey returns false for Enter, so WinForms treats it as a "dialog key" and routes it
+        /// straight to the form's AcceptButton (OK) before the control's own KeyDown is ever raised.
+        /// Intercepting here is the correct place: if the SimBrief username field has focus and isn't
+        /// empty, save+import first, then commit and close - same end result as Import followed by OK.
+        /// An empty field just falls through to the normal AcceptButton (OK) behavior.
         /// </summary>
-        private async void Text_SimBriefUsername_KeyDown(object sender, KeyEventArgs e)
+        protected override bool ProcessDialogKey(Keys keyData)
         {
-            if (e.KeyCode == Keys.Enter)
+            if (keyData == Keys.Enter && ActiveControl == Text_SimBriefUsername && Text_SimBriefUsername.Text.Trim().Length > 0)
             {
-                e.Handled = true;
-                e.SuppressKeyPress = true;
-
-                await ImportSimBriefAsync();
-
-                Button_OK_Click(this, EventArgs.Empty);
-                DialogResult = DialogResult.OK;
-                Close();
+                _ = AcceptSimBriefUsernameAsync();
+                return true;
             }
+            return base.ProcessDialogKey(keyData);
+        }
+
+        async Task AcceptSimBriefUsernameAsync()
+        {
+            await ImportSimBriefAsync();
+
+            Button_OK_Click(this, EventArgs.Empty);
+            DialogResult = DialogResult.OK;
+            Close();
         }
 
         private void Button_Clear_Click(object sender, EventArgs e)
