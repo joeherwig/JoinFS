@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using JoinFS.Properties;
 
@@ -93,6 +94,15 @@ namespace JoinFS
 
         private async void Button_ImportSimBrief_Click(object sender, EventArgs e)
         {
+            await ImportSimBriefAsync();
+        }
+
+        /// <summary>
+        /// Save the SimBrief username and fetch a plan from it, pre-filling the dialog on success.
+        /// Shared by the Import button and pressing Enter in the username field.
+        /// </summary>
+        async Task ImportSimBriefAsync()
+        {
             string username = Text_SimBriefUsername.Text.Trim();
 
             // remember the username regardless of fetch outcome
@@ -136,6 +146,26 @@ namespace JoinFS
             finally
             {
                 Button_ImportSimBrief.Enabled = true;
+            }
+        }
+
+        /// <summary>
+        /// Enter in the username field used to just trigger the form's AcceptButton (OK) directly,
+        /// closing the dialog without ever saving/importing the just-typed username. Instead, save
+        /// and import first, then commit and close - same end result as Import followed by OK.
+        /// </summary>
+        private async void Text_SimBriefUsername_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+
+                await ImportSimBriefAsync();
+
+                Button_OK_Click(this, EventArgs.Empty);
+                DialogResult = DialogResult.OK;
+                Close();
             }
         }
 

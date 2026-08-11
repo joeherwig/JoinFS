@@ -61,8 +61,7 @@
             // 
             resources.ApplyResources(this.Text_Callsign, "Text_Callsign");
             this.Text_Callsign.Name = "Text_Callsign";
-            this.Text_Callsign.ReadOnly = true;
-            // 
+            //
             // label2
             // 
             resources.ApplyResources(this.label2, "label2");
@@ -135,7 +134,10 @@
             this.Button_Cancel.UseVisualStyleBackColor = true;
             // moved down to make room for the SimBrief row below Remarks
             this.Button_Cancel.Location = new System.Drawing.Point(222, 213);
-            // 
+            // tab order: SimBrief username -> Import -> Clear -> OK -> Cancel (overrides the resx
+            // value, which predates the SimBrief row and collides with Button_ImportSimBrief's index)
+            this.Button_Cancel.TabIndex = 11;
+            //
             // Button_OK
             //
             resources.ApplyResources(this.Button_OK, "Button_OK");
@@ -146,6 +148,8 @@
             // moved down to make room for the SimBrief row below Remarks (not resx-driven, no
             // localized layout exists yet for these new controls)
             this.Button_OK.Location = new System.Drawing.Point(127, 213);
+            // tab order: see Button_Cancel.TabIndex above
+            this.Button_OK.TabIndex = 10;
             //
             // label8
             //
@@ -162,6 +166,7 @@
             this.Text_SimBriefUsername.Name = "Text_SimBriefUsername";
             this.Text_SimBriefUsername.Size = new System.Drawing.Size(140, 23);
             this.Text_SimBriefUsername.TabIndex = 7;
+            this.Text_SimBriefUsername.KeyDown += new System.Windows.Forms.KeyEventHandler(this.Text_SimBriefUsername_KeyDown);
             //
             // Button_ImportSimBrief
             //
@@ -188,7 +193,7 @@
             this.Button_Clear.Location = new System.Drawing.Point(9, 213);
             this.Button_Clear.Name = "Button_Clear";
             this.Button_Clear.Size = new System.Drawing.Size(75, 27);
-            this.Button_Clear.TabIndex = 10;
+            this.Button_Clear.TabIndex = 9;
             this.Button_Clear.Text = "Clear";
             this.Button_Clear.UseVisualStyleBackColor = true;
             this.Button_Clear.Click += new System.EventHandler(this.Button_Clear_Click);
