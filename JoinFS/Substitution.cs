@@ -16,7 +16,6 @@ namespace JoinFS
         const string MODELS_FILE = "models.txt";
         const string MATCHING_FILE = "matching.txt";
         const string MASQUERADING_FILE = "masquerading.txt";
-        const string CALLSIGNS_FILE = "callsigns.txt";
 
         /// <summary>
         /// folders
@@ -1400,11 +1399,6 @@ namespace JoinFS
         public readonly Dictionary<string, Model> masquerades = [];
 
         /// <summary>
-        /// Model callsigns
-        /// </summary>
-        public readonly Dictionary<string, string> callsigns = [];
-
-        /// <summary>
         /// Trim white space and quote characters
         /// </summary>
         /// <param name="str"></param>
@@ -2569,15 +2563,6 @@ namespace JoinFS
         }
 
         /// <summary>
-        /// Make the filename from the simulator name and version
-        /// </summary>
-        /// <returns></returns>
-        string MakeCallsignsFilename()
-        {
-            return main.storagePath + Path.DirectorySeparatorChar + "callsigns - " + (main.sim != null ? main.sim.GetSimulatorName() : "null") + ".txt";
-        }
-
-        /// <summary>
         /// Load models from file
         /// </summary>
         void LoadModels()
@@ -3042,123 +3027,6 @@ namespace JoinFS
         }
 
         /// <summary>
-        /// Load list of callsigns
-        /// </summary>
-        void LoadCallsigns()
-        {
-            // check for simulator
-#if XPLANE || CONSOLE
-            if (main.sim != null)
-#else
-            if (main.sim != null && main.sim.Connected)
-#endif
-            {
-                try
-                {
-                    // make filename
-                    string filename = MakeCallsignsFilename();
-
-                    // check for matching file
-                    if (File.Exists(filename))
-                    {
-                        // clear list
-                        callsigns.Clear();
-
-                        // open file
-                        StreamReader reader = File.OpenText(filename);
-                        string line;
-                        while ((line = reader.ReadLine()) != null)
-                        {
-                            // parse line
-                            string[] parts = line.Split('=');
-                            // check for three parts
-                            if (parts.Length == 2)
-                            {
-                                // get info
-                                string modelTitle = parts[0].TrimStart(' ').TrimEnd(' ');
-                                string callsign = parts[1].TrimStart(' ').TrimEnd(' ');
-
-                                // check for callsign
-                                if (modelTitle.Length > 0 && callsign.Length > 0)
-                                {
-                                    // add callsign
-                                    callsigns[modelTitle] = callsign;
-                                }
-                            }
-                            else
-                            {
-                                main.ShowMessage(Resources.Strings.InvalidSubstitution + ": " + line);
-                            }
-                        }
-                        reader.Close();
-
-                        // message
-                        main.MonitorEvent("Loaded " + callsigns.Count + " callsign substitutions");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    main.ShowMessage(ex.Message);
-                }
-            }
-            else
-            {
-                // error
-                main.MonitorEvent("Unable to load callsigns because a simulator is not connected.");
-            }
-
-#if !SERVER && !CONSOLE
-            // refresh
-            main.aircraftForm ?. refresher.Schedule(3);
-#endif
-        }
-
-        /// <summary>
-        /// Save callsigns
-        /// </summary>
-        void SaveCallsigns()
-        {
-            // check for simulator
-#if XPLANE || CONSOLE
-            if (main.sim != null)
-#else
-            if (main.sim != null && main.sim.Connected)
-#endif
-            {
-                try
-                {
-                    // make filename
-                    string filename = MakeCallsignsFilename();
-
-                    // open file
-                    StreamWriter writer = new(filename);
-                    if (writer != null)
-                    {
-                        // for each callsign
-                        foreach (var pair in callsigns)
-                        {
-                            // write callsign
-                            writer.WriteLine(pair.Key + "=" + pair.Value);
-                        }
-                        writer.Close();
-                    }
-
-                    // message
-                    main.MonitorEvent("Saved " + callsigns.Count + " callsign substitutions");
-                }
-                catch (Exception ex)
-                {
-                    main.ShowMessage(ex.Message);
-                }
-            }
-            else
-            {
-                // error
-                main.MonitorEvent("Unable to save model masquerading because a simulator is not connected.");
-            }
-        }
-
-        /// <summary>
         /// Save scan folders
         /// </summary>
         public void SaveFolders()
@@ -3569,8 +3437,6 @@ namespace JoinFS
                 LoadMatches();
                 // load masquerades
                 LoadMasquerades();
-                // load callsigns
-                LoadCallsigns();
 
                 // now we can save
                 main.ScheduleSubstitutionSave();
@@ -3592,7 +3458,6 @@ namespace JoinFS
             SaveModels();
             SaveMatches();
             SaveMasquerades();
-            SaveCallsigns();
             return true;
         }
 
@@ -3606,7 +3471,6 @@ namespace JoinFS
             prefixList.Clear();
             matches.Clear();
             masquerades.Clear();
-            callsigns.Clear();
 
 #if !SERVER && !CONSOLE
             main.matchingForm ?. refresher.Schedule();
@@ -3720,43 +3584,6 @@ namespace JoinFS
 
 #if !SERVER && !CONSOLE
             // refresh
-            main.aircraftForm ?. refresher.Schedule();
-#endif
-        }
-
-        /// <summary>
-        /// Apply a callsign to a model
-        /// </summary>
-        void ApplyCallsign(string modelTitle, string callsign)
-        {
-            // check for sim
-            if (main.sim != null)
-            {
-                // for all objects in the sim
-                foreach (var obj in main.sim.objectList)
-                {
-                    // check if replace model
-                    if (obj is Sim.Aircraft && obj.Injected == false && obj.ownerModel.Equals(modelTitle))
-                    {
-                        // get aircraft
-                        Sim.Aircraft aircraft = obj as Sim.Aircraft;
-                        // check for valid callsign
-                        if (callsign.Length > 0)
-                        {
-                            // set the substitute
-                            aircraft.flightPlan.callsign = callsign;
-                        }
-                        else
-                        {
-                            // use original
-                            aircraft.flightPlan.callsign = aircraft.originalCallsign;
-                        }
-                    }
-                }
-            }
-
-            // refresh
-#if !SERVER && !CONSOLE
             main.aircraftForm ?. refresher.Schedule();
 #endif
         }
@@ -3909,73 +3736,6 @@ namespace JoinFS
             }
 #endif
                                 return false;
-        }
-
-        /// <summary>
-        /// Edit an existing masquerade
-        /// </summary>
-        /// <param name="modelTitle"></param>
-        /// <param name="typerole"></param>
-        /// <returns></returns>
-        public bool EditCallsign(string modelTitle, string originalCallsign)
-        {
-#if !SERVER && !CONSOLE
-            // check for some models
-            if (models.Count > 0)
-            {
-                try
-                {
-                    // show dialog for changing callsign
-                    CallsignForm callsignForm = new(main, modelTitle, originalCallsign);
-                    switch (callsignForm.ShowDialog())
-                    {
-                        case System.Windows.Forms.DialogResult.OK:
-                            lock (main.conch)
-                            {
-                                // check for empty callsign
-                                if (callsignForm.callsign.Length > 0)
-                                {
-                                    // update callsign
-                                    callsigns[modelTitle] = callsignForm.callsign;
-                                }
-                                else
-                                {
-                                    // remove callsign
-                                    callsigns.Remove(modelTitle);
-                                }
-                                // save
-                                main.ScheduleSubstitutionSave();
-                                // apply
-                                ApplyCallsign(modelTitle, callsignForm.callsign);
-                            }
-                            return true;
-
-                        case System.Windows.Forms.DialogResult.No:
-                            lock (main.conch)
-                            {
-                                // remove callsign
-                                callsigns.Remove(modelTitle);
-                                // save
-                                main.ScheduleSubstitutionSave();
-                                // apply
-                                ApplyCallsign(modelTitle, "");
-                            }
-                            return true;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    main.ShowMessage(ex.Message);
-                }
-
-                return false;
-            }
-            else
-            {
-                MessageBox.Show(Resources.Strings.MatchingForm_EmptyModelList, Main.Name + ": Model Masquerading");
-            }
-#endif
-            return false;
         }
 
         /// <summary>
@@ -4522,23 +4282,5 @@ namespace JoinFS
             }
         }
 
-        /// <summary>
-        /// Callsign
-        /// </summary>
-        /// <param name="model">Model to check</param>
-        public string Callsign(string modelTitle, string original)
-        {
-            // check for existing callsign
-            if (callsigns.TryGetValue(modelTitle, out string value))
-            {
-                // return modified callsign
-                return value;
-            }
-            else
-            {
-                // use original
-                return original;
-            }
-        }
     }
 }

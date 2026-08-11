@@ -186,26 +186,30 @@
             //
             // Button_FlightPlan
             // (not resx-driven - added below the Simulator/Network/Global row; see MainForm.cs for the
-            // dynamic repositioning that keeps it glued to that row under NO_CREATE/NO_JOIN)
+            // dynamic repositioning that keeps it glued to that row under NO_CREATE/NO_JOIN, and the
+            // width recalculation in RefreshFlightPlanButtons() that keeps its right edge lined up with
+            // either Button_Network or Button_SimBrief depending on whether SimBrief is visible)
             //
             this.Button_FlightPlan.Location = new System.Drawing.Point(8, 112);
-            // width/gap chosen so Button_SimBrief lines up with Button_Create/Button_Join's column (x=214, width=57)
+            // width spans Button_Simulator's left edge to Button_Network's right edge (8 to 166); see
+            // RefreshFlightPlanButtons() for the recalculation when Button_SimBrief is hidden
             this.Button_FlightPlan.Name = "Button_FlightPlan";
-            this.Button_FlightPlan.Size = new System.Drawing.Size(198, 25);
+            this.Button_FlightPlan.Size = new System.Drawing.Size(158, 25);
             this.Button_FlightPlan.TabIndex = 30;
             this.Button_FlightPlan.Text = "Flight plan";
             this.Button_FlightPlan.UseVisualStyleBackColor = true;
             this.Button_FlightPlan.Click += new System.EventHandler(this.Button_FlightPlan_Click);
             //
             // Button_SimBrief
+            // (Location.X/Size.Width recomputed in the constructor to match Button_Global's column;
+            // BackColor/ForeColor recomputed in RefreshFlightPlanButtons() to match the Simulator/Network
+            // Active/Inactive color scheme - see MainForm.cs)
             //
-            this.Button_SimBrief.BackColor = System.Drawing.Color.FromArgb(79, 79, 79);
-            this.Button_SimBrief.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.Button_SimBrief.ImageAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            this.Button_SimBrief.Location = new System.Drawing.Point(214, 112);
+            this.Button_SimBrief.Location = new System.Drawing.Point(172, 112);
             this.Button_SimBrief.Name = "Button_SimBrief";
-            this.Button_SimBrief.Size = new System.Drawing.Size(57, 25);
+            this.Button_SimBrief.Size = new System.Drawing.Size(99, 25);
             this.Button_SimBrief.TabIndex = 31;
+            this.Button_SimBrief.Text = "Simbrief";
             this.Button_SimBrief.UseVisualStyleBackColor = false;
             this.Button_SimBrief.Click += new System.EventHandler(this.Button_SimBrief_Click);
             //

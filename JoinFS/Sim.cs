@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.IO;
@@ -1641,10 +1642,18 @@ namespace JoinFS
         /// SimConnect's ATC ID is a tail number, not a callsign, and there is no single SimConnect variable that
         /// delivers a combined real-world callsign - so fall back to the tail number when either part is missing.
         /// </summary>
-        static string ResolveCallsign(string icaoAirline, string flightNumber, string tailNumber)
+        internal static string ResolveCallsign(string icaoAirline, string flightNumber, string tailNumber)
         {
             if (!string.IsNullOrEmpty(icaoAirline) && !string.IsNullOrEmpty(flightNumber))
             {
+                // ATC FLIGHT NUMBER is meant to be purely numeric, but it was write-only/unread by JoinFS
+                // before this feature existed, so many add-ons/pilots instead stored an entire pre-existing
+                // callsign there. If it already carries the airline prefix, or isn't numeric at all, trust
+                // it as a complete callsign rather than gluing the airline code onto it again.
+                if (flightNumber.StartsWith(icaoAirline, StringComparison.OrdinalIgnoreCase) || !flightNumber.All(char.IsDigit))
+                {
+                    return flightNumber;
+                }
                 return icaoAirline + flightNumber;
             }
             return tailNumber;
@@ -3359,8 +3368,7 @@ namespace JoinFS
                         // set flight plan
                         userAircraft.flightPlan = userFlightPlan;
                     }
-                    // sub callsign
-                    aircraft.flightPlan.callsign = main.substitution != null ? main.substitution.Callsign(aircraft.ownerModel, aircraft.originalCallsign) : aircraft.originalCallsign;
+                    aircraft.flightPlan.callsign = aircraft.originalCallsign;
                     // message
                     main.MonitorEvent("Listing aircraft '" + aircraft.flightPlan.callsign + "' User 'Me' - ID '" + obj.simId + "' - Model '" + obj.ownerModel + "'");
                 }
@@ -3398,8 +3406,7 @@ namespace JoinFS
                     {
                         // update callsign
                         aircraft.originalCallsign = callsign;
-                        // sub callsign
-                        aircraft.flightPlan.callsign = main.substitution != null ? main.substitution.Callsign(aircraft.ownerModel, aircraft.originalCallsign) : aircraft.originalCallsign;
+                        aircraft.flightPlan.callsign = aircraft.originalCallsign;
                     }
                     // update icao
                     aircraft.flightPlan.icaoType = icaoType;
@@ -3619,12 +3626,13 @@ namespace JoinFS
                                     {
                                         // aircraft
                                         Aircraft aircraft = obj as Aircraft;
-                                        // ATC ID is a tail number, not a callsign - keep the per-model override behavior for it
-                                        string tailNumber = main.substitution != null ? main.substitution.Callsign(aircraft.ownerModel, callsign) : callsign;
+                                        // ATC ID is a tail number, not a callsign
+                                        string tailNumber = callsign;
+                                        string flightNumber = info.flightNumber.TrimStart(' ', '\t').TrimEnd(' ', '\t');
                                         aircraft.flightPlan.registration = tailNumber;
-                                        aircraft.flightPlan.flightNumber = info.flightNumber;
+                                        aircraft.flightPlan.flightNumber = flightNumber;
                                         // prefer a synthesized real callsign (ICAO airline + flight number) over the tail number
-                                        aircraft.flightPlan.callsign = ResolveCallsign(resolvedIcaoAirline, info.flightNumber, tailNumber);
+                                        aircraft.flightPlan.callsign = ResolveCallsign(resolvedIcaoAirline, flightNumber, tailNumber);
                                         // fill in ICAO type/airline from the live-resolved data (learnIcaoType/
                                         // resolvedIcaoAirline - see the confidence hierarchy above), but only when
                                         // not already set - this was never populated here at all before, leaving

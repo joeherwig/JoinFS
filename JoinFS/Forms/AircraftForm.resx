@@ -288,9 +288,6 @@
   <data name="&gt;&gt;ColRecord.Type" xml:space="preserve">
     <value>System.Windows.Forms.DataGridViewCheckBoxColumn, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
-  <data name="Context_Aircraft_Callsign.Size" type="System.Drawing.Size, System.Drawing">
-    <value>226, 22</value>
-  </data>
   <data name="label6.TabIndex" type="System.Int32, mscorlib">
     <value>17</value>
   </data>
@@ -368,9 +365,6 @@
   </data>
   <data name="&gt;&gt;label2.Name" xml:space="preserve">
     <value>label2</value>
-  </data>
-  <data name="&gt;&gt;Context_Aircraft_Callsign.Name" xml:space="preserve">
-    <value>Context_Aircraft_Callsign</value>
   </data>
   <data name="Button_Refresh.Size" type="System.Drawing.Size, System.Drawing">
     <value>68, 27</value>
@@ -461,9 +455,6 @@
   </data>
   <data name="$this.MinimumSize" type="System.Drawing.Size, System.Drawing">
     <value>347, 225</value>
-  </data>
-  <data name="Context_Aircraft_Callsign.Text" xml:space="preserve">
-    <value>Change Callsign...</value>
   </data>
   <data name="$this.Text" xml:space="preserve">
     <value>JoinFS: Aircraft</value>
@@ -1043,9 +1034,6 @@
   </data>
   <data name="Label_Details.Anchor" type="System.Windows.Forms.AnchorStyles, System.Windows.Forms">
     <value>Bottom, Left</value>
-  </data>
-  <data name="&gt;&gt;Context_Aircraft_Callsign.Type" xml:space="preserve">
-    <value>System.Windows.Forms.ToolStripMenuItem, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="&gt;&gt;label6.Type" xml:space="preserve">
     <value>System.Windows.Forms.Label, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>

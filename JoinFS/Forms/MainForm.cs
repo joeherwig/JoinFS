@@ -63,6 +63,12 @@ namespace JoinFS
                 // set main
                 this.main = main;
 
+                // Button_SimBrief spans the same width and left/right alignment as Button_Global (Join Global),
+                // just on the Flight Plan row - computed from Button_Global rather than hardcoded so it stays
+                // correct if that button's own position/size ever changes
+                Button_SimBrief.Location = new Point(Button_Global.Location.X, Button_SimBrief.Location.Y);
+                Button_SimBrief.Size = new Size(Button_Global.Size.Width, Button_SimBrief.Size.Height);
+
 #if NO_CREATE
                 Text_MyIP.Visible = false;
                 Button_Create.Visible = false;
@@ -1546,7 +1552,7 @@ namespace JoinFS
         }
 
         /// <summary>
-        /// Update the flight-plan summary button and SimBrief badge to reflect the current flight plan/source
+        /// Update the flight-plan summary button and SimBrief button to reflect the current flight plan/source
         /// </summary>
         void RefreshFlightPlanButtons()
         {
@@ -1577,56 +1583,30 @@ namespace JoinFS
                 flightPlanTip.SetToolTip(Button_FlightPlan, tooltip);
             }
 
-            Button_SimBrief.Image = GetSimBriefIcon(main.sim.simBriefLastFetchSucceeded);
-        }
-
-        Bitmap simBriefIconCache;
-        bool? simBriefIconCacheOk;
-
-        /// <summary>
-        /// Composite the SimBrief document icon with a green check / red cross status badge in the
-        /// lower-right corner. Cached and only rebuilt when the fetch status actually changes.
-        /// </summary>
-        Bitmap GetSimBriefIcon(bool ok)
-        {
-            if (simBriefIconCache != null && simBriefIconCacheOk == ok)
+            // SimBrief button - green/red (Active/Inactive) coloring, same scheme as Button_Simulator/Button_Network
+            bool ok = main.sim.simBriefLastFetchSucceeded;
+            Color simBriefBackColor = ok ? Settings.Default.ColourActiveBackground : Settings.Default.ColourInactiveBackground;
+            Color simBriefForeColor = ok ? Settings.Default.ColourActiveText : Settings.Default.ColourInactiveText;
+            if (Button_SimBrief.BackColor != simBriefBackColor)
             {
-                return simBriefIconCache;
+                Button_SimBrief.BackColor = simBriefBackColor;
+            }
+            if (Button_SimBrief.ForeColor != simBriefForeColor)
+            {
+                Button_SimBrief.ForeColor = simBriefForeColor;
             }
 
-            simBriefIconCache?.Dispose();
-
-            const int size = 28;
-            Bitmap composited = new(size, size);
-            using (Graphics g = Graphics.FromImage(composited))
+            // only shown once a SimBrief username is configured; Button_FlightPlan absorbs the freed
+            // column (up to Button_SimBrief's - i.e. Button_Global's - right edge) when it's hidden
+            bool simBriefEnabled = !string.IsNullOrWhiteSpace(Settings.Default.SimBriefUsername);
+            if (Button_SimBrief.Visible != simBriefEnabled)
             {
-                g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-                g.DrawImage(Properties.Resources.SimBriefIcon, 0, 0, size, size);
-
-                Rectangle badgeRect = new(size - 11, size - 11, 10, 10);
-                Color badgeColor = ok ? Color.FromArgb(46, 204, 64) : Color.FromArgb(224, 64, 58);
-                using (Brush badgeBrush = new SolidBrush(badgeColor))
-                {
-                    g.FillEllipse(badgeBrush, badgeRect);
-                }
-                using (Pen badgeOutline = new(Color.White, 1))
-                {
-                    g.DrawEllipse(badgeOutline, badgeRect);
-                }
-                using (Font badgeFont = new("Segoe UI", 6f, FontStyle.Bold))
-                using (Brush textBrush = new SolidBrush(Color.White))
-                {
-                    string glyph = ok ? "✓" : "✕";
-                    SizeF textSize = g.MeasureString(glyph, badgeFont);
-                    g.DrawString(glyph, badgeFont, textBrush,
-                        badgeRect.X + (badgeRect.Width - textSize.Width) / 2,
-                        badgeRect.Y + (badgeRect.Height - textSize.Height) / 2);
-                }
+                Button_SimBrief.Visible = simBriefEnabled;
+                int rightEdge = simBriefEnabled
+                    ? Button_Network.Location.X + Button_Network.Size.Width
+                    : Button_SimBrief.Location.X + Button_SimBrief.Size.Width;
+                Button_FlightPlan.Size = new Size(rightEdge - Button_FlightPlan.Location.X, Button_FlightPlan.Size.Height);
             }
-
-            simBriefIconCache = composited;
-            simBriefIconCacheOk = ok;
-            return composited;
         }
 
         void CommitUserFlightPlanChange()

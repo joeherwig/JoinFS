@@ -1097,7 +1097,6 @@ namespace JoinFS
             // disable all options
             Context_Aircraft_Substitute.Enabled = false;
             Context_Aircraft_ExplainMatch.Enabled = false;
-            Context_Aircraft_Callsign.Enabled = false;
             Context_Aircraft_FlightPlan.Enabled = false;
             Context_Aircraft_Variables.Enabled = false;
             Context_Aircraft_AdjustHeight.Enabled = false;
@@ -1151,11 +1150,6 @@ namespace JoinFS
                             {
                                 // allow height adjustment
                                 Context_Aircraft_AdjustHeight.Enabled = aircraft.subModel != null;
-                            }
-                            else
-                            {
-                                // allow callsign change
-                                Context_Aircraft_Callsign.Enabled = true;
                             }
 
                             // check if aircraft is owned by someone else
@@ -1294,33 +1288,6 @@ namespace JoinFS
             if (aircraft != null && aircraft.subTrace != null)
             {
                 new MatchExplainForm(main, aircraft).ShowDialog();
-            }
-        }
-
-        private void Context_Aircraft_Callsign_Click(object sender, EventArgs e)
-        {
-            string model = "";
-            string originalCallsign = "";
-            bool injected = false;
-
-            lock (main.conch)
-            {
-                // get aircraft
-                Sim.Aircraft aircraft = GetAircraft(GetSelectedItem());
-                // check for selection
-                if (aircraft != null)
-                {
-                    model = aircraft.ownerModel;
-                    originalCallsign = aircraft.originalCallsign;
-                    injected = aircraft.Injected;
-                }
-            }
-
-            // check for model
-            if (model.Length > 0 && injected == false)
-            {
-                // edit match
-                main.substitution ?. EditCallsign(model, originalCallsign);
             }
         }
 
