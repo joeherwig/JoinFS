@@ -2967,11 +2967,7 @@ namespace JoinFS
         /// <summary>
         /// Current data version
         /// </summary>
-#if FS2024
         public const short VERSION = 21007;
-#else
-        public const short VERSION = 21007;
-#endif
 
         /// <summary>
         /// Method for reading specific data versions
