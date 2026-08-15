@@ -104,6 +104,9 @@
             Label_PluginAddress = new System.Windows.Forms.Label();
             Button_InstallPlugin = new System.Windows.Forms.Button();
             Button_Reset = new System.Windows.Forms.Button();
+            GroupBox_SimBrief = new System.Windows.Forms.GroupBox();
+            Label_SimBriefUsername = new System.Windows.Forms.Label();
+            Text_SimBriefUsername = new System.Windows.Forms.TextBox();
             ((System.ComponentModel.ISupportInitialize)Track_Follow).BeginInit();
             ((System.ComponentModel.ISupportInitialize)Track_Circle).BeginInit();
             GroupBox_Simulator.SuspendLayout();
@@ -112,6 +115,7 @@
             GroupBox_Hub.SuspendLayout();
             groupBox5.SuspendLayout();
             GroupBox_Xplane.SuspendLayout();
+            GroupBox_SimBrief.SuspendLayout();
             SuspendLayout();
             // 
             // Button_OK
@@ -634,13 +638,32 @@
             Button_Reset.Name = "Button_Reset";
             Button_Reset.UseVisualStyleBackColor = true;
             Button_Reset.Click += Button_Reset_Click;
-            // 
+            //
+            // GroupBox_SimBrief
+            //
+            GroupBox_SimBrief.Controls.Add(Text_SimBriefUsername);
+            GroupBox_SimBrief.Controls.Add(Label_SimBriefUsername);
+            resources.ApplyResources(GroupBox_SimBrief, "GroupBox_SimBrief");
+            GroupBox_SimBrief.Name = "GroupBox_SimBrief";
+            GroupBox_SimBrief.TabStop = false;
+            //
+            // Label_SimBriefUsername
+            //
+            resources.ApplyResources(Label_SimBriefUsername, "Label_SimBriefUsername");
+            Label_SimBriefUsername.Name = "Label_SimBriefUsername";
+            //
+            // Text_SimBriefUsername
+            //
+            resources.ApplyResources(Text_SimBriefUsername, "Text_SimBriefUsername");
+            Text_SimBriefUsername.Name = "Text_SimBriefUsername";
+            //
             // SettingsForm
-            // 
+            //
             AcceptButton = Button_OK;
             resources.ApplyResources(this, "$this");
             AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             CancelButton = Button_Cancel;
+            Controls.Add(GroupBox_SimBrief);
             Controls.Add(Button_Reset);
             Controls.Add(GroupBox_Xplane);
             Controls.Add(groupBox5);
@@ -668,6 +691,8 @@
             groupBox5.PerformLayout();
             GroupBox_Xplane.ResumeLayout(false);
             GroupBox_Xplane.PerformLayout();
+            GroupBox_SimBrief.ResumeLayout(false);
+            GroupBox_SimBrief.PerformLayout();
             ResumeLayout(false);
 
         }
@@ -749,5 +774,8 @@
         private System.Windows.Forms.CheckBox Check_EarlyUpdate;
         private System.Windows.Forms.CheckBox Check_TCAS;
         private System.Windows.Forms.CheckBox Check_UseAIFeatures;
+        private System.Windows.Forms.GroupBox GroupBox_SimBrief;
+        private System.Windows.Forms.Label Label_SimBriefUsername;
+        private System.Windows.Forms.TextBox Text_SimBriefUsername;
     }
 }

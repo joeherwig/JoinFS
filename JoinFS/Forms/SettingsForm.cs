@@ -134,6 +134,14 @@ namespace JoinFS
             Check_ShowSpeed.Visible = false;
             Button_LabelColour.Visible = false;
             Label_LabelColour.Visible = false;
+#else
+            // ATC Mode would otherwise overlap the visible X-Plane group box in this build, so stack it below instead
+            GroupBox_ATC.Location = new System.Drawing.Point(GroupBox_ATC.Location.X, GroupBox_Xplane.Location.Y + GroupBox_Xplane.Height + 6);
+            int xplaneExtraHeight = (GroupBox_ATC.Location.Y + GroupBox_ATC.Height) - (GroupBox_Xplane.Location.Y + GroupBox_Xplane.Height) + 24;
+            Button_Reset.Location = new System.Drawing.Point(Button_Reset.Location.X, Button_Reset.Location.Y + xplaneExtraHeight);
+            Button_OK.Location = new System.Drawing.Point(Button_OK.Location.X, Button_OK.Location.Y + xplaneExtraHeight);
+            Button_Cancel.Location = new System.Drawing.Point(Button_Cancel.Location.X, Button_Cancel.Location.Y + xplaneExtraHeight);
+            ClientSize = new System.Drawing.Size(ClientSize.Width, ClientSize.Height + xplaneExtraHeight);
 #endif
 
 #if SERVER
@@ -168,6 +176,7 @@ namespace JoinFS
             Text_HubEvent.Font = main.dataFont;
             Text_HubVoIP.Font = main.dataFont;
             Text_PluginAddress.Font = main.dataFont;
+            Text_SimBriefUsername.Font = main.dataFont;
         }
 
         private void Button_OK_Click(object sender, EventArgs e)
@@ -199,6 +208,9 @@ namespace JoinFS
             }
             main.settingsNickname = nickname;
             Settings.Default.Nickname = nickname;
+
+            // update simbrief username
+            Settings.Default.SimBriefUsername = Text_SimBriefUsername.Text.Trim();
 
             // update show nicknames enabled
             bool newShowNicknames = (Check_ShowNickname.CheckState == CheckState.Checked);
@@ -486,6 +498,8 @@ namespace JoinFS
             Check_EarlyUpdate.CheckState = Settings.Default.EarlyUpdate ? CheckState.Checked : CheckState.Unchecked;
             // get nickname
             Text_Nickname.Text = Settings.Default.Nickname;
+            // get simbrief username
+            Text_SimBriefUsername.Text = Settings.Default.SimBriefUsername;
             // get nickname
             Check_ShowNickname.CheckState = Settings.Default.ShowNicknames ? CheckState.Checked : CheckState.Unchecked;
             // get callsign
