@@ -60,6 +60,7 @@
             this.label1 = new System.Windows.Forms.Label();
             this.label2 = new System.Windows.Forms.Label();
             this.label3 = new System.Windows.Forms.Label();
+            this.label4 = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.DataGrid_HubList)).BeginInit();
             this.Context_Hub.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.DataGrid_Hub)).BeginInit();
@@ -95,6 +96,7 @@
             this.DataGrid_HubList.ShowEditingIcon = false;
             this.DataGrid_HubList.ShowRowErrors = false;
             this.DataGrid_HubList.CellClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.DataGrid_HubList_CellClick);
+            this.DataGrid_HubList.CellDoubleClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.DataGrid_HubList_CellDoubleClick);
             this.DataGrid_HubList.SelectionChanged += new System.EventHandler(this.DataGrid_HubList_SelectionChanged);
             // 
             // ColHubName
@@ -285,17 +287,23 @@
             this.label2.Name = "label2";
             // 
             // label3
-            // 
+            //
             resources.ApplyResources(this.label3, "label3");
             this.label3.Name = "label3";
-            // 
+            //
+            // label4
+            //
+            resources.ApplyResources(this.label4, "label4");
+            this.label4.Name = "label4";
+            //
             // HubsForm
-            // 
+            //
             resources.ApplyResources(this, "$this");
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.Controls.Add(this.label2);
             this.Controls.Add(this.label3);
             this.Controls.Add(this.label1);
+            this.Controls.Add(this.label4);
             this.Controls.Add(this.Button_Refresh);
             this.Controls.Add(this.DataGrid_Hub);
             this.Controls.Add(this.DataGrid_HubList);
@@ -325,6 +333,7 @@
         private System.Windows.Forms.ToolStripMenuItem Context_Hub_Join;
         private System.Windows.Forms.Label label2;
         private System.Windows.Forms.Label label3;
+        private System.Windows.Forms.Label label4;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
         private System.Windows.Forms.ToolStripMenuItem Context_Hub_Offline;
         private System.Windows.Forms.ToolStripMenuItem Context_Hub_Ignored;

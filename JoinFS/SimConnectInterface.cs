@@ -83,8 +83,10 @@ namespace JoinFS
                 sc.AddToDataDefinition(Sim.Definitions.OBJECT_GET_INFO, "NUMBER OF ENGINES", null, SIMCONNECT_DATATYPE.INT32, 0.0f, SimConnect.SIMCONNECT_UNUSED);
 #if FS2024
                 sc.AddToDataDefinition(Sim.Definitions.OBJECT_GET_INFO, "LIVERY NAME", null, SIMCONNECT_DATATYPE.STRING256, 0.0f, SimConnect.SIMCONNECT_UNUSED);
+                sc.AddToDataDefinition(Sim.Definitions.OBJECT_GET_INFO, "LIVERY FOLDER", null, SIMCONNECT_DATATYPE.STRING256, 0.0f, SimConnect.SIMCONNECT_UNUSED);
                 sc.AddToDataDefinition(Sim.Definitions.OBJECT_GET_INFO, "ATC AIRLINE", null, SIMCONNECT_DATATYPE.STRING64, 0.0f, SimConnect.SIMCONNECT_UNUSED);
 #endif
+                sc.AddToDataDefinition(Sim.Definitions.OBJECT_GET_INFO, "ATC FLIGHT NUMBER", null, SIMCONNECT_DATATYPE.STRING32, 0.0f, SimConnect.SIMCONNECT_UNUSED);
 
                 // define a position velocity variables structure
                 sc.AddToDataDefinition(Sim.Definitions.OBJECT_POSITION_VELOCITY, "Plane Latitude", "radians", SIMCONNECT_DATATYPE.FLOAT64, 0.0f, SimConnect.SIMCONNECT_UNUSED);
@@ -122,6 +124,7 @@ namespace JoinFS
                 sc.AddToDataDefinition(Sim.Definitions.OBJECT_POSITION_UPDATE, "Plane Pitch Degrees", "radians", SIMCONNECT_DATATYPE.FLOAT32, 0.0f, SimConnect.SIMCONNECT_UNUSED);
                 sc.AddToDataDefinition(Sim.Definitions.OBJECT_POSITION_UPDATE, "Plane Bank Degrees", "radians", SIMCONNECT_DATATYPE.FLOAT32, 0.0f, SimConnect.SIMCONNECT_UNUSED);
                 sc.AddToDataDefinition(Sim.Definitions.OBJECT_POSITION_UPDATE, "Plane Heading Degrees True", "radians", SIMCONNECT_DATATYPE.FLOAT32, 0.0f, SimConnect.SIMCONNECT_UNUSED);
+                sc.AddToDataDefinition(Sim.Definitions.OBJECT_POSITION_UPDATE, "SIM ON GROUND", "bool", SIMCONNECT_DATATYPE.INT32, 0.0f, SimConnect.SIMCONNECT_UNUSED);
 
                 // define a velocity structure
                 sc.AddToDataDefinition(Sim.Definitions.OBJECT_VELOCITY, "Velocity Body X", "m/s", SIMCONNECT_DATATYPE.FLOAT32, 0.0f, SimConnect.SIMCONNECT_UNUSED);

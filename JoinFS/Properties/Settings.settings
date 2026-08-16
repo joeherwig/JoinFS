@@ -20,6 +20,9 @@
     <Setting Name="AtcAirport" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
+    <Setting Name="SimBriefUsername" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
     <Setting Name="HubAddress" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>

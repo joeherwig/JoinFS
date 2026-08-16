@@ -350,19 +350,8 @@ namespace JoinFS
                 if (aircraft.variableSet != null)
                 {
                     // COM frequencies
-                    // Try Float first, if not available then try Integer
-                    var com1Value = aircraft.variableSet.GetFloat(vuidCom1);
-                    if (com1Value == 0)
-                    {
-                        com1Value = aircraft.variableSet.GetInteger(vuidCom1) / 100f;
-                    }
-                    item.com1 = com1Value.ToString("F3");
-                    var com2Value = aircraft.variableSet.GetFloat(vuidCom2);
-                    if (com2Value == 0)
-                    {  
-                        com2Value = aircraft.variableSet.GetInteger(vuidCom2) / 100f; 
-                    }
-                    item.com2 = com2Value.ToString("F3");
+                    item.com1 = aircraft.variableSet.GetFrequency(vuidCom1).ToString("F3");
+                    item.com2 = aircraft.variableSet.GetFrequency(vuidCom2).ToString("F3");
                     // squawk
                     item.squawk = aircraft.variableSet.GetInteger(vuidSquawk).ToString();
                     // rules
@@ -1108,7 +1097,6 @@ namespace JoinFS
             // disable all options
             Context_Aircraft_Substitute.Enabled = false;
             Context_Aircraft_ExplainMatch.Enabled = false;
-            Context_Aircraft_Callsign.Enabled = false;
             Context_Aircraft_FlightPlan.Enabled = false;
             Context_Aircraft_Variables.Enabled = false;
             Context_Aircraft_AdjustHeight.Enabled = false;
@@ -1162,11 +1150,6 @@ namespace JoinFS
                             {
                                 // allow height adjustment
                                 Context_Aircraft_AdjustHeight.Enabled = aircraft.subModel != null;
-                            }
-                            else
-                            {
-                                // allow callsign change
-                                Context_Aircraft_Callsign.Enabled = true;
                             }
 
                             // check if aircraft is owned by someone else
@@ -1305,33 +1288,6 @@ namespace JoinFS
             if (aircraft != null && aircraft.subTrace != null)
             {
                 new MatchExplainForm(main, aircraft).ShowDialog();
-            }
-        }
-
-        private void Context_Aircraft_Callsign_Click(object sender, EventArgs e)
-        {
-            string model = "";
-            string originalCallsign = "";
-            bool injected = false;
-
-            lock (main.conch)
-            {
-                // get aircraft
-                Sim.Aircraft aircraft = GetAircraft(GetSelectedItem());
-                // check for selection
-                if (aircraft != null)
-                {
-                    model = aircraft.ownerModel;
-                    originalCallsign = aircraft.originalCallsign;
-                    injected = aircraft.Injected;
-                }
-            }
-
-            // check for model
-            if (model.Length > 0 && injected == false)
-            {
-                // edit match
-                main.substitution ?. EditCallsign(model, originalCallsign);
             }
         }
 

@@ -1681,12 +1681,20 @@ namespace JoinFS
             message.Write(simObject.simTime);
             // add position and velocity
             Sim.Write(message, ref positionVelocity);
-#if FS2024
+            // livery/ICAO type/airline - unconditional; livery is only ever populated on FS2024 (the
+            // only sim that reports a real livery name via SimConnect), but other builds still relay
+            // whatever a peer sends them, same reasoning as ICAO data mattering for FS2020 too
             message.Write(simObject.ownerLivery);
-#endif
-            // ICAO type/airline - unconditional, ICAO data matters for FS2020 too
             message.Write(simObject is Sim.Aircraft aircraftObj ? aircraftObj.flightPlan.icaoType : "");
             message.Write(simObject is Sim.Aircraft aircraftObj2 ? aircraftObj2.flightPlan.icaoAirline : "");
+            // class code/WTC - appended at the end so older peers (which stop reading after icaoAirline)
+            // simply ignore these trailing bytes. Sourced from the owner's own config-confirmed/live-
+            // derived data (Sim.Obj.ownerClassCode etc.), not re-derived here, so every receiving peer
+            // gets the sender's best-available classification instead of independently re-deriving it
+            // from ownerIcaoType, which fails for add-ons reporting a bogus/non-standard type string.
+            message.Write(simObject.ownerClassCode);
+            message.Write(simObject.ownerWtc);
+            message.Write(simObject.ownerClassCodeConfirmed);
         }
 
 
@@ -1718,12 +1726,21 @@ namespace JoinFS
             message.Write(netTime);
             // add position and velocity
             Sim.Write(message, ref aircraftPosition);
-#if FS2024
+            // livery/ICAO type/airline - unconditional; livery is only ever populated on FS2024 (the
+            // only sim that reports a real livery name via SimConnect), but other builds still relay
+            // whatever a peer sends them, same reasoning as ICAO data mattering for FS2020 too
             message.Write(aircraft.ownerLivery);
-#endif
-            // ICAO type/airline - unconditional, ICAO data matters for FS2020 too
             message.Write(aircraft.flightPlan.icaoType);
             message.Write(aircraft.flightPlan.icaoAirline);
+            // registration/flight number - appended at the end so older peers (which stop reading after
+            // icaoAirline) simply ignore these trailing bytes instead of misreading the message
+            message.Write(aircraft.flightPlan.registration);
+            message.Write(aircraft.flightPlan.flightNumber);
+            // class code/WTC - see WriteObjectPositionVelocityMessage for why these are sourced from the
+            // owner's own confirmed data rather than re-derived by each receiving peer
+            message.Write(aircraft.ownerClassCode);
+            message.Write(aircraft.ownerWtc);
+            message.Write(aircraft.ownerClassCodeConfirmed);
         }
 
         /// <summary>
@@ -2355,6 +2372,9 @@ namespace JoinFS
                     message.Write(user.flightPlan.alternate);
                     message.Write(user.flightPlan.speed);
                     message.Write(user.flightPlan.altitude);
+                    message.Write(user.flightPlan.registration);
+                    message.Write(user.flightPlan.icaoAirline);
+                    message.Write(user.flightPlan.flightNumber);
                     // send hub list
                     localNode.Send(endPoint);
                 }
@@ -2908,6 +2928,9 @@ namespace JoinFS
             message.Write(flightPlan.speed);
             message.Write(flightPlan.altitude);
             message.Write(flightPlan.callsign);
+            message.Write(flightPlan.registration);
+            message.Write(flightPlan.icaoAirline);
+            message.Write(flightPlan.flightNumber);
             // send message
             localNode.Broadcast();
         }
@@ -3084,16 +3107,13 @@ namespace JoinFS
                                     Sim.Read(dataVersion, reader, ref positionVelocity);
 
                                     // update position and velocity
-#if FS2024
                                     string variation = (reader.PeekChar() != -1) ? reader.ReadString() : "";
-#endif
                                     string icaoType = (reader.PeekChar() != -1) ? reader.ReadString() : "";
                                     string icaoAirline = (reader.PeekChar() != -1) ? reader.ReadString() : "";
-#if FS2024
-                                    Sim.Obj simObject = main.sim?.UpdateObject(nuid, netId, model, variation, icaoType, icaoAirline, typerole, netTime, ref positionVelocity);
-#else
-                                    Sim.Obj simObject = main.sim ?. UpdateObject(nuid, netId, model, icaoType, icaoAirline, typerole, netTime, ref positionVelocity);
-#endif
+                                    string classCode = (reader.PeekChar() != -1) ? reader.ReadString() : "";
+                                    string wtc = (reader.PeekChar() != -1) ? reader.ReadString() : "";
+                                    bool classCodeConfirmed = (reader.PeekChar() != -1) ? reader.ReadBoolean() : false;
+                                    Sim.Obj simObject = main.sim?.UpdateObject(nuid, netId, model, variation, icaoType, icaoAirline, classCode, wtc, classCodeConfirmed, typerole, netTime, ref positionVelocity);
 
                                     // check for object
                                     if (simObject != null)
@@ -3162,16 +3182,15 @@ namespace JoinFS
                                             // get nickname
                                             string nickname = user ? main.network.GetNodeName(nuid) : "";
                                             // update position and velocity
-#if FS2024
                                             string variation = (reader.PeekChar() != -1) ? reader.ReadString() : "";
-#endif
                                             string icaoType = (reader.PeekChar() != -1) ? reader.ReadString() : "";
                                             string icaoAirline = (reader.PeekChar() != -1) ? reader.ReadString() : "";
-#if FS2024
-                                            Sim.Aircraft aircraft = main.sim?.UpdateAircraft(nuid, netId, user, plane, callsign, nickname, model, variation, icaoType, icaoAirline, typerole, netTime, ref aircraftPosition);
-#else
-                                            Sim.Aircraft aircraft = main.sim ?. UpdateAircraft(nuid, netId, user, plane, callsign, nickname, model, icaoType, icaoAirline, typerole, netTime, ref aircraftPosition);
-#endif
+                                            string registration = (reader.PeekChar() != -1) ? reader.ReadString() : "";
+                                            string flightNumber = (reader.PeekChar() != -1) ? reader.ReadString() : "";
+                                            string classCode = (reader.PeekChar() != -1) ? reader.ReadString() : "";
+                                            string wtc = (reader.PeekChar() != -1) ? reader.ReadString() : "";
+                                            bool classCodeConfirmed = (reader.PeekChar() != -1) ? reader.ReadBoolean() : false;
+                                            Sim.Aircraft aircraft = main.sim?.UpdateAircraft(nuid, netId, user, plane, callsign, registration, nickname, model, variation, icaoType, icaoAirline, flightNumber, classCode, wtc, classCodeConfirmed, typerole, netTime, ref aircraftPosition);
                                             // check for aircraft
                                             if (aircraft != null)
                                             {
@@ -3752,8 +3771,8 @@ namespace JoinFS
                                             user.altitude = altitude;
                                             user.speed = speed;
                                             user.flightPlan.icaoType = icaoType;
-                                            user.flightPlan.departure = from;
-                                            user.flightPlan.destination = to;
+                                            user.flightPlan.departure = from.ToUpperInvariant();
+                                            user.flightPlan.destination = to.ToUpperInvariant();
                                             user.squawk = squawk;
                                             user.level = level;
                                             user.range = range;
@@ -3810,14 +3829,17 @@ namespace JoinFS
                                         user.range = reader.ReadByte();
                                         user.heading = reader.ReadUInt16();
                                         user.flightPlan.icaoType = reader.ReadString();
-                                        user.flightPlan.departure = reader.ReadString();
-                                        user.flightPlan.destination = reader.ReadString();
+                                        user.flightPlan.departure = reader.ReadString().ToUpperInvariant();
+                                        user.flightPlan.destination = reader.ReadString().ToUpperInvariant();
                                         user.flightPlan.rules = reader.ReadString();
                                         user.flightPlan.route = reader.ReadString();
                                         user.flightPlan.remarks = reader.ReadString();
                                         user.flightPlan.alternate = dataVersion >= 21003 ? reader.ReadString() : "";
                                         user.flightPlan.speed = dataVersion >= 21003 ? reader.ReadString() : "";
                                         user.flightPlan.altitude = dataVersion >= 21003 ? reader.ReadString() : "";
+                                        user.flightPlan.registration = dataVersion >= 21006 ? reader.ReadString() : "";
+                                        user.flightPlan.icaoAirline = dataVersion >= 21006 ? reader.ReadString() : "";
+                                        user.flightPlan.flightNumber = dataVersion >= 21006 ? reader.ReadString() : "";
                                     }
                                 }
                             }
@@ -4073,8 +4095,8 @@ namespace JoinFS
                                     reader.ReadByte();
                                     // read flight plan
                                     main.sim.userFlightPlan.icaoType = reader.ReadString();
-                                    main.sim.userFlightPlan.departure = reader.ReadString();
-                                    main.sim.userFlightPlan.destination = reader.ReadString();
+                                    main.sim.userFlightPlan.departure = reader.ReadString().ToUpperInvariant();
+                                    main.sim.userFlightPlan.destination = reader.ReadString().ToUpperInvariant();
                                     main.sim.userFlightPlan.rules = reader.ReadString();
                                     main.sim.userFlightPlan.route = reader.ReadString();
                                     main.sim.userFlightPlan.remarks = reader.ReadString();
@@ -4082,6 +4104,9 @@ namespace JoinFS
                                     main.sim.userFlightPlan.speed = dataVersion >= 21003 ? reader.ReadString() : "";
                                     main.sim.userFlightPlan.altitude = dataVersion >= 21003 ? reader.ReadString() : "";
                                     main.sim.userFlightPlan.callsign = dataVersion >= 21003 ? reader.ReadString() : "";
+                                    main.sim.userFlightPlan.registration = dataVersion >= 21006 ? reader.ReadString() : "";
+                                    main.sim.userFlightPlan.icaoAirline = dataVersion >= 21006 ? reader.ReadString() : "";
+                                    main.sim.userFlightPlan.flightNumber = dataVersion >= 21006 ? reader.ReadString() : "";
                                     // message
                                     main.MonitorEvent("Flight Plan Update");
                                     // check for user aircraft
@@ -4099,8 +4124,8 @@ namespace JoinFS
                                     aircraft.flightPlanVersion = reader.ReadByte();
                                     // read flight plan
                                     aircraft.flightPlan.icaoType = reader.ReadString();
-                                    aircraft.flightPlan.departure = reader.ReadString();
-                                    aircraft.flightPlan.destination = reader.ReadString();
+                                    aircraft.flightPlan.departure = reader.ReadString().ToUpperInvariant();
+                                    aircraft.flightPlan.destination = reader.ReadString().ToUpperInvariant();
                                     aircraft.flightPlan.rules = reader.ReadString();
                                     aircraft.flightPlan.route = reader.ReadString();
                                     aircraft.flightPlan.remarks = reader.ReadString();
@@ -4108,6 +4133,9 @@ namespace JoinFS
                                     aircraft.flightPlan.speed = dataVersion >= 21003 ? reader.ReadString() : "";
                                     aircraft.flightPlan.altitude = dataVersion >= 21003 ? reader.ReadString() : "";
                                     aircraft.flightPlan.callsign = dataVersion >= 21003 ? reader.ReadString() : "";
+                                    aircraft.flightPlan.registration = dataVersion >= 21006 ? reader.ReadString() : "";
+                                    aircraft.flightPlan.icaoAirline = dataVersion >= 21006 ? reader.ReadString() : "";
+                                    aircraft.flightPlan.flightNumber = dataVersion >= 21006 ? reader.ReadString() : "";
                                 }
                             }
                             catch (Exception ex)

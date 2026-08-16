@@ -133,8 +133,8 @@ namespace JoinFS
                 // for each addon
                 for (int index = 0; index < addOns.Count && index < addOnsSelected.Length; index++)
                 {
-                    // add to grid
-                    DataGrid_AddOns.Rows.Add(addOnsSelected[index], addOns[index]);
+                    // add to grid (display name only - selection/persistence still keys off addOns[index] unchanged)
+                    DataGrid_AddOns.Rows.Add(addOnsSelected[index], AddOnDisplayName(addOns[index]));
                 }
                 // clear selection
                 DataGrid_AddOns.ClearSelection();
@@ -142,6 +142,16 @@ namespace JoinFS
             catch
             {
             }
+        }
+
+        /// <summary>
+        /// "My MSFS 2024" is the internal key Substitution.Scan() matches against and that
+        /// gets persisted to the folders file - kept stable so existing saved settings
+        /// keep working. Only the grid's displayed text is friendlier here.
+        /// </summary>
+        static string AddOnDisplayName(string addOn)
+        {
+            return addOn == "My MSFS 2024" ? "FS2024 models via SimConnect" : addOn;
         }
 
         public ScanForm(Main main, string simFolder, string initialScanFolders, string initialAddOns, string initialAdditionals)
@@ -291,7 +301,27 @@ namespace JoinFS
                     Text_Additional.Text += folder;
                 }
             }
+
+#if FS2020 || FS2024
+            // the Subfolder grid only ever finds anything for sims that keep a single
+            // "<root>\SimObjects\<category>" layout (FSX/Prepar3D) - a modern MSFS
+            // Packages folder nests SimObjects separately per installed package instead,
+            // so this grid can never show anything useful here. Hide it and let the
+            // Add-on grid use the freed width rather than confuse users with a dead control.
+            HideSubfolderGrid();
+#endif
         }
+
+#if FS2020 || FS2024
+        void HideSubfolderGrid()
+        {
+            DataGrid_Folders.Visible = false;
+
+            int left = DataGrid_Folders.Left;
+            int right = DataGrid_AddOns.Left + DataGrid_AddOns.Width;
+            DataGrid_AddOns.SetBounds(left, DataGrid_AddOns.Top, right - left, DataGrid_AddOns.Height);
+        }
+#endif
 
         private void Button_Browse_Click(object sender, EventArgs e)
         {

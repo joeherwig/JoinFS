@@ -587,6 +587,27 @@ namespace JoinFS
             }
         }
 
+        private void DataGrid_HubList_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            // ignore header double-click
+            if (e.RowIndex < 0 || e.RowIndex >= itemList.Count)
+            {
+                return;
+            }
+
+            // get double-clicked hub
+            Item item = itemList[e.RowIndex];
+
+            // check hub can be joined (same condition as Context_Hub_Join's enabled state)
+            if (item != null && item.online && item.endPoint != null)
+            {
+                // join hub
+                main.Join(item.endPoint.ToString());
+                // close (hide) this window, same as the title bar close button
+                Hide();
+            }
+        }
+
         private void DataGrid_Hub_CellClick(object sender, DataGridViewCellEventArgs e)
         {
             // get selected item

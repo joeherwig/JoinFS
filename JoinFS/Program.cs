@@ -5,6 +5,7 @@ using System.Windows.Forms;
 #endif
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Diagnostics;
 using System.IO;
 using System.Drawing;
@@ -46,6 +47,19 @@ namespace JoinFS
         public static string Name
         {
             get { return name; }
+        }
+
+        /// <summary>
+        /// Parse a command-line true/false (also accepting 1/0) argument
+        /// </summary>
+        static bool ParseBoolArg(string value, bool fallback)
+        {
+            return value.Trim().ToLowerInvariant() switch
+            {
+                "true" or "1" => true,
+                "false" or "0" => false,
+                _ => fallback,
+            };
         }
 
         /// <summary>
@@ -106,6 +120,11 @@ namespace JoinFS
         public bool settingsTcas = false;
         public bool settingsScan = false;
         public bool settingsUseAIFeatures = false;
+
+        // elevated platform (helipad/ship deck/rooftop) ground-trust feature - command-line only, not persisted
+        public bool settingsElevatedPlatformRecognition = true;
+        public bool settingsElevatedPlatformHelicoptersOnly = true;
+        public int settingsElevatedPlatformThreshold = 50; // cm
 #if XPLANE || CONSOLE
         public bool settingsGenerateCsl = false;
         public bool settingsSkipCsl = false;
@@ -537,6 +556,36 @@ namespace JoinFS
                                 settingsScan = true;
                                 break;
 
+                            case "-elevatedplatformrecognition":
+                                // next parameter
+                                index++;
+                                // check for parameter
+                                if (index < args.Length)
+                                {
+                                    settingsElevatedPlatformRecognition = ParseBoolArg(args[index], settingsElevatedPlatformRecognition);
+                                }
+                                break;
+
+                            case "-elevatedplatformhelicoptersonly":
+                                // next parameter
+                                index++;
+                                // check for parameter
+                                if (index < args.Length)
+                                {
+                                    settingsElevatedPlatformHelicoptersOnly = ParseBoolArg(args[index], settingsElevatedPlatformHelicoptersOnly);
+                                }
+                                break;
+
+                            case "-elevatedplatformthreshold":
+                                // next parameter
+                                index++;
+                                // check for parameter
+                                if (index < args.Length && Int32.TryParse(args[index], NumberStyles.Number, CultureInfo.InvariantCulture, out int elevatedPlatformThresholdVal))
+                                {
+                                    settingsElevatedPlatformThreshold = elevatedPlatformThresholdVal;
+                                }
+                                break;
+
 #if XPLANE || CONSOLE
                             case "-generatecsl":
                                 settingsGenerateCsl = true;
@@ -638,6 +687,9 @@ namespace JoinFS
                                 Console.WriteLine("  --websocket            Enable WebSocket server broadcasting aircraft data");
                                 Console.WriteLine("  --websocketport <port> WebSocket server port (default 8765)");
                                 Console.WriteLine("  --websocketlog         Log WebSocket events and webhook calls (default false)");
+                                Console.WriteLine("  --elevatedplatformrecognition <true|false>       Trust remote on-ground flag on helipads/ship decks/rooftops instead of local terrain mesh (default true)");
+                                Console.WriteLine("  --elevatedplatformhelicoptersonly <true|false>   Restrict elevated platform recognition to helicopters (default true)");
+                                Console.WriteLine("  --elevatedplatformthreshold <cm>                 Minimum elevation mismatch before elevated platform recognition engages (default 50)");
                                 Console.WriteLine("");
                                 Console.WriteLine("Interactive key commands:");
                                 Console.WriteLine("");
@@ -768,6 +820,54 @@ namespace JoinFS
                 network = new Network(this);
 #if !SERVER
                 substitution = new Substitution(this);
+
+                // try to resolve the simulator folder from the simulator's own recorded
+                // install location before ever asking the user - see SimPathDetector
+#if FS2020
+                if (substitution.EnsureFoldersConfigured("Microsoft Flight Simulator 2020", out string fs2020SimName) == false)
+                {
+                    scheduleSimFolderPrompt = true;
+                    pendingSimFolderName = fs2020SimName;
+                }
+                // no eager scan here - the FS2020 addons list isn't loaded until the sim connects
+#elif FS2024
+                if (substitution.EnsureFoldersConfigured("Microsoft Flight Simulator 2024", out string fs2024SimName) == false)
+                {
+                    scheduleSimFolderPrompt = true;
+                    pendingSimFolderName = fs2024SimName;
+                }
+                // no eager scan here - FS2024 community models come from a live SimConnect request
+#elif FSX
+                if (substitution.EnsureFoldersConfigured("Microsoft Flight Simulator X", out string fsxSimName))
+                {
+                    substitution.Scan(false, fsxSimName);
+                }
+                else
+                {
+                    scheduleSimFolderPrompt = true;
+                    pendingSimFolderName = fsxSimName;
+                }
+#elif P3D
+                if (substitution.EnsureFoldersConfigured("Prepar3D v5", out string p3dSimName))
+                {
+                    substitution.Scan(false, p3dSimName);
+                }
+                else
+                {
+                    scheduleSimFolderPrompt = true;
+                    pendingSimFolderName = p3dSimName;
+                }
+#elif XPLANE
+                if (substitution.EnsureFoldersConfigured("X-Plane", out string xplaneSimName))
+                {
+                    substitution.Scan(false, xplaneSimName);
+                }
+                else
+                {
+                    scheduleSimFolderPrompt = true;
+                    pendingSimFolderName = xplaneSimName;
+                }
+#endif
 #endif
                 recorder = new Recorder(this);
                 addressBook = new AddressBook(this);
@@ -776,6 +876,15 @@ namespace JoinFS
                 notes = new Notes(this);
                 stats = new Stats();
                 variableMgr = new VariableMgr(this);
+
+#if !CONSOLE
+                // fetch the pilot's SimBrief flight plan on startup if a username is already saved -
+                // this is a cloud API call independent of the simulator, so it doesn't need to wait for a connection
+                if (string.IsNullOrWhiteSpace(Settings.Default.SimBriefUsername) == false)
+                {
+                    _ = sim.RefreshUserFlightPlanFromSimBriefAsync();
+                }
+#endif
 
                 // check for specified sim folder
                 if (simFolder.Length > 0)
@@ -993,6 +1102,7 @@ namespace JoinFS
         volatile bool scheduleSubstitutionClear = false;
         volatile bool scheduleHeightAdjustmentLoad = false;
         volatile bool scheduleHeightAdjustmentSave = false;
+        volatile bool substitutionLoadRunning = false;
 
         /// <summary>
         /// Schedule substitution load
@@ -1095,19 +1205,38 @@ namespace JoinFS
                         scheduleSubstitutionClear = false;
                     }
 
-                    // check for scheduled model load
-                    if (scheduleSubstitutionLoad)
+                    // check for scheduled model load - dispatched to its own background thread
+                    // rather than run inline here, since Load()/Scan() can take many seconds
+                    // (network fetches plus a full aircraft.cfg directory walk) and running it
+                    // inside this lock would stall network/sim processing for the rest of DoWork,
+                    // and block the UI thread's periodic refresh timers, which take the same lock
+                    if (scheduleSubstitutionLoad && !substitutionLoadRunning)
                     {
-                        // load model matching
-                        substitution?.Load();
-                        // reset
+                        // reset immediately so we don't dispatch this twice
                         scheduleSubstitutionLoad = false;
-                        // Load() calls Scan() when settingsScan is true, and Scan() calls Match()
-                        // If Scan() was not called, we need to call Match() to load matching data from file
-                        if (!settingsScan)
+                        substitutionLoadRunning = true;
+                        Task.Run(() =>
                         {
-                            scheduleSubstitutionMatch = true;
-                        }
+                            try
+                            {
+                                // load model matching
+                                substitution?.Load();
+                            }
+                            catch (Exception ex)
+                            {
+                                MonitorEvent("Error during substitution load/scan: " + ex);
+                            }
+                            finally
+                            {
+                                substitutionLoadRunning = false;
+                            }
+                            // Load() calls Scan() when settingsScan is true, and Scan() calls Match()
+                            // If Scan() was not called, we need to call Match() to load matching data from file
+                            if (!settingsScan)
+                            {
+                                scheduleSubstitutionMatch = true;
+                            }
+                        });
                     }
 
                     // check for scheduled model match
@@ -1219,6 +1348,8 @@ namespace JoinFS
         public volatile bool scheduleFlightPlan = false;
         public volatile bool scheduleScanForModels = false;
         public volatile bool scheduleAskPlugin = false;
+        public volatile bool scheduleSimFolderPrompt = false;
+        public volatile string pendingSimFolderName = null;
 
         /// <summary>
         /// Show message to the user
@@ -2034,6 +2165,28 @@ namespace JoinFS
         static void Main()
         {
             Main main = new();
+
+            // log any unhandled exception before the process dies, instead of silently vanishing with
+            // no trace at all - confirmed no handler existed before this. Covers three distinct ways an
+            // exception can otherwise go unlogged: a genuinely fatal unhandled exception on any thread,
+            // one escaping WinForms' UI message loop, and one from a fire-and-forget Task.Run that's
+            // never awaited/observed (which, unlike the other two, doesn't even crash the process by
+            // default - it just silently disappears).
+            AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
+            {
+                main.MonitorEvent("FATAL unhandled exception (terminating=" + e.IsTerminating + "): " + (e.ExceptionObject as Exception)?.ToString());
+            };
+            TaskScheduler.UnobservedTaskException += (sender, e) =>
+            {
+                main.MonitorEvent("Unobserved background task exception: " + e.Exception);
+                e.SetObserved();
+            };
+#if !CONSOLE
+            Application.ThreadException += (sender, e) =>
+            {
+                main.MonitorEvent("Unhandled UI thread exception: " + e.Exception);
+            };
+#endif
 
             // check for gui
             if (main.settingsNoGui)

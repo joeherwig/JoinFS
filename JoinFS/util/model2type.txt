@@ -57,7 +57,7 @@ e|Robin CAP10|SingleProp
 e|Robin DR400|SingleProp
 e|S12-G: Passengers|Glider
 c|S-64F Skycrane|Rotorcraft
-e|Skyship600 Passenger|Rotorcraft
+e|Skyship600 Passenger|Airship
 e|Wright Flyer|TwinProp
 c|XCub|SingleProp
 c|Zlin Aviation Savage Cub|SingleProp

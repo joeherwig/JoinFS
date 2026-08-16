@@ -19,6 +19,23 @@ JoinFS is an advanced multiplayer client for flight simulators including Microso
 * Run the installer
 * Run the JoinFS utility
 
+On first run, JoinFS tries to auto-detect your simulator's install folder from the
+simulator's own records (MSFS's `UserCfg.opt`, X-Plane's `x-plane_install_*.txt`, or the
+FSX/Prepar3D registry keys), so you don't have to browse for it yourself. If it can't be
+found, you'll be asked to pick it once, alongside setting your nickname and (optionally)
+your SimBrief username.
+
+How the model set is then obtained differs by simulator:
+* **FSX / Prepar3D / X-Plane** - model matching is a folder scan (`aircraft.cfg`/`.acf`
+  files), so once the folder is known (detected or picked), the scan runs immediately -
+  no need to open the sim first.
+* **MSFS 2020** - also a folder scan, but the add-ons list it also reads is only
+  available once you've actually connected to the sim, so the scan itself runs at that
+  point (automatically, same as today).
+* **MSFS 2024** - fetches its community model set by asking the running sim directly,
+  so a folder is saved right away but the model list can only be completed once you've
+  connected to the sim.
+
 OR
 ### If you want to run it as unattended Hub on Docker
 the docker image is worth a look: https://hub.docker.com/r/joinfs/joinfs-console

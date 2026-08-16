@@ -177,6 +177,16 @@ namespace JoinFS
             }
 
             /// <summary>
+            /// Get COM frequency (MHz), preferring the 8.33kHz-capable float variable,
+            /// falling back to the legacy BCD integer format for older network peers
+            /// </summary>
+            public float GetFrequency(uint vuid)
+            {
+                float value = GetFloat(vuid);
+                return value != 0 ? value : GetInteger(vuid) / 100f;
+            }
+
+            /// <summary>
             /// Add variables from a file
             /// </summary>
             public void AddFromFile(string filename)
@@ -472,7 +482,7 @@ namespace JoinFS
                     {
 
                         // reject any shared cockpit updates intended for pilot only
-                        if (UserAircraft && (definition.pilot == false || main.sim.userAircraft.remoteFlightControl) || injected && definition.injected)
+                        if (main.sim == null || main.sim.Connected == false || UserAircraft && (definition.pilot == false || main.sim.userAircraft.remoteFlightControl) || injected && definition.injected)
                         {
                             // check for newer value
                             if (startTimes.ContainsKey(vuid) == false || startTimes[vuid] < main.ElapsedTime)
@@ -594,12 +604,13 @@ namespace JoinFS
                         uint vuid = variableMgr.LookupVuid(variable.Key);
                         // get value
                         float value = variable.Value;
+
                         // check for valid variable
                         if (variableMgr.definitions.TryGetValue(vuid, out Definition definition))
                         {
 
-                            // reject any shared cockpit updates intended for pilot only
-                            if (UserAircraft && (definition.pilot == false || main.sim.userAircraft.remoteFlightControl) || injected && definition.injected)
+                            // reject any shared cockpit updates intended for pilot only, unless there's no live sim to push into anyway
+                            if (main.sim == null || main.sim.Connected == false || UserAircraft && (definition.pilot == false || main.sim.userAircraft.remoteFlightControl) || injected && definition.injected)
                             {
                                 // check for newer value
                                 if (startTimes.ContainsKey(vuid) == false || startTimes[vuid] < main.ElapsedTime)
@@ -697,7 +708,7 @@ namespace JoinFS
                         {
 
                             // reject any shared cockpit updates intended for pilot only
-                            if (UserAircraft && (definition.pilot == false || main.sim.userAircraft.remoteFlightControl) || injected && definition.injected)
+                            if (main.sim == null || main.sim.Connected == false || UserAircraft && (definition.pilot == false || main.sim.userAircraft.remoteFlightControl) || injected && definition.injected)
                             {
                                 // check for newer value
                                 if (startTimes.ContainsKey(vuid) == false || startTimes[vuid] < main.ElapsedTime)

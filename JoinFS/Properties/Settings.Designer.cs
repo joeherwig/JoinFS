@@ -86,6 +86,18 @@ namespace JoinFS.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string SimBriefUsername {
+            get {
+                return ((string)(this["SimBriefUsername"]));
+            }
+            set {
+                this["SimBriefUsername"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string AtcAirport {
             get {
                 return ((string)(this["AtcAirport"]));

@@ -191,12 +191,6 @@
   <data name="Context_Aircraft_Substitute.Text" xml:space="preserve">
     <value>&amp;Substituir...</value>
   </data>
-  <data name="Context_Aircraft_Callsign.Size" type="System.Drawing.Size, System.Drawing">
-    <value>280, 22</value>
-  </data>
-  <data name="Context_Aircraft_Callsign.Text" xml:space="preserve">
-    <value>Mudar Indicativo...</value>
-  </data>
   <data name="Context_Aircraft_FlightPlan.Size" type="System.Drawing.Size, System.Drawing">
     <value>280, 22</value>
   </data>

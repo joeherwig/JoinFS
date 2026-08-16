@@ -518,12 +518,10 @@ namespace JoinFS
             /// Aircraft model
             /// </summary>
             public string model = "";
-#if FS2024
             /// <summary>
             /// Aircraft variation
             /// </summary>
             public string livery = "";
-#endif
             /// <summary>
             /// ICAO type designator (e.g. A20N)
             /// </summary>
@@ -569,11 +567,7 @@ namespace JoinFS
             /// Constructor
             /// </summary>
             /// <param name="model">Object model</param>
-#if FS2024
             public Obj(string model, string livery, string icaoType, string icaoAirline, int typerole, Sim.Obj.Owner owner)
-#else
-            public Obj(string model, string icaoType, string icaoAirline, int typerole, Sim.Obj.Owner owner)
-#endif
             {
                 // ID
                 this.id = nextId++;
@@ -582,9 +576,7 @@ namespace JoinFS
                 this.icaoAirline = icaoAirline;
                 this.typerole = typerole;
                 this.owner = owner;
-#if FS2024
                 this.livery = livery;
-#endif
 
                 // versions
                 readVersions = new Dictionary<short, Sim.ReadVersion>()
@@ -749,18 +741,12 @@ namespace JoinFS
             /// <param name="plane">Aircraft is a plane</param>
             /// <param name="callsign">Aircraft callsign</param>
             /// <param name="model">Aircraft model</param>
-#if FS2024
             public Aircraft(bool plane, string callsign, string nickname, string model, string livery, string icaoType, string icaoAirline, int typerole, Sim.Obj.Owner owner) : base(model, livery, icaoType, icaoAirline, typerole, owner)
-#else
-            public Aircraft(bool plane, string callsign, string nickname, string model, string icaoType, string icaoAirline, int typerole, Sim.Obj.Owner owner) : base(model, icaoType, icaoAirline, typerole, owner)
-#endif
             {
                 this.plane = plane;
                 this.callsign = callsign;
                 this.nickname = nickname;
-#if FS2024
                 this.livery = livery;
-#endif
 
                 // versions
                 readVersions = new Dictionary<short, Sim.ReadVersion>()
@@ -1122,20 +1108,12 @@ namespace JoinFS
                             // plane
                             Sim.Aircraft simAircraft = simObject as Sim.Aircraft;
                             // create recorded aircraft
-#if FS2024
                             simObject.recorderObj = new Aircraft(simAircraft is Sim.Plane, simAircraft.flightPlan.callsign, main.network.GetNodeName(simAircraft.ownerNuid), simAircraft.ownerModel, simAircraft.ownerLivery, simAircraft.ownerIcaoType, simAircraft.ownerIcaoAirline, simAircraft.typerole, simAircraft.owner);
-#else
-                            simObject.recorderObj = new Aircraft(simAircraft is Sim.Plane, simAircraft.flightPlan.callsign, main.network.GetNodeName(simAircraft.ownerNuid), simAircraft.ownerModel, simAircraft.ownerIcaoType, simAircraft.ownerIcaoAirline, simAircraft.typerole, simAircraft.owner);
-#endif
                         }
                         else
                         {
                             // create recorded object
-#if FS2024
                             simObject.recorderObj = new Obj(simObject.ownerModel, simObject.ownerLivery, simObject.ownerIcaoType, simObject.ownerIcaoAirline, simObject.typerole, simObject.owner);
-#else
-                            simObject.recorderObj = new Obj(simObject.ownerModel, simObject.ownerIcaoType, simObject.ownerIcaoAirline, simObject.typerole, simObject.owner);
-#endif
                         }
                         // add to list
                         objList.Add(simObject.recorderObj);
@@ -1385,20 +1363,15 @@ namespace JoinFS
                             // aircraft
                             Aircraft aircraft = obj as Aircraft;
                             // update position
-#if FS2024
-                            main.sim ?. UpdateAircraft(new LocalNode.Nuid(), obj.id, false, aircraft.plane, aircraft.callsign, aircraft.nickname, aircraft.model, aircraft.livery, aircraft.icaoType, aircraft.icaoAirline, aircraft.typerole, recentFrame.time, ref (recentFrame as AircraftPositionFrame).data);
-#else
-                            main.sim ?. UpdateAircraft(new LocalNode.Nuid(), obj.id, false, aircraft.plane, aircraft.callsign, aircraft.nickname, aircraft.model, aircraft.icaoType, aircraft.icaoAirline, aircraft.typerole, recentFrame.time, ref (recentFrame as AircraftPositionFrame).data);
-#endif
+                            // recordings don't currently capture classCode/wtc (a Phase 3 network-only
+                            // addition) - pass empty/unconfirmed so replay falls back to local re-derivation
+                            // from icaoType, same as before this feature existed
+                            main.sim ?. UpdateAircraft(new LocalNode.Nuid(), obj.id, false, aircraft.plane, aircraft.callsign, "", aircraft.nickname, aircraft.model, aircraft.livery, aircraft.icaoType, aircraft.icaoAirline, "", "", "", false, aircraft.typerole, recentFrame.time, ref (recentFrame as AircraftPositionFrame).data);
                         }
                         else
                         {
                             // update position
-#if FS2024
-                            main.sim?.UpdateObject(new LocalNode.Nuid(), obj.id, obj.model, obj.livery, obj.icaoType, obj.icaoAirline, obj.typerole, recentFrame.time, ref (recentFrame as ObjectPositionFrame).data);
-#else
-                            main.sim ?. UpdateObject(new LocalNode.Nuid(), obj.id, obj.model, obj.icaoType, obj.icaoAirline, obj.typerole, recentFrame.time, ref (recentFrame as ObjectPositionFrame).data);
-#endif
+                            main.sim?.UpdateObject(new LocalNode.Nuid(), obj.id, obj.model, obj.livery, obj.icaoType, obj.icaoAirline, "", "", false, obj.typerole, recentFrame.time, ref (recentFrame as ObjectPositionFrame).data);
                         }
                         // reset object
                         main.sim ?. ResetObject(new LocalNode.Nuid(), obj.id);
@@ -1552,11 +1525,7 @@ namespace JoinFS
                     double t = Blend(from, to, time);
                     Vector angles = InterpolateAngles(obj, from.data.pitch, from.data.heading, from.data.bank, to.data.pitch, to.data.heading, to.data.bank, t);
                     Sim.AircraftPosition data = Interpolate(from, to, t, angles);
-#if FS2024
-                    main.sim?.UpdateAircraft(new LocalNode.Nuid(), obj.id, false, aircraft.plane, aircraft.callsign, aircraft.nickname, aircraft.model, aircraft.livery, aircraft.icaoType, aircraft.icaoAirline, aircraft.typerole, time, ref data);
-#else
-                    main.sim?.UpdateAircraft(new LocalNode.Nuid(), obj.id, false, aircraft.plane, aircraft.callsign, aircraft.nickname, aircraft.model, aircraft.icaoType, aircraft.icaoAirline, aircraft.typerole, time, ref data);
-#endif
+                    main.sim?.UpdateAircraft(new LocalNode.Nuid(), obj.id, false, aircraft.plane, aircraft.callsign, "", aircraft.nickname, aircraft.model, aircraft.livery, aircraft.icaoType, aircraft.icaoAirline, "", "", "", false, aircraft.typerole, time, ref data);
                 }
             }
             else
@@ -1568,11 +1537,7 @@ namespace JoinFS
                     double t = Blend(from, to, time);
                     Vector angles = InterpolateAngles(obj, from.data.pitch, from.data.heading, from.data.bank, to.data.pitch, to.data.heading, to.data.bank, t);
                     Sim.ObjectPositionVelocity data = Interpolate(from, to, t, angles);
-#if FS2024
-                    main.sim?.UpdateObject(new LocalNode.Nuid(), obj.id, obj.model, obj.livery, obj.icaoType, obj.icaoAirline, obj.typerole, time, ref data);
-#else
-                    main.sim?.UpdateObject(new LocalNode.Nuid(), obj.id, obj.model, obj.icaoType, obj.icaoAirline, obj.typerole, time, ref data);
-#endif
+                    main.sim?.UpdateObject(new LocalNode.Nuid(), obj.id, obj.model, obj.livery, obj.icaoType, obj.icaoAirline, "", "", false, obj.typerole, time, ref data);
                 }
             }
         }
@@ -1664,20 +1629,12 @@ namespace JoinFS
                             // plane
                             Sim.Aircraft simAircraft = simObject as Sim.Aircraft;
                             // create recorded aircraft
-#if FS2024
                             simObject.recorderObj = new Aircraft(simAircraft is Sim.Plane, simAircraft.flightPlan.callsign, main.network.GetNodeName(simAircraft.ownerNuid), simAircraft.ownerModel, simAircraft.ownerLivery, simAircraft.ownerIcaoType, simAircraft.ownerIcaoAirline, simAircraft.typerole, simAircraft.owner);
-#else
-                            simObject.recorderObj = new Aircraft(simAircraft is Sim.Plane, simAircraft.flightPlan.callsign, main.network.GetNodeName(simAircraft.ownerNuid), simAircraft.ownerModel, simAircraft.ownerIcaoType, simAircraft.ownerIcaoAirline, simAircraft.typerole, simAircraft.owner);
-#endif
                         }
                         else
                         {
                             // create recorded object
-#if FS2024
                             simObject.recorderObj = new Obj(simObject.ownerModel, simObject.ownerLivery, simObject.ownerIcaoType, simObject.ownerIcaoAirline, simObject.typerole, simObject.owner);
-#else
-                            simObject.recorderObj = new Obj(simObject.ownerModel, simObject.ownerIcaoType, simObject.ownerIcaoAirline, simObject.typerole, simObject.owner);
-#endif
                         }
                         // add to list
                         objList.Add(simObject.recorderObj);
