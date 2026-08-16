@@ -395,6 +395,8 @@ namespace JoinFS
             public float brakeLeft;
             public float brakeRight;
             public float elevation;
+            /// <summary>"PLANE ALT ABOVE GROUND", feet - diagnostic only, see helicopters-on-elevated-platforms feature. Not yet used in any trust/correction decision.</summary>
+            public float radarAltitude;
             public int ground;
         };
 
@@ -493,6 +495,8 @@ namespace JoinFS
             public Vector geo;
             public Vector angles;
             public double elevation;
+            /// <summary>"PLANE ALT ABOVE GROUND" in meters, diagnostic only - see helicopters-on-elevated-platforms feature. NaN when not sourced from an AircraftPosition read (distinct from a real 0.0 reading).</summary>
+            public double radarHeight;
             public int ground;
 
             /// <summary>
@@ -503,17 +507,19 @@ namespace JoinFS
                 this.geo = new Vector();
                 this.angles = new Vector();
                 this.elevation = 0.0;
+                this.radarHeight = double.NaN;
                 this.ground = 0;
             }
 
             /// <summary>
             /// Constructor
             /// </summary>
-            public Pos(Vector geo, Vector angles, double elevation, int ground)
+            public Pos(Vector geo, Vector angles, double elevation, int ground, double radarHeight = double.NaN)
             {
                 this.geo = geo;
                 this.angles = angles;
                 this.elevation = elevation;
+                this.radarHeight = radarHeight;
                 this.ground = ground;
             }
 
@@ -525,6 +531,7 @@ namespace JoinFS
                 this.geo = new Vector(position.longitude, position.altitude, position.latitude);
                 this.angles = new Vector(position.pitch, position.heading, position.bank);
                 this.elevation = position.height;
+                this.radarHeight = double.NaN;
                 this.ground = position.ground;
             }
 
@@ -536,6 +543,7 @@ namespace JoinFS
                 this.geo = new Vector(position.longitude, position.altitude, position.latitude);
                 this.angles = new Vector(position.pitch, position.heading, position.bank);
                 this.elevation = position.elevation;
+                this.radarHeight = position.radarAltitude * 0.3048;
                 this.ground = position.ground;
             }
 
@@ -547,13 +555,14 @@ namespace JoinFS
                 this.geo = new Vector(position.longitude, position.altitude, position.latitude);
                 this.angles = new Vector(position.pitch, position.heading, position.bank);
                 this.elevation = position.height;
+                this.radarHeight = double.NaN;
                 this.ground = position.ground;
             }
 
             /// <summary>
             /// Clone
             /// </summary>
-            public Pos Clone() => new(geo.Clone(), angles.Clone(), elevation, ground);
+            public Pos Clone() => new(geo.Clone(), angles.Clone(), elevation, ground, radarHeight);
 
             /// <summary>
             /// Extrapolate a position using velocity and time
@@ -568,7 +577,7 @@ namespace JoinFS
                 double zRate = Vector.GeodesicDistance(geo.x, geo.z, geo.x, geo.z + Vector.GEODESIC_EPSILON);
                 // extrapolate position and velocity
                 Vector scalar = new(1.0 / xRate * Vector.GEODESIC_EPSILON, 1.0, 1.0 / zRate * Vector.GEODESIC_EPSILON);
-                return new Pos(geo + (velocity.linear * time + velocity.acc * (time * time)) * scalar, angles + velocity.angular * time, elevation, ground);
+                return new Pos(geo + (velocity.linear * time + velocity.acc * (time * time)) * scalar, angles + velocity.angular * time, elevation, ground, radarHeight);
             }
         }
 
@@ -756,7 +765,9 @@ namespace JoinFS
             public Pos simPosition = new();
             public Pos netPosition = new();
             public Vel netVelocity = new();
-            /// <summary>True when this object's on-ground state should be trusted from the network (elevated platform - helipad/ship deck/rooftop) rather than corrected toward local terrain mesh. See helicopters-on-elevated-platforms feature.</summary>
+            /// <summary>True when the sender's altitude should be trusted as-is (elevated platform - helipad/ship deck/rooftop) instead of being blended toward local terrain mesh. Unlike trustingPlatformGround, this can apply on final approach, before the sender reports on-ground. See helicopters-on-elevated-platforms feature.</summary>
+            public bool trustingPlatformElevation = false;
+            /// <summary>True when this object's on-ground state should be trusted from the network (elevated platform - helipad/ship deck/rooftop) and forwarded to the local sim's placement of the object. Always requires the sender to actually report on-ground, so the local sim is never told an airborne aircraft is resting on the ground. See helicopters-on-elevated-platforms feature.</summary>
             public bool trustingPlatformGround = false;
             public Vector oldEuler;
             public double distance = double.MaxValue;
@@ -1912,29 +1923,61 @@ namespace JoinFS
                 if (aircraft.NetValid == false || netTime > aircraft.netStateTime)
                 {
                     // elevated platform (helipad/ship deck/rooftop) ground-trust check - see helicopters-on-elevated-platforms feature.
-                    // when the sender reports on-ground and its reported height mismatches our local terrain mesh by more than the
-                    // configured threshold, trust the sender's altitude instead of blending toward local mesh - large mismatches mean
-                    // the sender is resting on a platform our local mesh probe has no knowledge of, not just cross-client mesh noise.
-                    bool trustPlatformGround = false;
-                    if (main.settingsElevatedPlatformRecognition && aircraftPosition.ground != 0 && aircraft.SimValid &&
+                    // two related but distinct decisions are made here:
+                    //  - trustingPlatformElevation: whether to skip the elevation-correction blend below and trust the sender's raw
+                    //    altitude. This can apply on final approach too, before the sender reports on-ground - waiting for the ground
+                    //    flag let the blend keep dragging the aircraft down toward our local bare-terrain reading right up until
+                    //    touchdown, then snap back up once the ground flag arrived, reported as "sinks through the platform, then
+                    //    gets lifted onto it".
+                    //  - trustingPlatformGround: whether to forward on-ground to the local sim's own placement of the object (which
+                    //    affects local physics/animation, e.g. gear compression, rotor spin-down). This must stay tied to the sender
+                    //    actually reporting on-ground, so the local sim is never told an airborne aircraft is resting on the ground.
+                    // Both use hysteresis (the release threshold is half the trust threshold) so a mismatch hovering near the
+                    // configured threshold doesn't flip the decision every update - without it, the blend and the raw altitude
+                    // would alternate update to update, visible as the aircraft jittering in height while parked on a platform.
+                    double mismatchCm = 0.0;
+                    bool trustPlatformElevation = aircraft.trustingPlatformElevation;
+                    if (main.settingsElevatedPlatformRecognition && aircraft.SimValid &&
                         (main.settingsElevatedPlatformHelicoptersOnly == false || aircraft is Helicopter))
                     {
                         double senderHeight = aircraftPosition.altitude - aircraftPosition.elevation;
                         double localHeight = aircraftPosition.altitude - aircraft.simPosition.elevation;
-                        double mismatchCm = Math.Abs(localHeight - senderHeight) * 100.0;
-                        if (mismatchCm >= main.settingsElevatedPlatformThreshold)
+                        mismatchCm = Math.Abs(localHeight - senderHeight) * 100.0;
+
+                        bool nearGround = aircraftPosition.ground != 0 || senderHeight < 50.0;
+                        double releaseThreshold = main.settingsElevatedPlatformThreshold * 0.5;
+
+                        if (nearGround && mismatchCm >= main.settingsElevatedPlatformThreshold)
                         {
-                            trustPlatformGround = true;
+                            trustPlatformElevation = true;
                         }
-                        if (trustPlatformGround != aircraft.trustingPlatformGround)
+                        else if (nearGround == false || mismatchCm < releaseThreshold)
                         {
-                            main.MonitorNetwork("ElevatedPlatform '" + aircraft.flightPlan.callsign + "' mismatch=" + mismatchCm.ToString("F0") + "cm threshold=" + main.settingsElevatedPlatformThreshold + "cm trust=" + trustPlatformGround);
+                            trustPlatformElevation = false;
                         }
+                        // else: still near ground with a mismatch inside the hysteresis band - keep the previous decision
                     }
+                    else
+                    {
+                        trustPlatformElevation = false;
+                    }
+                    bool trustPlatformGround = trustPlatformElevation && aircraftPosition.ground != 0;
+
+                    if (trustPlatformElevation != aircraft.trustingPlatformElevation || trustPlatformGround != aircraft.trustingPlatformGround)
+                    {
+                        // "PLANE ALT ABOVE GROUND" (radarHeight) is diagnostic only here - not used in the trust decision above.
+                        // Logged so it can be checked against a real elevated-platform approach/landing before anyone relies on it,
+                        // since it's unproven for JoinFS's own injected AI objects (see helicopters-on-elevated-platforms feature).
+                        string radarInfo = double.IsNaN(aircraft.simPosition.radarHeight)
+                            ? "radar=n/a"
+                            : "radar=" + aircraft.simPosition.radarHeight.ToString("F1") + "m bareTerrain=" + (aircraftPosition.altitude - aircraft.simPosition.elevation).ToString("F1") + "m";
+                        main.MonitorNetwork("ElevatedPlatform '" + aircraft.flightPlan.callsign + "' mismatch=" + mismatchCm.ToString("F0") + "cm threshold=" + main.settingsElevatedPlatformThreshold + "cm elevationTrust=" + trustPlatformElevation + " groundTrust=" + trustPlatformGround + " " + radarInfo);
+                    }
+                    aircraft.trustingPlatformElevation = trustPlatformElevation;
                     aircraft.trustingPlatformGround = trustPlatformGround;
 
                     // check if correction is enabled and local height is valid
-                    if (Settings.Default.ElevationCorrection && aircraft.SimValid && trustPlatformGround == false)
+                    if (Settings.Default.ElevationCorrection && aircraft.SimValid && trustPlatformElevation == false)
                     {
                         // calculate height
                         double height = aircraftPosition.altitude - aircraftPosition.elevation;
