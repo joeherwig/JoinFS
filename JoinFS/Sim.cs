@@ -769,6 +769,8 @@ namespace JoinFS
             public bool trustingPlatformElevation = false;
             /// <summary>True when this object's on-ground state should be trusted from the network (elevated platform - helipad/ship deck/rooftop) and forwarded to the local sim's placement of the object. Always requires the sender to actually report on-ground, so the local sim is never told an airborne aircraft is resting on the ground. See helicopters-on-elevated-platforms feature.</summary>
             public bool trustingPlatformGround = false;
+            /// <summary>Low-pass-filtered local-vs-remote terrain elevation offset used by the near-ground altitude blend in UpdateAircraft. NaN when not currently tracking (out of blend range, or no sample taken yet). The "GROUND ALTITUDE" probe feeding both sides has tick-to-tick noise; blending by the raw offset every update showed up as the aircraft jittering in height while sitting on/taxiing on ordinary ground.</summary>
+            public double smoothedElevationOffset = double.NaN;
             public Vector oldEuler;
             public double distance = double.MaxValue;
             public bool paused = false;
@@ -1988,8 +1990,23 @@ namespace JoinFS
                             double proportion = 1.0 - height * 0.02;
                             double remoteElevation = aircraftPosition.elevation;
                             double localElevation = aircraft.simPosition.elevation;
+                            // the "GROUND ALTITUDE" probe feeding both localElevation and remoteElevation has small
+                            // tick-to-tick noise (terrain LOD/mesh streaming) - blending by the raw difference every
+                            // update let that noise pass straight through into the displayed altitude, visible as
+                            // the aircraft jittering in height while sitting on/taxiing on ordinary ground. Low-pass
+                            // filter the offset instead of using the raw sample each time.
+                            double rawOffset = localElevation - remoteElevation;
+                            aircraft.smoothedElevationOffset = double.IsNaN(aircraft.smoothedElevationOffset)
+                                ? rawOffset
+                                : aircraft.smoothedElevationOffset + (rawOffset - aircraft.smoothedElevationOffset) * 0.15;
                             // blend altitude
-                            aircraftPosition.altitude += (localElevation - remoteElevation) * proportion;
+                            aircraftPosition.altitude += aircraft.smoothedElevationOffset * proportion;
+                        }
+                        else
+                        {
+                            // far from the ground - drop the smoothed offset so a later approach starts fresh
+                            // instead of carrying over a stale value from a different location/time.
+                            aircraft.smoothedElevationOffset = double.NaN;
                         }
                     }
 
