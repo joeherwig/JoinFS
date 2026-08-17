@@ -124,7 +124,7 @@
     <value>Der ATC-Modus ist aktiviert. Dies ermöglicht die Sichtbarkeit von Flugzeugen auf dem Radar, wirkt sich jedoch nachteilig auf die reibungslose Bewegung von Flugzeugen aus.</value>
   </data>
   <data name="AtcWarning" xml:space="preserve">
-    <value>Wenn der ATC-Modus aktiviert ist, werden Netwerkflugzeuge auf dem Standardradar angezeigt. Einige Flugzeuge können sich jedoch auf seltsame Weise verhalten, während der ATC-Modus aktiviert ist.</value>
+    <value>Wenn der ATC-Modus aktiviert ist, werden Netzwerkflugzeuge auf dem Standardradar angezeigt. Einige Flugzeuge können sich jedoch auf seltsame Weise verhalten, während der ATC-Modus aktiviert ist.</value>
   </data>
   <data name="BecomeAPatron" xml:space="preserve">
     <value>Patreon</value>
@@ -187,7 +187,7 @@
     <value>Die Modellliste ist für diesen Simulator leer. Soll die Suche nach Modellen jetzt gestartet werden?</value>
   </data>
   <data name="Network" xml:space="preserve">
-    <value>Netwerk</value>
+    <value>Netzwerk</value>
   </data>
   <data name="NewVersion" xml:space="preserve">
     <value>Eine neue Version ist verfügbar. Soll sie installiert werden?</value>
@@ -277,7 +277,7 @@
     <value>Folgen Sie ausgewählten Flugzeugen</value>
   </data>
   <data name="Shortcuts_Network" xml:space="preserve">
-    <value>Schalten Sie den Netwerkstatus ein / aus</value>
+    <value>Schalten Sie den Netzwerkstatus ein / aus</value>
   </data>
   <data name="Shortcuts_Simulator" xml:space="preserve">
     <value>Schalten Sie den Simulatorstatus ein / aus</value>
@@ -361,10 +361,10 @@
     <value>Die ATC-Ebene, auf der Sie steuern</value>
   </data>
   <data name="Tip_LocalPort" xml:space="preserve">
-    <value>Geben Sie an, welcher UDP-Netwerkport JoinFS verwenden soll. Der Standardwert ist 6112</value>
+    <value>Geben Sie an, welcher UDP-Netzwerkport JoinFS verwenden soll. Der Standardwert ist 6112</value>
   </data>
   <data name="Tip_LowBandwidth" xml:space="preserve">
-    <value>Reduzieren Sie die Menge der von JoinFS verwendeten Netwerkdaten. Dies kann die Leistung beeinträchtigen</value>
+    <value>Reduzieren Sie die Menge der von JoinFS verwendeten Netzwerkdaten. Dies kann die Leistung beeinträchtigen</value>
   </data>
   <data name="Tip_Me" xml:space="preserve">
     <value>Dies ist Ihre Adresse. Andere können sich Ihnen unter dieser Adresse anschließen</value>
@@ -448,7 +448,7 @@
     <value>Warnung</value>
   </data>
   <data name="WeatherObservation" xml:space="preserve">
-    <value>Wetterangaben sind nur von einem Flugzeug im Netwerk möglich</value>
+    <value>Wetterangaben sind nur von einem Flugzeug im Netzwerk möglich</value>
   </data>
   <data name="Tip_LabelColour" xml:space="preserve">
     <value>Die Farbe der Etiketten der injizierten Flugzeuge im Simulator</value>
