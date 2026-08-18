@@ -1,5 +1,6 @@
 *.p12
 *.pfx
+*.log
 .claude
 /.vs
 /JoinFS-XP/.vs

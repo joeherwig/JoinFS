@@ -164,6 +164,8 @@ namespace JoinFS
                 sc.AddToDataDefinition(Sim.Definitions.AIRCRAFT_POSITION, "BRAKE LEFT POSITION", "position", SIMCONNECT_DATATYPE.FLOAT32, 0.0f, SimConnect.SIMCONNECT_UNUSED);
                 sc.AddToDataDefinition(Sim.Definitions.AIRCRAFT_POSITION, "BRAKE RIGHT POSITION", "position", SIMCONNECT_DATATYPE.FLOAT32, 0.0f, SimConnect.SIMCONNECT_UNUSED);
                 sc.AddToDataDefinition(Sim.Definitions.AIRCRAFT_POSITION, "GROUND ALTITUDE", "meter", SIMCONNECT_DATATYPE.FLOAT32, 0.0f, SimConnect.SIMCONNECT_UNUSED);
+                // diagnostic only (see helicopters-on-elevated-platforms feature) - not yet used in any trust/correction decision, logged to verify reliability for injected aircraft first
+                sc.AddToDataDefinition(Sim.Definitions.AIRCRAFT_POSITION, "PLANE ALT ABOVE GROUND", "feet", SIMCONNECT_DATATYPE.FLOAT32, 0.0f, SimConnect.SIMCONNECT_UNUSED);
                 sc.AddToDataDefinition(Sim.Definitions.AIRCRAFT_POSITION, "SIM ON GROUND", "bool", SIMCONNECT_DATATYPE.INT32, 0.0f, SimConnect.SIMCONNECT_UNUSED);
 
                 // define an ID structure
