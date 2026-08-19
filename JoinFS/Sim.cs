@@ -3687,8 +3687,15 @@ namespace JoinFS
                                         string flightNumber = info.flightNumber.TrimStart(' ', '\t').TrimEnd(' ', '\t');
                                         aircraft.flightPlan.registration = tailNumber;
                                         aircraft.flightPlan.flightNumber = flightNumber;
-                                        // prefer a synthesized real callsign (ICAO airline + flight number) over the tail number
-                                        aircraft.flightPlan.callsign = ResolveCallsign(resolvedIcaoAirline, flightNumber, tailNumber);
+                                        // prefer a synthesized real callsign (ICAO airline + flight number) over the tail number,
+                                        // but only when not already set - a prior SimBrief-imported callsign must survive this
+                                        // aircraft being (re-)listed, matching the "userFlightPlan survives" intent above; without
+                                        // this guard the sim-reported ATC AIRLINE/FLIGHT NUMBER (aircraft.cfg/livery.cfg/MSFS2024
+                                        // aircraft customization) unconditionally clobbered the SimBrief callsign every time
+                                        if (aircraft.flightPlan.callsign.Length == 0)
+                                        {
+                                            aircraft.flightPlan.callsign = ResolveCallsign(resolvedIcaoAirline, flightNumber, tailNumber);
+                                        }
                                         // fill in ICAO type/airline from the live-resolved data (learnIcaoType/
                                         // resolvedIcaoAirline - see the confidence hierarchy above), but only when
                                         // not already set - this was never populated here at all before, leaving
