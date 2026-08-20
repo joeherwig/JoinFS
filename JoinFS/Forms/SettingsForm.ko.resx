@@ -442,6 +442,9 @@
   <data name="Check_Hub.Text" xml:space="preserve">
     <value>~ 할 수있게하다</value>
   </data>
+  <data name="GroupBox_ATC.Location" type="System.Drawing.Point, System.Drawing">
+    <value>360, 391</value>
+  </data>
   <data name="GroupBox_Hub.Location" type="System.Drawing.Point, System.Drawing">
     <value>360, 187</value>
   </data>

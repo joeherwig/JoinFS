@@ -380,7 +380,7 @@
     <value>разрешать</value>
   </data>
   <data name="GroupBox_ATC.Location" type="System.Drawing.Point, System.Drawing">
-    <value>14, 438</value>
+    <value>361, 385</value>
   </data>
   <data name="Text_HubDomain.Location" type="System.Drawing.Point, System.Drawing">
     <value>60, 46</value>
