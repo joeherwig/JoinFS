@@ -380,7 +380,10 @@
     <value>Habilitar</value>
   </data>
   <data name="GroupBox_ATC.Location" type="System.Drawing.Point, System.Drawing">
-    <value>360, 392</value>
+    <value>360, 390</value>
+  </data>
+  <data name="GroupBox_SimBrief.Location" type="System.Drawing.Point, System.Drawing">
+    <value>14, 446</value>
   </data>
   <data name="GroupBox_ATC.Size" type="System.Drawing.Size, System.Drawing">
     <value>340, 103</value>

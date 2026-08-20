@@ -425,7 +425,10 @@
     <value>Activeer Server Modus</value>
   </data>
   <data name="GroupBox_ATC.Location" type="System.Drawing.Point, System.Drawing">
-    <value>360, 392</value>
+    <value>360, 390</value>
+  </data>
+  <data name="GroupBox_SimBrief.Location" type="System.Drawing.Point, System.Drawing">
+    <value>14, 468</value>
   </data>
   <data name="GroupBox_Hub.Location" type="System.Drawing.Point, System.Drawing">
     <value>360, 187</value>

@@ -388,6 +388,9 @@
   <data name="GroupBox_ATC.Location" type="System.Drawing.Point, System.Drawing">
     <value>361, 390</value>
   </data>
+  <data name="GroupBox_SimBrief.Location" type="System.Drawing.Point, System.Drawing">
+    <value>14, 438</value>
+  </data>
   <data name="GroupBox_ATC.Size" type="System.Drawing.Size, System.Drawing">
     <value>340, 105</value>
   </data>

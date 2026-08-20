@@ -371,7 +371,10 @@
     <value>ATC Modus aktivieren</value>
   </data>
   <data name="GroupBox_ATC.Location" type="System.Drawing.Point, System.Drawing">
-    <value>360, 400</value>
+    <value>360, 402</value>
+  </data>
+  <data name="GroupBox_SimBrief.Location" type="System.Drawing.Point, System.Drawing">
+    <value>14, 440</value>
   </data>
   <data name="GroupBox_ATC.Size" type="System.Drawing.Size, System.Drawing">
     <value>340, 108</value>

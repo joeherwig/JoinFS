@@ -382,6 +382,9 @@
   <data name="GroupBox_ATC.Location" type="System.Drawing.Point, System.Drawing">
     <value>361, 385</value>
   </data>
+  <data name="GroupBox_SimBrief.Location" type="System.Drawing.Point, System.Drawing">
+    <value>14, 464</value>
+  </data>
   <data name="Text_HubDomain.Location" type="System.Drawing.Point, System.Drawing">
     <value>60, 46</value>
   </data>
