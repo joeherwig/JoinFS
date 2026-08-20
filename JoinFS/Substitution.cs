@@ -2150,12 +2150,19 @@ namespace JoinFS
                         // get folder name
                         scanFolder = Path.GetFileName(Path.GetDirectoryName(path));
 
-                        // create reader
-                        StreamReader reader = new(path);
-
                         // track the maximum smoke entry
                         int smokeCount = 0;
                         int startIndex = models.Count;
+                        StreamReader reader = null;
+
+                        // one broken/inaccessible file (permission denied, locked by another
+                        // process, a corrupt/truncated config) must not abort scanning every
+                        // other installed aircraft - catch it here and move on to the next file,
+                        // same convention as the XPLANE branch of this same method above
+                        try
+                        {
+                        // create reader
+                        reader = new(path);
 
                         // [GENERAL] section values - apply once per file to every model found in it
                         string generalIcaoType = "";
@@ -2336,6 +2343,32 @@ namespace JoinFS
                                 }
 #endif
                             }
+                        }
+                        }
+                        catch (Exception ex)
+                        {
+                            // one broken/inaccessible file must not abort scanning every other
+                            // installed aircraft - log it and move on to the next file, same
+                            // convention as the XPLANE branch of this same method above
+                            main.MonitorEvent("Failed to read file '" + path + "'. " + ex.Message);
+                            // discard any model(s) already added from this file before the
+                            // failure - a file that misbehaved partway through can't be trusted
+                            // to have parsed correctly up to that point
+                            if (models.Count > startIndex)
+                            {
+                                models.RemoveRange(startIndex, models.Count - startIndex);
+                            }
+                            // a failure mid-read can leave an in-progress [fltsim.N] block's
+                            // fields (scanTitle etc.) sitting in the method-level scan* fields
+                            // without having gone through SubmitScan()'s own reset - clear the
+                            // flag that gates SubmitScan() using them, so the next file's first
+                            // block boundary doesn't fold this broken file's stale/partial data
+                            // into a new model
+                            scanBlock = false;
+                        }
+                        finally
+                        {
+                            if (reader != null) reader.Close();
                         }
                     }
 
