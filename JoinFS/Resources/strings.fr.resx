@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -740,5 +740,11 @@
   </data>
   <data name="MainForm_SimBriefButtonTooltip" xml:space="preserve">
     <value>Utiliser les données SimBrief comme source du plan de vol et les récupérer à nouveau maintenant</value>
+  </data>
+  <data name="Airship" xml:space="preserve">
+    <value>Dirigeable</value>
+  </data>
+  <data name="Balloon" xml:space="preserve">
+    <value>Ballon</value>
   </data>
 </root>

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -740,5 +740,11 @@
   </data>
   <data name="MainForm_SimBriefButtonTooltip" xml:space="preserve">
     <value>SimBrief 데이터를 비행 계획 소스로 사용하고 지금 다시 가져오기</value>
+  </data>
+  <data name="Airship" xml:space="preserve">
+    <value>비행선</value>
+  </data>
+  <data name="Balloon" xml:space="preserve">
+    <value>기구</value>
   </data>
 </root>
