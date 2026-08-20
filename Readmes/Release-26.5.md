@@ -30,6 +30,7 @@
 - Fixed the Flight Plan dialog's callsign field being read-only - it's the one place to set/override a callsign now that the old context-menu override has been removed.
 - Pressing Enter in the SimBrief username field now saves the username and runs the import before closing the dialog, instead of closing immediately without saving anything.
 - Fixed the Flight Plan dialog's tab order (SimBrief username → Import → Clear → OK → Cancel), which had collided with the OK/Cancel buttons' tab indices.
+- **Fixed a SimBrief-imported callsign being overwritten by a sim/livery-derived guess (e.g. `DLH1234` reverting to `Lufthansa 320`).** Whenever the user's aircraft object was (re-)listed by the sim, its callsign was unconditionally re-derived from the aircraft's `ATC AIRLINE`/`ATC FLIGHT NUMBER` (aircraft.cfg/livery.cfg or MSFS2024 aircraft customization data), clobbering any callsign already fetched from SimBrief - regardless of fetch order. The sim-derived callsign is now only used as a fallback when no callsign is already set, matching how ICAO type/airline are already handled in the same code path.
 
 ## Limitations
 
