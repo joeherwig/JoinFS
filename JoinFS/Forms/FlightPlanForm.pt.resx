@@ -149,7 +149,7 @@
     <value>250, 12</value>
   </data>
   <data name="label4.Location" type="System.Drawing.Point, System.Drawing">
-    <value>223, 44</value>
+    <value>214, 44</value>
   </data>
   <data name="Text_To.Location" type="System.Drawing.Point, System.Drawing">
     <value>250, 41</value>
@@ -447,5 +447,23 @@
   </data>
   <data name="label4.Text" xml:space="preserve">
     <value>Para</value>
+  </data>
+  <data name="Label_Altitude.Location" type="System.Drawing.Point, System.Drawing">
+    <value>195, 73</value>
+  </data>
+  <data name="Label_Altitude.Text" xml:space="preserve">
+    <value>Altitude</value>
+  </data>
+  <data name="Text_Altitude.Location" type="System.Drawing.Point, System.Drawing">
+    <value>250, 70</value>
+  </data>
+  <data name="label8.Text" xml:space="preserve">
+    <value>SimBrief</value>
+  </data>
+  <data name="Button_ImportSimBrief.Text" xml:space="preserve">
+    <value>Importar</value>
+  </data>
+  <data name="Button_Clear.Text" xml:space="preserve">
+    <value>Limpar</value>
   </data>
 </root>

@@ -445,4 +445,22 @@
   <data name="label4.Text" xml:space="preserve">
     <value>A</value>
   </data>
+  <data name="Label_Altitude.Location" type="System.Drawing.Point, System.Drawing">
+    <value>199, 73</value>
+  </data>
+  <data name="Label_Altitude.Text" xml:space="preserve">
+    <value>Altitud</value>
+  </data>
+  <data name="Text_Altitude.Location" type="System.Drawing.Point, System.Drawing">
+    <value>248, 70</value>
+  </data>
+  <data name="label8.Text" xml:space="preserve">
+    <value>SimBrief</value>
+  </data>
+  <data name="Button_ImportSimBrief.Text" xml:space="preserve">
+    <value>Importar</value>
+  </data>
+  <data name="Button_Clear.Text" xml:space="preserve">
+    <value>Limpiar</value>
+  </data>
 </root>

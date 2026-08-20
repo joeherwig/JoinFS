@@ -753,4 +753,7 @@
   <data name="MainForm_FlightPlanButtonTooltipNoPlan" xml:space="preserve">
     <value>Нажмите, чтобы создать план полёта, если хотите его назначить.</value>
   </data>
+  <data name="FlightPlan_AltitudeTooltip" xml:space="preserve">
+    <value>Крейсерская высота или эшелон полёта, напр. 35000 или FL350</value>
+  </data>
 </root>

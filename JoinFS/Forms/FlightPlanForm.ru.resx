@@ -454,4 +454,22 @@
   <data name="Button_OK.Text" xml:space="preserve">
     <value>OK</value>
   </data>
+  <data name="Label_Altitude.Location" type="System.Drawing.Point, System.Drawing">
+    <value>174, 73</value>
+  </data>
+  <data name="Label_Altitude.Text" xml:space="preserve">
+    <value>Высота</value>
+  </data>
+  <data name="Text_Altitude.Location" type="System.Drawing.Point, System.Drawing">
+    <value>227, 70</value>
+  </data>
+  <data name="label8.Text" xml:space="preserve">
+    <value>SimBrief</value>
+  </data>
+  <data name="Button_ImportSimBrief.Text" xml:space="preserve">
+    <value>Импорт</value>
+  </data>
+  <data name="Button_Clear.Text" xml:space="preserve">
+    <value>Очистить</value>
+  </data>
 </root>

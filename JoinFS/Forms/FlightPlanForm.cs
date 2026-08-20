@@ -23,7 +23,6 @@ namespace JoinFS
         string pendingIcaoAirline;
         string pendingFlightNumber;
         string pendingAlternate;
-        string pendingAltitude;
 
         public FlightPlanForm(Main main, Sim.FlightPlan plan)
         {
@@ -45,11 +44,13 @@ namespace JoinFS
             Combo_Rules.Font = main.dataFont;
             Text_Route.Font = main.dataFont;
             Text_Remarks.Font = main.dataFont;
+            Text_Altitude.Font = main.dataFont;
             Text_SimBriefUsername.Font = main.dataFont;
 
             if (Settings.Default.ToolTips)
             {
                 ToolTip tip = new() { ShowAlways = true, IsBalloon = true, AutomaticDelay = 2000 };
+                tip.SetToolTip(Text_Altitude, Resources.Strings.FlightPlan_AltitudeTooltip);
                 tip.SetToolTip(Text_SimBriefUsername, Resources.Strings.FlightPlan_SimBriefUsernameTooltip);
                 tip.SetToolTip(Button_ImportSimBrief, Resources.Strings.FlightPlan_ImportSimBriefTooltip);
             }
@@ -75,13 +76,13 @@ namespace JoinFS
                 Combo_Rules.SelectedIndex = plan.rules == "IFR" ? 1 : 0;
                 Text_Route.Text = plan.route;
                 Text_Remarks.Text = plan.remarks;
+                Text_Altitude.Text = plan.altitude;
 
                 // carry through fields with no visible control, unchanged, unless an import replaces them
                 pendingRegistration = plan.registration;
                 pendingIcaoAirline = plan.icaoAirline;
                 pendingFlightNumber = plan.flightNumber;
                 pendingAlternate = plan.alternate;
-                pendingAltitude = plan.altitude;
             }
 
             Text_SimBriefUsername.Text = Settings.Default.SimBriefUsername;
@@ -130,10 +131,10 @@ namespace JoinFS
                     Combo_Rules.SelectedIndex = imported.rules == "IFR" ? 1 : 0;
                     Text_Route.Text = imported.route;
                     Text_Remarks.Text = imported.remarks;
+                    Text_Altitude.Text = imported.altitude;
 
                     pendingRegistration = imported.registration;
                     pendingAlternate = imported.alternate;
-                    pendingAltitude = imported.altitude;
 
                     Label_SimBriefStatus.Text = string.Format(Resources.Strings.FlightPlan_Imported, imported.departure, imported.destination);
                 }
@@ -184,8 +185,8 @@ namespace JoinFS
             Text_To.Text = "";
             Text_Route.Text = "";
             Text_Remarks.Text = "";
+            Text_Altitude.Text = "";
             pendingAlternate = "";
-            pendingAltitude = "";
             Label_SimBriefStatus.Text = "";
         }
 
@@ -201,11 +202,11 @@ namespace JoinFS
                 plan.rules = Combo_Rules.Text;
                 plan.route = Text_Route.Text.Substring(0, Math.Min(Sim.FlightPlan.MAX_ROUTE, Text_Route.Text.Length));
                 plan.remarks = Text_Remarks.Text.Substring(0, Math.Min(Sim.FlightPlan.MAX_REMARKS, Text_Remarks.Text.Length));
+                plan.altitude = Text_Altitude.Text;
                 plan.registration = pendingRegistration;
                 plan.icaoAirline = pendingIcaoAirline;
                 plan.flightNumber = pendingFlightNumber;
                 plan.alternate = pendingAlternate;
-                plan.altitude = pendingAltitude;
             }
         }
     }

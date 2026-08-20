@@ -753,4 +753,7 @@
   <data name="MainForm_FlightPlanButtonTooltipNoPlan" xml:space="preserve">
     <value>Click to create your flight plan, if you'd like to have one assigned.</value>
   </data>
+  <data name="FlightPlan_AltitudeTooltip" xml:space="preserve">
+    <value>Cruise altitude or flight level, e.g. 35000 or FL350</value>
+  </data>
 </root>

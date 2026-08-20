@@ -753,4 +753,7 @@
   <data name="MainForm_FlightPlanButtonTooltipNoPlan" xml:space="preserve">
     <value>Klicken, um Ihren Flugplan zu erstellen, falls Sie einen zugewiesen haben möchten.</value>
   </data>
+  <data name="FlightPlan_AltitudeTooltip" xml:space="preserve">
+    <value>Reiseflughöhe oder Flugfläche, z. B. 35000 oder FL350</value>
+  </data>
 </root>

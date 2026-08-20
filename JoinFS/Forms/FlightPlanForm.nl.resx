@@ -451,4 +451,22 @@
   <data name="label6.Text" xml:space="preserve">
     <value>Route</value>
   </data>
+  <data name="Label_Altitude.Location" type="System.Drawing.Point, System.Drawing">
+    <value>192, 73</value>
+  </data>
+  <data name="Label_Altitude.Text" xml:space="preserve">
+    <value>Hoogte</value>
+  </data>
+  <data name="Text_Altitude.Location" type="System.Drawing.Point, System.Drawing">
+    <value>245, 70</value>
+  </data>
+  <data name="label8.Text" xml:space="preserve">
+    <value>SimBrief</value>
+  </data>
+  <data name="Button_ImportSimBrief.Text" xml:space="preserve">
+    <value>Importeren</value>
+  </data>
+  <data name="Button_Clear.Text" xml:space="preserve">
+    <value>Wissen</value>
+  </data>
 </root>

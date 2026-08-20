@@ -753,4 +753,7 @@
   <data name="MainForm_FlightPlanButtonTooltipNoPlan" xml:space="preserve">
     <value>Cliquez pour créer votre plan de vol, si vous souhaitez en avoir un assigné.</value>
   </data>
+  <data name="FlightPlan_AltitudeTooltip" xml:space="preserve">
+    <value>Altitude de croisière ou niveau de vol, ex. 35000 ou FL350</value>
+  </data>
 </root>

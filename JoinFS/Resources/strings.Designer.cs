@@ -1817,5 +1817,11 @@ namespace JoinFS.Resources {
                 return ResourceManager.GetString("MainForm_FlightPlanButtonTooltipNoPlan", resourceCulture);
             }
         }
+
+        internal static string FlightPlan_AltitudeTooltip {
+            get {
+                return ResourceManager.GetString("FlightPlan_AltitudeTooltip", resourceCulture);
+            }
+        }
     }
 }
