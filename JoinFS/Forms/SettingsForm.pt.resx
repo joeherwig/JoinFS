@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -819,5 +819,32 @@
   </data>
   <data name="$this.Text" xml:space="preserve">
     <value>JoinFS: Configurações</value>
+  </data>
+  <data name="Button_OK.Text" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="Check_TCAS.Text" xml:space="preserve">
+    <value>TCAS</value>
+  </data>
+  <data name="GroupBox_Xplane.Text" xml:space="preserve">
+    <value>X-Plane</value>
+  </data>
+  <data name="Check_Euroscope.Text" xml:space="preserve">
+    <value>EuroScope</value>
+  </data>
+  <data name="Check_Whazzup.Text" xml:space="preserve">
+    <value>whazzup.txt</value>
+  </data>
+  <data name="GroupBox_Simulator.Text" xml:space="preserve">
+    <value>Simulador</value>
+  </data>
+  <data name="GroupBox_ATC.Text" xml:space="preserve">
+    <value>Modo ATC</value>
+  </data>
+  <data name="GroupBox_SimBrief.Text" xml:space="preserve">
+    <value>Simbrief</value>
+  </data>
+  <data name="Label_SimBriefUsername.Text" xml:space="preserve">
+    <value>Nome de usuário Simbrief</value>
   </data>
 </root>

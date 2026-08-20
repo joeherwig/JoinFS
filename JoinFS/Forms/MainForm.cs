@@ -1564,7 +1564,7 @@ namespace JoinFS
             Sim.FlightPlan plan = main.sim.userFlightPlan;
             bool hasPlan = plan.departure.Length > 0 || plan.destination.Length > 0;
 
-            Button_FlightPlan.Text = hasPlan ? plan.departure + "   ➜   " + plan.destination : "Flight plan";
+            Button_FlightPlan.Text = hasPlan ? plan.departure + "   ➜   " + plan.destination : Resources.Strings.MainForm_FlightPlanButtonDefaultText;
 
             if (Settings.Default.ToolTips)
             {
@@ -1578,7 +1578,7 @@ namespace JoinFS
                 }
                 else
                 {
-                    tooltip = "Click to create your flight plan, if you'd like to have one assigned.";
+                    tooltip = Resources.Strings.MainForm_FlightPlanButtonTooltipNoPlan;
                 }
                 flightPlanTip.SetToolTip(Button_FlightPlan, tooltip);
             }

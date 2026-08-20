@@ -750,4 +750,10 @@
   <data name="Password" xml:space="preserve">
     <value>Wachtwoord</value>
   </data>
+  <data name="MainForm_FlightPlanButtonDefaultText" xml:space="preserve">
+    <value>Vluchtplan</value>
+  </data>
+  <data name="MainForm_FlightPlanButtonTooltipNoPlan" xml:space="preserve">
+    <value>Klik om uw vluchtplan aan te maken, als u er een wilt toewijzen.</value>
+  </data>
 </root>

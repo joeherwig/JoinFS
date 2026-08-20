@@ -747,4 +747,10 @@
   <data name="Balloon" xml:space="preserve">
     <value>Воздушный шар</value>
   </data>
+  <data name="MainForm_FlightPlanButtonDefaultText" xml:space="preserve">
+    <value>План полёта</value>
+  </data>
+  <data name="MainForm_FlightPlanButtonTooltipNoPlan" xml:space="preserve">
+    <value>Нажмите, чтобы создать план полёта, если хотите его назначить.</value>
+  </data>
 </root>

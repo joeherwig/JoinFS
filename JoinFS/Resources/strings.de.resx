@@ -747,4 +747,10 @@
   <data name="Balloon" xml:space="preserve">
     <value>Ballon</value>
   </data>
+  <data name="MainForm_FlightPlanButtonDefaultText" xml:space="preserve">
+    <value>Flugplan</value>
+  </data>
+  <data name="MainForm_FlightPlanButtonTooltipNoPlan" xml:space="preserve">
+    <value>Klicken, um Ihren Flugplan zu erstellen, falls Sie einen zugewiesen haben möchten.</value>
+  </data>
 </root>

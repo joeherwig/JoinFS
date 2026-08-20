@@ -747,4 +747,10 @@
   <data name="Balloon" xml:space="preserve">
     <value>기구</value>
   </data>
+  <data name="MainForm_FlightPlanButtonDefaultText" xml:space="preserve">
+    <value>비행 계획</value>
+  </data>
+  <data name="MainForm_FlightPlanButtonTooltipNoPlan" xml:space="preserve">
+    <value>비행 계획을 지정하고 싶다면 클릭하여 생성하세요.</value>
+  </data>
 </root>

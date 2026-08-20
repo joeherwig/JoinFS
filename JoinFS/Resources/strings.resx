@@ -747,4 +747,10 @@
   <data name="MainForm_SimBriefButtonTooltip" xml:space="preserve">
     <value>Use SimBrief data as the flight-plan source and re-fetch it now</value>
   </data>
+  <data name="MainForm_FlightPlanButtonDefaultText" xml:space="preserve">
+    <value>Flight plan</value>
+  </data>
+  <data name="MainForm_FlightPlanButtonTooltipNoPlan" xml:space="preserve">
+    <value>Click to create your flight plan, if you'd like to have one assigned.</value>
+  </data>
 </root>
