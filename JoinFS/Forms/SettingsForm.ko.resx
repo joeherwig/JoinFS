@@ -805,4 +805,7 @@
   <data name="Label_SimBriefUsername.Text" xml:space="preserve">
     <value>Simbrief 사용자 이름</value>
   </data>
+  <data name="Check_SimBriefAutoImport.Text" xml:space="preserve">
+    <value>자동 가져오기</value>
+  </data>
 </root>

@@ -838,6 +838,9 @@
   <data name="Label_SimBriefUsername.Text" xml:space="preserve">
     <value>Nombre de usuario Simbrief</value>
   </data>
+  <data name="Check_SimBriefAutoImport.Text" xml:space="preserve">
+    <value>Importación automática</value>
+  </data>
   <data name="Label_PluginAddress.Text" xml:space="preserve">
     <value>Dirección IP</value>
   </data>

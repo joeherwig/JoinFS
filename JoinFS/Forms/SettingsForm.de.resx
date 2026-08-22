@@ -778,6 +778,9 @@
   <data name="Label_SimBriefUsername.Text" xml:space="preserve">
     <value>Simbrief-Benutzername</value>
   </data>
+  <data name="Check_SimBriefAutoImport.Text" xml:space="preserve">
+    <value>Automatischer Import</value>
+  </data>
   <data name="Label_HubDomain.Text" xml:space="preserve">
     <value>Domäne</value>
   </data>

@@ -862,6 +862,9 @@
   <data name="Label_SimBriefUsername.Text" xml:space="preserve">
     <value>Nom d'utilisateur Simbrief</value>
   </data>
+  <data name="Check_SimBriefAutoImport.Text" xml:space="preserve">
+    <value>Importation automatique</value>
+  </data>
   <data name="Label_Password.Text" xml:space="preserve">
     <value>Mot de passe</value>
   </data>

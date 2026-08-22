@@ -112,14 +112,15 @@ namespace JoinFS
 
             Button_ImportSimBrief.Enabled = false;
             Label_SimBriefStatus.Text = "";
+            // the main-screen badge reflects the fetch *attempt*, regardless of whether the pilot
+            // goes on to commit it via OK - update it immediately, not just on OK
+            main.sim.simBriefFetchState = Sim.SimBriefFetchState.Fetching;
             try
             {
                 Sim.FlightPlan imported = new();
                 bool ok = await SimBrief.FetchAsync(username, imported, main);
 
-                // the main-screen badge reflects the last fetch *attempt*, regardless of whether
-                // the pilot goes on to commit it via OK - update it immediately, not just on OK
-                main.sim.simBriefLastFetchSucceeded = ok;
+                main.sim.simBriefFetchState = ok ? Sim.SimBriefFetchState.Success : Sim.SimBriefFetchState.Failed;
 
                 if (ok)
                 {
@@ -188,6 +189,10 @@ namespace JoinFS
             Text_Altitude.Text = "";
             pendingAlternate = "";
             Label_SimBriefStatus.Text = "";
+            // the main-screen SimBrief button's color reflects the last fetch attempt - clearing the plan
+            // here should revert it back to neutral/default, as if no SimBrief fetch had happened yet,
+            // rather than continuing to show a stale success/failure from before the clear
+            main.sim.simBriefFetchState = Sim.SimBriefFetchState.NotTriggered;
         }
 
         private void Button_OK_Click(object sender, EventArgs e)
@@ -196,6 +201,10 @@ namespace JoinFS
             {
                 // return flight plan
                 plan.callsign = Text_Callsign.Text;
+                // explicitly set here (manual entry, or a SimBrief import pre-filled into this same
+                // textbox and committed via OK either way) - once true, SimConnect-derived defaults must
+                // never overwrite it again, see FlightPlan.callsignSetByUser
+                plan.callsignSetByUser = true;
                 plan.icaoType = Text_Type.Text;
                 plan.departure = Text_From.Text.Substring(0, Math.Min(4, Text_From.Text.Length)).ToUpperInvariant();
                 plan.destination = Text_To.Text.Substring(0, Math.Min(4, Text_To.Text.Length)).ToUpperInvariant();

@@ -877,4 +877,7 @@
   <data name="Label_SimBriefUsername.Text" xml:space="preserve">
     <value>Имя пользователя Simbrief</value>
   </data>
+  <data name="Check_SimBriefAutoImport.Text" xml:space="preserve">
+    <value>Автоматический импорт</value>
+  </data>
 </root>
