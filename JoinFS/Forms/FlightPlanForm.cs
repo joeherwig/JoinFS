@@ -20,7 +20,6 @@ namespace JoinFS
         // fields SimBrief can supply that this dialog doesn't have a visible control for -
         // carried through to plan on OK so they still reach the network/EuroScope
         string pendingRegistration;
-        string pendingIcaoAirline;
         string pendingFlightNumber;
         string pendingAlternate;
 
@@ -80,7 +79,6 @@ namespace JoinFS
 
                 // carry through fields with no visible control, unchanged, unless an import replaces them
                 pendingRegistration = plan.registration;
-                pendingIcaoAirline = plan.icaoAirline;
                 pendingFlightNumber = plan.flightNumber;
                 pendingAlternate = plan.alternate;
             }
@@ -205,6 +203,12 @@ namespace JoinFS
                 // textbox and committed via OK either way) - once true, SimConnect-derived defaults must
                 // never overwrite it again, see FlightPlan.callsignSetByUser
                 plan.callsignSetByUser = true;
+                // re-derive the ICAO airline from the (possibly just-changed) callsign - it's the only
+                // airline-relevant signal actually editable in this dialog (SimBrief never supplies
+                // icaoAirline), so a stale sim/livery-derived tag (e.g. from the sim's own aircraft-
+                // customization dialog) must not keep overriding what the user is now flying as. Empty
+                // when the new callsign doesn't look like a commercial flight (GA-style).
+                plan.icaoAirline = Sim.DeriveIcaoAirlineFromCallsign(plan.callsign);
                 plan.icaoType = Text_Type.Text;
                 plan.departure = Text_From.Text.Substring(0, Math.Min(4, Text_From.Text.Length)).ToUpperInvariant();
                 plan.destination = Text_To.Text.Substring(0, Math.Min(4, Text_To.Text.Length)).ToUpperInvariant();
@@ -213,7 +217,6 @@ namespace JoinFS
                 plan.remarks = Text_Remarks.Text.Substring(0, Math.Min(Sim.FlightPlan.MAX_REMARKS, Text_Remarks.Text.Length));
                 plan.altitude = Text_Altitude.Text;
                 plan.registration = pendingRegistration;
-                plan.icaoAirline = pendingIcaoAirline;
                 plan.flightNumber = pendingFlightNumber;
                 plan.alternate = pendingAlternate;
             }
