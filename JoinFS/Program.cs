@@ -123,7 +123,6 @@ namespace JoinFS
 
         // elevated platform (helipad/ship deck/rooftop) ground-trust feature - command-line only, not persisted
         public bool settingsElevatedPlatformRecognition = true;
-        public bool settingsElevatedPlatformHelicoptersOnly = true;
         public int settingsElevatedPlatformThreshold = 50; // cm
 #if XPLANE || CONSOLE
         public bool settingsGenerateCsl = false;
@@ -566,16 +565,6 @@ namespace JoinFS
                                 }
                                 break;
 
-                            case "-elevatedplatformhelicoptersonly":
-                                // next parameter
-                                index++;
-                                // check for parameter
-                                if (index < args.Length)
-                                {
-                                    settingsElevatedPlatformHelicoptersOnly = ParseBoolArg(args[index], settingsElevatedPlatformHelicoptersOnly);
-                                }
-                                break;
-
                             case "-elevatedplatformthreshold":
                                 // next parameter
                                 index++;
@@ -687,8 +676,7 @@ namespace JoinFS
                                 Console.WriteLine("  --websocket            Enable WebSocket server broadcasting aircraft data");
                                 Console.WriteLine("  --websocketport <port> WebSocket server port (default 8765)");
                                 Console.WriteLine("  --websocketlog         Log WebSocket events and webhook calls (default false)");
-                                Console.WriteLine("  --elevatedplatformrecognition <true|false>       Trust remote on-ground flag on helipads/ship decks/rooftops instead of local terrain mesh (default true)");
-                                Console.WriteLine("  --elevatedplatformhelicoptersonly <true|false>   Restrict elevated platform recognition to helicopters (default true)");
+                                Console.WriteLine("  --elevatedplatformrecognition <true|false>       Confirm on-ground mismatches (any aircraft type) against local radar altitude instead of always trusting local terrain mesh (default true)");
                                 Console.WriteLine("  --elevatedplatformthreshold <cm>                 Minimum elevation mismatch before elevated platform recognition engages (default 50)");
                                 Console.WriteLine("");
                                 Console.WriteLine("Interactive key commands:");
@@ -878,9 +866,10 @@ namespace JoinFS
                 variableMgr = new VariableMgr(this);
 
 #if !CONSOLE
-                // fetch the pilot's SimBrief flight plan on startup if a username is already saved -
-                // this is a cloud API call independent of the simulator, so it doesn't need to wait for a connection
-                if (string.IsNullOrWhiteSpace(Settings.Default.SimBriefUsername) == false)
+                // fetch the pilot's SimBrief flight plan on startup if a username is already saved and auto-import
+                // is enabled - this is a cloud API call independent of the simulator, so it doesn't need to wait
+                // for a connection
+                if (Settings.Default.SimBriefAutoImport && string.IsNullOrWhiteSpace(Settings.Default.SimBriefUsername) == false)
                 {
                     _ = sim.RefreshUserFlightPlanFromSimBriefAsync();
                 }

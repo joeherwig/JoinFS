@@ -2905,6 +2905,17 @@ namespace JoinFS
         /// </summary>
         public void SendFlightPlanMessage(LocalNode.Nuid ownerNuid, uint netId, Sim.FlightPlan flightPlan)
         {
+            // if nothing more authoritative (SimBrief, live sim/config data) already supplied a real ICAO
+            // airline, try to derive one from the callsign's shape - commercial airline callsigns are an ICAO
+            // airline designator + flight number (e.g. "DLH1234"); General Aviation tail-number callsigns
+            // ("N12345", "D-EJOE") won't match and are left alone. Mutates the shared FlightPlan object in
+            // place, so this also fixes up the icaoAirline seen by the more frequent position-update messages
+            // and the WebSocket telemetry feed, not just this message.
+            if (flightPlan.icaoAirline.Length == 0)
+            {
+                flightPlan.icaoAirline = Sim.DeriveIcaoAirlineFromCallsign(flightPlan.callsign);
+            }
+
             // prepare message
             BinaryWriter message = localNode.PrepareMessage(new LocalNode.Nuid(), false);
             // add header
