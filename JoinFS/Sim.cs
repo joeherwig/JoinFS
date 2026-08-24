@@ -398,6 +398,8 @@ namespace JoinFS
             /// <summary>"PLANE ALT ABOVE GROUND", feet - diagnostic only, see helicopters-on-elevated-platforms feature. Not yet used in any trust/correction decision.</summary>
             public float radarAltitude;
             public int ground;
+            /// <summary>TEMPORARY diagnostic - "STATIC CG TO GROUND", feet. Ground-jitter/model-mismatch investigation - quantifies a substitute model's own ground clearance without needing file access. Remove once diagnosed.</summary>
+            public float staticCgToGround;
         };
 
         /// <summary>
@@ -498,6 +500,8 @@ namespace JoinFS
             /// <summary>"PLANE ALT ABOVE GROUND" in meters, diagnostic only - see helicopters-on-elevated-platforms feature. NaN when not sourced from an AircraftPosition read (distinct from a real 0.0 reading).</summary>
             public double radarHeight;
             public int ground;
+            /// <summary>TEMPORARY diagnostic - "STATIC CG TO GROUND" in meters, ground-jitter/model-mismatch investigation. NaN when not sourced from an AircraftPosition read. Remove once diagnosed.</summary>
+            public double staticCgToGround;
 
             /// <summary>
             /// Constructor
@@ -509,6 +513,7 @@ namespace JoinFS
                 this.elevation = 0.0;
                 this.radarHeight = double.NaN;
                 this.ground = 0;
+                this.staticCgToGround = double.NaN;
             }
 
             /// <summary>
@@ -521,6 +526,7 @@ namespace JoinFS
                 this.elevation = elevation;
                 this.radarHeight = radarHeight;
                 this.ground = ground;
+                this.staticCgToGround = double.NaN;
             }
 
             /// <summary>
@@ -533,6 +539,7 @@ namespace JoinFS
                 this.elevation = position.height;
                 this.radarHeight = double.NaN;
                 this.ground = position.ground;
+                this.staticCgToGround = double.NaN;
             }
 
             /// <summary>
@@ -545,6 +552,7 @@ namespace JoinFS
                 this.elevation = position.elevation;
                 this.radarHeight = position.radarAltitude * 0.3048;
                 this.ground = position.ground;
+                this.staticCgToGround = position.staticCgToGround * 0.3048;
             }
 
             /// <summary>
@@ -557,6 +565,7 @@ namespace JoinFS
                 this.elevation = position.height;
                 this.radarHeight = double.NaN;
                 this.ground = position.ground;
+                this.staticCgToGround = double.NaN;
             }
 
             /// <summary>
@@ -771,6 +780,8 @@ namespace JoinFS
             public bool trustingPlatformGround = false;
             /// <summary>Low-pass-filtered local-vs-remote terrain elevation offset used by the near-ground altitude blend in UpdateAircraft. NaN when not currently tracking (out of blend range, or no sample taken yet). The "GROUND ALTITUDE" probe feeding both sides has tick-to-tick noise; blending by the raw offset every update showed up as the aircraft jittering in height while sitting on/taxiing on ordinary ground.</summary>
             public double smoothedElevationOffset = double.NaN;
+            /// <summary>TEMPORARY - throttle for the diagnostic RawPos trace in UpdateAircraft, ground-jitter/model-mismatch investigation. Remove this field and its log line once diagnosed.</summary>
+            public double nextRawDiagLogTime = 0.0;
             public Vector oldEuler;
             public double distance = double.MaxValue;
             public bool paused = false;
@@ -2026,6 +2037,20 @@ namespace JoinFS
                     {
                         main.MonitorNetwork("ElevatedPlatform '" + aircraft.flightPlan.callsign + "' mismatch=" + mismatchCm.ToString("F0") + "cm threshold=" + main.settingsElevatedPlatformThreshold + "cm senderHeight=" + (double.IsNaN(senderHeight) ? "n/a" : (senderHeight * 100.0).ToString("F0") + "cm") + " elevationTrust=" + trustPlatformElevation + " groundTrust=" + trustPlatformGround);
                     }
+                    // TEMPORARY diagnostic (ground-jitter/model-mismatch investigation) - fires every tick
+                    // (throttled to ~5/sec, not just on trust-state change) so the raw received values can be
+                    // inspected directly, e.g. to see whether aircraftPosition.elevation is flipping between a
+                    // real terrain reading and a zeroed/default value. Remove once diagnosed.
+                    if (netTime >= aircraft.nextRawDiagLogTime)
+                    {
+                        aircraft.nextRawDiagLogTime = netTime + 0.2;
+                        main.MonitorNetwork("RawPos '" + aircraft.flightPlan.callsign + "' rawGround=" + aircraftPosition.ground +
+                            " altitude=" + aircraftPosition.altitude.ToString("F1") + "m elevation=" + aircraftPosition.elevation.ToString("F1") + "m" +
+                            " staticCgToGround=" + (aircraftPosition.staticCgToGround * 0.3048).ToString("F2") + "m" +
+                            " localElevation=" + aircraft.simPosition.elevation.ToString("F1") + "m" +
+                            " subModelStaticCg=" + (double.IsNaN(aircraft.simPosition.staticCgToGround) ? "n/a" : aircraft.simPosition.staticCgToGround.ToString("F2") + "m") +
+                            " netTime=" + netTime.ToString("F1"));
+                    }
                     aircraft.trustingPlatformElevation = trustPlatformElevation;
                     aircraft.trustingPlatformGround = trustPlatformGround;
 
@@ -2132,6 +2157,18 @@ namespace JoinFS
             // check if aircraft is injected and needs to be broadcast
             if (aircraft.Injected && IsBroadcast(aircraft))
             {
+                // TEMPORARY diagnostic (ground-jitter/model-mismatch investigation) - this re-broadcasts an
+                // already-received position onward to other nodes (multi-hop/relay topology); log it
+                // distinctly from RawPosSend so a relay-introduced bad value can be told apart from a
+                // freshly-read one. Remove once diagnosed.
+                if (netTime >= aircraft.nextRawDiagLogTime)
+                {
+                    aircraft.nextRawDiagLogTime = netTime + 0.2;
+                    main.MonitorNetwork("RawPosRelay '" + aircraft.flightPlan.callsign + "' rawGround=" + aircraftPosition.ground +
+                        " altitude=" + aircraftPosition.altitude.ToString("F1") + "m elevation=" + aircraftPosition.elevation.ToString("F1") + "m" +
+                        " staticCgToGround=" + (aircraftPosition.staticCgToGround * 0.3048).ToString("F2") + "m" +
+                        " netTime=" + netTime.ToString("F1"));
+                }
                 // create message
                 main.network.WriteAircraftPositionMessage(aircraft.netId, netTime, aircraft, ref aircraftPosition);
                 // broadcast message to other nodes
@@ -2316,6 +2353,20 @@ namespace JoinFS
                 aircraft.simPosition = new Pos(ref aircraftPosition);
                 // store current time
                 aircraft.simTime = simTime;
+
+                // TEMPORARY diagnostic (ground-jitter/model-mismatch investigation) - raw SimConnect read for
+                // whichever aircraft this is (own aircraft or a locally-simulated one being broadcast), before
+                // anything else touches it, to catch whether SimConnect itself intermittently returns a
+                // zeroed/default "GROUND ALTITUDE" on this periodic per-object read. Remove once diagnosed.
+                if (simTime >= aircraft.nextRawDiagLogTime)
+                {
+                    aircraft.nextRawDiagLogTime = simTime + 0.2;
+                    main.MonitorNetwork("RawPosSend '" + aircraft.flightPlan.callsign + "' owner=" + aircraft.owner +
+                        " rawGround=" + aircraftPosition.ground + " altitude=" + aircraftPosition.altitude.ToString("F1") + "m" +
+                        " elevation=" + aircraftPosition.elevation.ToString("F1") + "m" +
+                        " staticCgToGround=" + (aircraftPosition.staticCgToGround * 0.3048).ToString("F2") + "m" +
+                        " simTime=" + simTime.ToString("F1"));
+                }
 
                 // check if user or broadcasting this aircraft
                 if (aircraft.owner == Obj.Owner.Me || main.network.localNode.Connected && IsBroadcast(aircraft))
@@ -3266,6 +3317,10 @@ namespace JoinFS
             if (aircraftPosition.ground != 0) flags |= 0x01;
             if (Settings.Default.ElevationCorrection) flags |= 0x02;
             writer.Write(flags);
+            // TEMPORARY diagnostic (ground-jitter/model-mismatch investigation) - both sender and receiver
+            // are expected to be running the same diagnostic build, so no version/backward-compat guard.
+            // Remove this field once diagnosed.
+            writer.Write(aircraftPosition.staticCgToGround);
         }
 
         /// <summary>
@@ -3301,6 +3356,8 @@ namespace JoinFS
             aircraftPosition.elevation = version >= 10023 ? reader.ReadSingle() : 0.0f;
             byte flags = version >= 10023 ? reader.ReadByte() : (byte)0;
             aircraftPosition.ground = (flags & 0x01) != 0 ? 1 : 0;
+            // TEMPORARY diagnostic - see Write() above. Remove once diagnosed.
+            aircraftPosition.staticCgToGround = reader.ReadSingle();
         }
 
         /// <summary>
