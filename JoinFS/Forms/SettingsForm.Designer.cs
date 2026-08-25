@@ -107,6 +107,7 @@
             GroupBox_SimBrief = new System.Windows.Forms.GroupBox();
             Label_SimBriefUsername = new System.Windows.Forms.Label();
             Text_SimBriefUsername = new System.Windows.Forms.TextBox();
+            Check_SimBriefAutoImport = new System.Windows.Forms.CheckBox();
             ((System.ComponentModel.ISupportInitialize)Track_Follow).BeginInit();
             ((System.ComponentModel.ISupportInitialize)Track_Circle).BeginInit();
             GroupBox_Simulator.SuspendLayout();
@@ -641,6 +642,7 @@
             //
             // GroupBox_SimBrief
             //
+            GroupBox_SimBrief.Controls.Add(Check_SimBriefAutoImport);
             GroupBox_SimBrief.Controls.Add(Text_SimBriefUsername);
             GroupBox_SimBrief.Controls.Add(Label_SimBriefUsername);
             resources.ApplyResources(GroupBox_SimBrief, "GroupBox_SimBrief");
@@ -656,6 +658,16 @@
             //
             resources.ApplyResources(Text_SimBriefUsername, "Text_SimBriefUsername");
             Text_SimBriefUsername.Name = "Text_SimBriefUsername";
+            //
+            // Check_SimBriefAutoImport
+            //
+            // Location/Size are set at runtime in the SettingsForm constructor, relative to
+            // Text_SimBriefUsername's resolved position - each locale's resx snapshots its own absolute
+            // Y positions for GroupBox_SimBrief and the button row below it, so a fixed Designer position
+            // here would misalign in every locale except the one last saved in the Designer.
+            resources.ApplyResources(Check_SimBriefAutoImport, "Check_SimBriefAutoImport");
+            Check_SimBriefAutoImport.Name = "Check_SimBriefAutoImport";
+            Check_SimBriefAutoImport.UseVisualStyleBackColor = true;
             //
             // SettingsForm
             //
@@ -777,5 +789,6 @@
         private System.Windows.Forms.GroupBox GroupBox_SimBrief;
         private System.Windows.Forms.Label Label_SimBriefUsername;
         private System.Windows.Forms.TextBox Text_SimBriefUsername;
+        private System.Windows.Forms.CheckBox Check_SimBriefAutoImport;
     }
 }

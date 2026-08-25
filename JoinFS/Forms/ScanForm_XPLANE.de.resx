@@ -407,4 +407,7 @@
   <data name="$this.Text" xml:space="preserve">
     <value>JoinFS: Nach Modellen suchen</value>
   </data>
+  <data name="Button_Scan.Text" xml:space="preserve">
+    <value>Scannen</value>
+  </data>
 </root>

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -129,5 +129,17 @@
   </data>
   <data name="Button_Cancel.Text" xml:space="preserve">
     <value>Annulla</value>
+  </data>
+  <data name="Button_OK.Text" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="Label_Verify.Text" xml:space="preserve">
+    <value>Verifica Password</value>
+  </data>
+  <data name="$this.Text" xml:space="preserve">
+    <value>Accesso</value>
+  </data>
+  <data name="label2.Text" xml:space="preserve">
+    <value>Password:</value>
   </data>
 </root>

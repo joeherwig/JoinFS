@@ -316,7 +316,7 @@ namespace JoinFS
             public float pitch;
             public float bank;
             public float heading;
-            /// <summary>Forwarded to SimConnect's "SIM ON GROUND" only when the elevated-platform ground-trust decision applies - see helicopters-on-elevated-platforms feature. Left 0 (unset) for ordinary traffic, unchanged from prior behavior.</summary>
+            /// <summary>Forwarded to SimConnect's "SIM ON GROUND" whenever the sender reports the object on-ground, for any aircraft type - independent of the elevated-platform elevation-trust decision. This lets the local sim's own gear/ground-contact physics handle placement instead of fighting an externally-driven altitude every tick. See helicopters-on-elevated-platforms feature.</summary>
             public int ground;
 
             public ObjectPositionUpdate(ref ObjectPosition position)
@@ -765,9 +765,9 @@ namespace JoinFS
             public Pos simPosition = new();
             public Pos netPosition = new();
             public Vel netVelocity = new();
-            /// <summary>True when the sender's altitude should be trusted as-is (elevated platform - helipad/ship deck/rooftop) instead of being blended toward local terrain mesh. Unlike trustingPlatformGround, this can apply on final approach, before the sender reports on-ground. See helicopters-on-elevated-platforms feature.</summary>
+            /// <summary>True when the sender's altitude should be trusted as-is (elevated platform - helipad/ship deck/rooftop) instead of being blended toward local terrain mesh. Applies to any aircraft type. Can apply on final approach too, before the sender reports on-ground. See helicopters-on-elevated-platforms feature.</summary>
             public bool trustingPlatformElevation = false;
-            /// <summary>True when this object's on-ground state should be trusted from the network (elevated platform - helipad/ship deck/rooftop) and forwarded to the local sim's placement of the object. Always requires the sender to actually report on-ground, so the local sim is never told an airborne aircraft is resting on the ground. See helicopters-on-elevated-platforms feature.</summary>
+            /// <summary>True whenever this object's on-ground state is trusted from the network and forwarded to the local sim's placement of the object, for any aircraft type - independent of trustingPlatformElevation. Always requires the sender to actually report on-ground, so the local sim is never told an airborne aircraft is resting on the ground. See helicopters-on-elevated-platforms feature.</summary>
             public bool trustingPlatformGround = false;
             /// <summary>Low-pass-filtered local-vs-remote terrain elevation offset used by the near-ground altitude blend in UpdateAircraft. NaN when not currently tracking (out of blend range, or no sample taken yet). The "GROUND ALTITUDE" probe feeding both sides has tick-to-tick noise; blending by the raw offset every update showed up as the aircraft jittering in height while sitting on/taxiing on ordinary ground.</summary>
             public double smoothedElevationOffset = double.NaN;
@@ -1235,9 +1235,10 @@ namespace JoinFS
             // check for valid object
             if (simconnect != null && obj.Created)
             {
-                // update object position and velocity - forward on-ground to the sim's own placement only when the
-                // elevated-platform ground-trust decision applies, so the sim's structure-aware collision/physics can
-                // rest the object on the real helipad/deck/rooftop geometry (see helicopters-on-elevated-platforms feature)
+                // update object position and velocity - forward on-ground to the sim's own placement whenever the
+                // sender reports the object on-ground, for any aircraft type, so the sim's own gear/ground-contact
+                // physics handles it instead of fighting an externally-driven altitude every tick (see
+                // helicopters-on-elevated-platforms feature)
                 ObjectPositionUpdate update = new(ref position)
                 {
                     ground = obj.trustingPlatformGround ? 1 : 0
@@ -1672,6 +1673,25 @@ namespace JoinFS
             return tailNumber;
         }
 
+        /// <summary>Matches a commercial-airline-shaped callsign: 3-letter ICAO airline designator, 1-4 digit
+        /// flight number, optional trailing letters (e.g. "DLH1234", "BAW456A", "UAL2345"). Group 1 captures
+        /// the designator. General Aviation tail-number callsigns ("N12345", "D-EJOE") don't match.</summary>
+        [GeneratedRegex(@"^([A-Z]{3})\d{1,4}[A-Z]{0,3}$", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
+        private static partial Regex AirlineCallsignRegex();
+
+        /// <summary>
+        /// Derive the ICAO airline designator from a callsign's shape, for use as a fallback when nothing
+        /// more authoritative (SimBrief, live sim/config data) already supplied one. Returns "" when the
+        /// callsign doesn't look like a commercial airline flight (General Aviation), so this is safe to try
+        /// unconditionally.
+        /// </summary>
+        internal static string DeriveIcaoAirlineFromCallsign(string callsign)
+        {
+            if (string.IsNullOrEmpty(callsign)) return "";
+            Match m = AirlineCallsignRegex().Match(callsign.Trim().ToUpperInvariant());
+            return m.Success ? m.Groups[1].Value : "";
+        }
+
         /// <summary>
         /// Flight plan
         /// </summary>
@@ -1681,6 +1701,12 @@ namespace JoinFS
             public const int MAX_REMARKS = 512;
 
             public string callsign = "";
+            /// <summary>
+            /// True once callsign has been explicitly set via SimBrief import or manual FlightPlanForm
+            /// entry - once true, SimConnect-derived defaults (the raw tail-number fallback, or the
+            /// ATC-FLIGHT-NUMBER-based ResolveCallsign synthesis) must never overwrite it again.
+            /// </summary>
+            public bool callsignSetByUser = false;
             public string registration = "";
             public string icaoType = "";
             public string icaoAirline = "";
@@ -1699,9 +1725,16 @@ namespace JoinFS
         public FlightPlan userFlightPlan = new();
 
         /// <summary>
-        /// Result of the most recent SimBrief fetch attempt, for the main-screen SimBrief icon's badge
+        /// State of the most recent SimBrief fetch attempt, for the main-screen SimBrief button's coloring -
+        /// NotTriggered (neutral/default, like the flight plan button) until a fetch has actually happened,
+        /// auto or manual, distinguishing "never asked" from "asked and failed".
         /// </summary>
-        public bool simBriefLastFetchSucceeded = false;
+        public enum SimBriefFetchState { NotTriggered, Fetching, Success, Failed }
+
+        /// <summary>
+        /// Result of the most recent SimBrief fetch attempt, for the main-screen SimBrief button's coloring
+        /// </summary>
+        public SimBriefFetchState simBriefFetchState = SimBriefFetchState.NotTriggered;
 
 #if !CONSOLE
         /// <summary>
@@ -1709,11 +1742,17 @@ namespace JoinFS
         /// </summary>
         public async Task<bool> RefreshUserFlightPlanFromSimBriefAsync()
         {
+            simBriefFetchState = SimBriefFetchState.Fetching;
             bool ok = await JoinFS.SimBrief.FetchAsync(Settings.Default.SimBriefUsername, userFlightPlan, main);
-            simBriefLastFetchSucceeded = ok;
+            simBriefFetchState = ok ? SimBriefFetchState.Success : SimBriefFetchState.Failed;
             if (ok)
             {
                 main.MonitorEvent("SimBrief flight plan imported: " + userFlightPlan.departure + " -> " + userFlightPlan.destination);
+                // don't lock out the SimConnect fallback if SimBrief didn't actually provide a callsign
+                if (userFlightPlan.callsign.Length > 0)
+                {
+                    userFlightPlan.callsignSetByUser = true;
+                }
             }
             return ok;
         }
@@ -1932,24 +1971,34 @@ namespace JoinFS
                     //    touchdown, then snap back up once the ground flag arrived, reported as "sinks through the platform, then
                     //    gets lifted onto it".
                     //  - trustingPlatformGround: whether to forward on-ground to the local sim's own placement of the object (which
-                    //    affects local physics/animation, e.g. gear compression, rotor spin-down). This must stay tied to the sender
-                    //    actually reporting on-ground, so the local sim is never told an airborne aircraft is resting on the ground.
-                    // Both use hysteresis (the release threshold is half the trust threshold) so a mismatch hovering near the
-                    // configured threshold doesn't flip the decision every update - without it, the blend and the raw altitude
-                    // would alternate update to update, visible as the aircraft jittering in height while parked on a platform.
+                    //    affects local physics/animation, e.g. gear compression, rotor spin-down). Unconditional whenever the sender
+                    //    reports on-ground, for any aircraft type - not really elevated-platform logic, just lets the local sim's own
+                    //    ground-contact physics handle it instead of fighting an externally-driven altitude every tick.
+                    // Trust engagement/release uses hysteresis (the release threshold is half the trust threshold) so a mismatch
+                    // hovering near the configured threshold doesn't flip the decision every update. A previous version of this
+                    // logic additionally tried to confirm/revoke trust reactively against a PLANE ALT ABOVE GROUND (radarHeight)
+                    // readback of the injected object - removed: that simvar is only meaningful for the user's own physically
+                    // simulated aircraft (a reference implementation, swift/pilotclient, registers it exclusively on its own-aircraft
+                    // data definition, never for AI-injected traffic), and for an injected object with a persistent mismatch it never
+                    // resolved, producing a continuous engage/fail/revoke/re-engage cycle each update - visible as jitter, since each
+                    // flip snaps between the raw sender altitude and the corrected blended altitude. senderIndicatesElevation below
+                    // is the mitigation for the false-positive case that mechanism was trying to solve instead: it requires the
+                    // sender's own reading (self-consistent, immune to cross-install bare-terrain datum noise, unlike the cross-
+                    // install mismatch check alone) to itself indicate real elevation before trust engages.
                     double mismatchCm = 0.0;
+                    double senderHeight = double.NaN;
                     bool trustPlatformElevation = aircraft.trustingPlatformElevation;
-                    if (main.settingsElevatedPlatformRecognition && aircraft.SimValid &&
-                        (main.settingsElevatedPlatformHelicoptersOnly == false || aircraft is Helicopter))
+                    if (main.settingsElevatedPlatformRecognition && aircraft.SimValid)
                     {
-                        double senderHeight = aircraftPosition.altitude - aircraftPosition.elevation;
+                        senderHeight = aircraftPosition.altitude - aircraftPosition.elevation;
                         double localHeight = aircraftPosition.altitude - aircraft.simPosition.elevation;
                         mismatchCm = Math.Abs(localHeight - senderHeight) * 100.0;
 
                         bool nearGround = aircraftPosition.ground != 0 || senderHeight < 50.0;
+                        bool senderIndicatesElevation = senderHeight * 100.0 >= main.settingsElevatedPlatformThreshold;
                         double releaseThreshold = main.settingsElevatedPlatformThreshold * 0.5;
 
-                        if (nearGround && mismatchCm >= main.settingsElevatedPlatformThreshold)
+                        if (nearGround && senderIndicatesElevation && mismatchCm >= main.settingsElevatedPlatformThreshold)
                         {
                             trustPlatformElevation = true;
                         }
@@ -1963,17 +2012,19 @@ namespace JoinFS
                     {
                         trustPlatformElevation = false;
                     }
-                    bool trustPlatformGround = trustPlatformElevation && aircraftPosition.ground != 0;
+                    // ground is forwarded to the local sim's placement whenever the sender reports on-ground, for
+                    // any aircraft type - see helicopters-on-elevated-platforms feature. heightAdjustmentCm (HeightForm
+                    // - a manual, cosmetic per-model correction for a mesh/gear-reference-point offset) does not gate
+                    // this: a large negative adjustment can still produce ground-penetration jitter, but that's the
+                    // sim's own generic terrain-penetration correction fighting an altitude pushed below the actual
+                    // mesh, independent of SIM ON GROUND - confirmed by testing with SIM ON GROUND forced permanently
+                    // unforwarded, which made no difference to that jitter on either FS2020 or FS2024.
+                    int heightAdjustmentCm = GetHeightAdjustment(aircraft.subModel);
+                    bool trustPlatformGround = aircraftPosition.ground != 0;
 
                     if (trustPlatformElevation != aircraft.trustingPlatformElevation || trustPlatformGround != aircraft.trustingPlatformGround)
                     {
-                        // "PLANE ALT ABOVE GROUND" (radarHeight) is diagnostic only here - not used in the trust decision above.
-                        // Logged so it can be checked against a real elevated-platform approach/landing before anyone relies on it,
-                        // since it's unproven for JoinFS's own injected AI objects (see helicopters-on-elevated-platforms feature).
-                        string radarInfo = double.IsNaN(aircraft.simPosition.radarHeight)
-                            ? "radar=n/a"
-                            : "radar=" + aircraft.simPosition.radarHeight.ToString("F1") + "m bareTerrain=" + (aircraftPosition.altitude - aircraft.simPosition.elevation).ToString("F1") + "m";
-                        main.MonitorNetwork("ElevatedPlatform '" + aircraft.flightPlan.callsign + "' mismatch=" + mismatchCm.ToString("F0") + "cm threshold=" + main.settingsElevatedPlatformThreshold + "cm elevationTrust=" + trustPlatformElevation + " groundTrust=" + trustPlatformGround + " " + radarInfo);
+                        main.MonitorNetwork("ElevatedPlatform '" + aircraft.flightPlan.callsign + "' mismatch=" + mismatchCm.ToString("F0") + "cm threshold=" + main.settingsElevatedPlatformThreshold + "cm senderHeight=" + (double.IsNaN(senderHeight) ? "n/a" : (senderHeight * 100.0).ToString("F0") + "cm") + " elevationTrust=" + trustPlatformElevation + " groundTrust=" + trustPlatformGround);
                     }
                     aircraft.trustingPlatformElevation = trustPlatformElevation;
                     aircraft.trustingPlatformGround = trustPlatformGround;
@@ -2011,7 +2062,7 @@ namespace JoinFS
                     }
 
                     // height adjustment
-                    aircraftPosition.altitude += GetHeightAdjustment(aircraft.subModel) * 0.01f;
+                    aircraftPosition.altitude += heightAdjustmentCm * 0.01f;
 
                     // save old orientation
                     aircraft.oldEuler = aircraft.netPosition.angles.Clone();
@@ -3424,7 +3475,10 @@ namespace JoinFS
                         // set flight plan
                         userAircraft.flightPlan = userFlightPlan;
                     }
-                    aircraft.flightPlan.callsign = aircraft.originalCallsign;
+                    if (aircraft.flightPlan.callsignSetByUser == false)
+                    {
+                        aircraft.flightPlan.callsign = aircraft.originalCallsign;
+                    }
                     // message
                     main.MonitorEvent("Listing aircraft '" + aircraft.flightPlan.callsign + "' User 'Me' - ID '" + obj.simId + "' - Model '" + obj.ownerModel + "'");
                 }
@@ -3462,7 +3516,10 @@ namespace JoinFS
                     {
                         // update callsign
                         aircraft.originalCallsign = callsign;
-                        aircraft.flightPlan.callsign = aircraft.originalCallsign;
+                        if (aircraft.flightPlan.callsignSetByUser == false)
+                        {
+                            aircraft.flightPlan.callsign = aircraft.originalCallsign;
+                        }
                     }
                     // update icao
                     aircraft.flightPlan.icaoType = icaoType;
@@ -3688,11 +3745,13 @@ namespace JoinFS
                                         aircraft.flightPlan.registration = tailNumber;
                                         aircraft.flightPlan.flightNumber = flightNumber;
                                         // prefer a synthesized real callsign (ICAO airline + flight number) over the tail number,
-                                        // but only when not already set - a prior SimBrief-imported callsign must survive this
-                                        // aircraft being (re-)listed, matching the "userFlightPlan survives" intent above; without
-                                        // this guard the sim-reported ATC AIRLINE/FLIGHT NUMBER (aircraft.cfg/livery.cfg/MSFS2024
-                                        // aircraft customization) unconditionally clobbered the SimBrief callsign every time
-                                        if (aircraft.flightPlan.callsign.Length == 0)
+                                        // but only when the user hasn't explicitly set one - a manually-entered or SimBrief-
+                                        // imported callsign must survive this aircraft being (re-)listed, matching the
+                                        // "userFlightPlan survives" intent above; without this guard the sim-reported ATC
+                                        // AIRLINE/FLIGHT NUMBER (aircraft.cfg/livery.cfg/MSFS2024 aircraft customization)
+                                        // would clobber it every time. callsignSetByUser (not just emptiness) so this also
+                                        // holds even if the user explicitly cleared the field on purpose.
+                                        if (aircraft.flightPlan.callsignSetByUser == false)
                                         {
                                             aircraft.flightPlan.callsign = ResolveCallsign(resolvedIcaoAirline, flightNumber, tailNumber);
                                         }

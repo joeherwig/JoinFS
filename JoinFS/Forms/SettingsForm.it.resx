@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -184,6 +184,15 @@
   <data name="Label_FollowText.Text" xml:space="preserve">
     <value>Distanza di inseguimento:</value>
   </data>
+  <data name="Check_UseAIFeatures.Location" type="System.Drawing.Point, System.Drawing">
+    <value>7, 209</value>
+  </data>
+  <data name="Check_UseAIFeatures.Size" type="System.Drawing.Size, System.Drawing">
+    <value>180, 19</value>
+  </data>
+  <data name="Check_UseAIFeatures.Text" xml:space="preserve">
+    <value>Usa corrispondenza modelli AI</value>
+  </data>
   <data name="Check_Connect.Location" type="System.Drawing.Point, System.Drawing">
     <value>52, 153</value>
   </data>
@@ -362,7 +371,10 @@
     <value>Abilita modalità ATC</value>
   </data>
   <data name="GroupBox_ATC.Location" type="System.Drawing.Point, System.Drawing">
-    <value>14, 434</value>
+    <value>360, 374</value>
+  </data>
+  <data name="GroupBox_SimBrief.Location" type="System.Drawing.Point, System.Drawing">
+    <value>14, 460</value>
   </data>
   <data name="GroupBox_ATC.Size" type="System.Drawing.Size, System.Drawing">
     <value>340, 106</value>
@@ -813,5 +825,38 @@
   </data>
   <data name="$this.Text" xml:space="preserve">
     <value>JoinFS: Settaggi</value>
+  </data>
+  <data name="Button_OK.Text" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="Check_TCAS.Text" xml:space="preserve">
+    <value>TCAS</value>
+  </data>
+  <data name="GroupBox_Xplane.Text" xml:space="preserve">
+    <value>X-Plane</value>
+  </data>
+  <data name="Check_Euroscope.Text" xml:space="preserve">
+    <value>EuroScope</value>
+  </data>
+  <data name="Check_Whazzup.Text" xml:space="preserve">
+    <value>whazzup.txt</value>
+  </data>
+  <data name="GroupBox_Simulator.Text" xml:space="preserve">
+    <value>Simulatore</value>
+  </data>
+  <data name="GroupBox_ATC.Text" xml:space="preserve">
+    <value>Modalità ATC</value>
+  </data>
+  <data name="GroupBox_SimBrief.Text" xml:space="preserve">
+    <value>Simbrief</value>
+  </data>
+  <data name="Label_SimBriefUsername.Text" xml:space="preserve">
+    <value>Nome utente Simbrief</value>
+  </data>
+  <data name="Check_SimBriefAutoImport.Text" xml:space="preserve">
+    <value>Importazione automatica</value>
+  </data>
+  <data name="Label_Password.Text" xml:space="preserve">
+    <value>Password</value>
   </data>
 </root>
