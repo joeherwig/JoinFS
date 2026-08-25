@@ -144,6 +144,20 @@ namespace JoinFS
         };
 
         /// <summary>
+        /// Base for dynamically-allocated per-object SimConnect request IDs used for periodic
+        /// AIRCRAFT_POSITION polling (see ground-jitter-on-model-mismatch fix) - each polled Obj gets its
+        /// own unique, persistent request ID (Obj.positionRequestId) instead of every object sharing
+        /// Requests.AIRCRAFT_POSITION, which could let SimConnect cross-match a response meant for one
+        /// object's position poll to a different object (a known class of ambiguity when many concurrent
+        /// requests share one request ID). Chosen well clear of both the fixed Requests enum above (0-23)
+        /// and VariableMgr.ScRequest's separately-growing dynamic range (100+, one allocation per variable
+        /// set) - safe from colliding with either for the lifetime of any realistic session.
+        /// </summary>
+        const int PositionPollRequestIdBase = 1_000_000_000;
+        int nextPositionPollRequestId = PositionPollRequestIdBase;
+        int NextPositionPollRequestId() { return nextPositionPollRequestId++; }
+
+        /// <summary>
         /// SimConnect events
         /// </summary>
         public enum Event
@@ -398,7 +412,7 @@ namespace JoinFS
             /// <summary>"PLANE ALT ABOVE GROUND", feet - diagnostic only, see helicopters-on-elevated-platforms feature. Not yet used in any trust/correction decision.</summary>
             public float radarAltitude;
             public int ground;
-            /// <summary>TEMPORARY diagnostic - "STATIC CG TO GROUND", feet. Ground-jitter/model-mismatch investigation - quantifies a substitute model's own ground clearance without needing file access. Remove once diagnosed.</summary>
+            /// <summary>"STATIC CG TO GROUND", feet - this object's own real static ground clearance, read live via SimConnect (no file access needed, unlike aircraft.cfg contact-point data). Used to ground a substitute model using its own geometry instead of the sender's - see the ground-jitter-on-model-mismatch fix.</summary>
             public float staticCgToGround;
         };
 
@@ -500,7 +514,7 @@ namespace JoinFS
             /// <summary>"PLANE ALT ABOVE GROUND" in meters, diagnostic only - see helicopters-on-elevated-platforms feature. NaN when not sourced from an AircraftPosition read (distinct from a real 0.0 reading).</summary>
             public double radarHeight;
             public int ground;
-            /// <summary>TEMPORARY diagnostic - "STATIC CG TO GROUND" in meters, ground-jitter/model-mismatch investigation. NaN when not sourced from an AircraftPosition read. Remove once diagnosed.</summary>
+            /// <summary>"STATIC CG TO GROUND" in meters - this object's own real static ground clearance. NaN when not sourced from an AircraftPosition read (a live SimConnect poll not yet arrived, or an older peer that didn't broadcast it - see the ground-jitter-on-model-mismatch fix).</summary>
             public double staticCgToGround;
 
             /// <summary>
@@ -740,6 +754,14 @@ namespace JoinFS
             public LocalNode.Nuid ownerNuid;
             public uint netId = uint.MaxValue;
             public uint simId = uint.MaxValue;
+            /// <summary>
+            /// This object's own, persistent SimConnect request ID for periodic AIRCRAFT_POSITION polling,
+            /// lazily allocated from Sim.NextPositionPollRequestId() the first time it's needed. -1 means
+            /// not yet allocated. Each object gets its own ID (rather than every object sharing the single
+            /// Requests.AIRCRAFT_POSITION value) to avoid SimConnect cross-matching a response meant for one
+            /// object's position poll to a different object - see the ground-jitter-on-model-mismatch fix.
+            /// </summary>
+            public int positionRequestId = -1;
             public string ownerModel = "";
             public string ownerLivery = "";
             public string ownerIcaoType = "";
@@ -2054,6 +2076,31 @@ namespace JoinFS
                     aircraft.trustingPlatformElevation = trustPlatformElevation;
                     aircraft.trustingPlatformGround = trustPlatformGround;
 
+                    // ground the substitute using its own STATIC CG TO GROUND, not the sender's - see
+                    // ground-jitter-on-model-mismatch fix. Strictly gated on the sender's own reported
+                    // on-ground state: an airborne aircraft must never be pulled toward a ground-relative
+                    // correction, regardless of how close to the ground it might numerically appear. When
+                    // on-ground, the sender's reported altitude corresponds to their own gear resting on the
+                    // real terrain (terrainElevation ~= altitude - senderClearance); re-deriving that same
+                    // terrain point but adding back the *substitute's own* clearance places the substitute's
+                    // gear on that same terrain point, regardless of whether the substitute is bigger or
+                    // smaller than the original aircraft - no matter which model the matcher happened to
+                    // pick. This is independent of, and complementary to, the ElevationCorrection bare-
+                    // terrain-datum blend below (that one compensates for cross-install terrain-mesh noise,
+                    // not model geometry). Requires both sides' clearance to be known (not NaN - an older
+                    // peer pre-dating this field, or a not-yet-settled local poll, falls back to no
+                    // correction rather than attempting a wrong one) and the local aircraft to have received
+                    // at least one live SimConnect update of its own (SimValid).
+                    if (trustPlatformGround && aircraft.SimValid)
+                    {
+                        double senderClearance = aircraftPosition.staticCgToGround * 0.3048;
+                        double localClearance = aircraft.simPosition.staticCgToGround;
+                        if (double.IsNaN(senderClearance) == false && double.IsNaN(localClearance) == false)
+                        {
+                            aircraftPosition.altitude += (float)(localClearance - senderClearance);
+                        }
+                    }
+
                     // check if correction is enabled and local height is valid
                     if (Settings.Default.ElevationCorrection && aircraft.SimValid && trustPlatformElevation == false)
                     {
@@ -2849,8 +2896,13 @@ namespace JoinFS
                         {
                             if (obj is Aircraft)
                             {
-                                // request full aircraft position
-                                simconnect.RequestData(Requests.AIRCRAFT_POSITION, Definitions.AIRCRAFT_POSITION, obj.simId);
+                                // request full aircraft position - own persistent request ID per object,
+                                // not the shared Requests.AIRCRAFT_POSITION value, see PositionPollRequestIdBase
+                                if (obj.positionRequestId < 0)
+                                {
+                                    obj.positionRequestId = NextPositionPollRequestId();
+                                }
+                                simconnect.RequestData((Requests)obj.positionRequestId, Definitions.AIRCRAFT_POSITION, obj.simId);
                             }
                             else
                             {
@@ -2863,8 +2915,13 @@ namespace JoinFS
                         {
                             if (obj is Aircraft)
                             {
-                                // request full aircraft position
-                                simconnect.RequestData(Requests.AIRCRAFT_POSITION, Definitions.AIRCRAFT_POSITION, obj.simId);
+                                // request full aircraft position - own persistent request ID per object,
+                                // not the shared Requests.AIRCRAFT_POSITION value, see PositionPollRequestIdBase
+                                if (obj.positionRequestId < 0)
+                                {
+                                    obj.positionRequestId = NextPositionPollRequestId();
+                                }
+                                simconnect.RequestData((Requests)obj.positionRequestId, Definitions.AIRCRAFT_POSITION, obj.simId);
                             }
                             else
                             {
@@ -3129,7 +3186,7 @@ namespace JoinFS
         /// <summary>
         /// Current data version
         /// </summary>
-        public const short VERSION = 21007;
+        public const short VERSION = 21008;
 
         /// <summary>
         /// Method for reading specific data versions
@@ -3317,9 +3374,11 @@ namespace JoinFS
             if (aircraftPosition.ground != 0) flags |= 0x01;
             if (Settings.Default.ElevationCorrection) flags |= 0x02;
             writer.Write(flags);
-            // TEMPORARY diagnostic (ground-jitter/model-mismatch investigation) - both sender and receiver
-            // are expected to be running the same diagnostic build, so no version/backward-compat guard.
-            // Remove this field once diagnosed.
+            // "STATIC CG TO GROUND", feet - the sender's own real ground clearance, used by the receiver to
+            // ground a substitute model using its own clearance instead of the sender's (see
+            // helicopters-on-elevated-platforms feature / ground-jitter-on-model-mismatch fix). Always
+            // written; older readers (version < 21008) simply don't read it, matching the elevation/flags
+            // fields' existing pattern above.
             writer.Write(aircraftPosition.staticCgToGround);
         }
 
@@ -3356,8 +3415,10 @@ namespace JoinFS
             aircraftPosition.elevation = version >= 10023 ? reader.ReadSingle() : 0.0f;
             byte flags = version >= 10023 ? reader.ReadByte() : (byte)0;
             aircraftPosition.ground = (flags & 0x01) != 0 ? 1 : 0;
-            // TEMPORARY diagnostic - see Write() above. Remove once diagnosed.
-            aircraftPosition.staticCgToGround = reader.ReadSingle();
+            // "STATIC CG TO GROUND" - see Write() above. NaN (not 0.0f) for an older peer that didn't send
+            // it, so downstream code can tell "no data" apart from a real zero clearance and fall back to
+            // uncorrected placement instead of attempting a wrong correction.
+            aircraftPosition.staticCgToGround = version >= 21008 ? reader.ReadSingle() : float.NaN;
         }
 
         /// <summary>
@@ -3934,15 +3995,6 @@ namespace JoinFS
                         }
                         break;
 
-                    case Requests.AIRCRAFT_POSITION:
-                        {
-                            // get sim position
-                            AircraftPosition aircraftPosition = (AircraftPosition)data;
-                            // process aircraft
-                            ProcessAircraftPosition(objectId, main.ElapsedTime, ref aircraftPosition);
-                        }
-                        break;
-
                     case Requests.OBJECT_POSITION:
                         {
                             // get object
@@ -3965,7 +4017,13 @@ namespace JoinFS
                         break;
 
                     default:
-                        if (requestId < (uint)VariableMgr.ScDefinition.ID0)
+                        if (requestId >= (uint)PositionPollRequestIdBase)
+                        {
+                            // per-object AIRCRAFT_POSITION poll response - see PositionPollRequestIdBase
+                            AircraftPosition aircraftPosition = (AircraftPosition)data;
+                            ProcessAircraftPosition(objectId, main.ElapsedTime, ref aircraftPosition);
+                        }
+                        else if (requestId < (uint)VariableMgr.ScDefinition.ID0)
                         {
                             main.MonitorEvent("ERROR - Unknown request ID '" + requestId + "'");
                         }
@@ -3973,7 +4031,7 @@ namespace JoinFS
                 }
 
                 // check for variable
-                if (requestId >= (uint)VariableMgr.ScRequest.ID0)
+                if (requestId >= (uint)VariableMgr.ScRequest.ID0 && requestId < (uint)PositionPollRequestIdBase)
                 {
                     // get aircraft
                     if (objectList.Find(o => o.simId == objectId) is Aircraft aircraft)
