@@ -167,7 +167,8 @@ namespace JoinFS
                 // diagnostic only (see helicopters-on-elevated-platforms feature) - not yet used in any trust/correction decision, logged to verify reliability for injected aircraft first
                 sc.AddToDataDefinition(Sim.Definitions.AIRCRAFT_POSITION, "PLANE ALT ABOVE GROUND", "feet", SIMCONNECT_DATATYPE.FLOAT32, 0.0f, SimConnect.SIMCONNECT_UNUSED);
                 sc.AddToDataDefinition(Sim.Definitions.AIRCRAFT_POSITION, "SIM ON GROUND", "bool", SIMCONNECT_DATATYPE.INT32, 0.0f, SimConnect.SIMCONNECT_UNUSED);
-                // TEMPORARY diagnostic - ground-jitter/model-mismatch investigation, see AircraftPosition.staticCgToGround
+                // used to ground a substitute model using its own real clearance instead of the sender's -
+                // see AircraftPosition.staticCgToGround / the ground-jitter-on-model-mismatch fix
                 sc.AddToDataDefinition(Sim.Definitions.AIRCRAFT_POSITION, "STATIC CG TO GROUND", "feet", SIMCONNECT_DATATYPE.FLOAT32, 0.0f, SimConnect.SIMCONNECT_UNUSED);
 
                 // define an ID structure
