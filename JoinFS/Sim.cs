@@ -1802,6 +1802,13 @@ namespace JoinFS
         {
             public bool user = false;
             public string originalCallsign = "";
+            /// <summary>
+            /// ICAO type designator as first reported by the sim for this aircraft object, kept separate
+            /// from flightPlan.icaoType (which the Flight Plan dialog's OK handler permanently overwrites
+            /// with whatever was typed) so a later "fetch fresh from the sim" (see FlightPlanForm's Clear
+            /// button) has something live to read back - same reasoning as originalCallsign.
+            /// </summary>
+            public string originalIcaoType = "";
             public byte flightPlanVersion = 0;
             public FlightPlan flightPlan = new();
             public byte cockpitShare = 0;
@@ -1821,6 +1828,7 @@ namespace JoinFS
                 netId = simId;
                 // update info
                 originalCallsign = callsign;
+                originalIcaoType = icaoType;
                 flightPlan.callsign = callsign;
                 // ATC ID is actually the tail number/registration, not a real callsign - see Substitution.cs
                 flightPlan.registration = callsign;
@@ -3891,6 +3899,13 @@ namespace JoinFS
                                         {
                                             aircraft.flightPlan.callsign = ResolveCallsign(resolvedIcaoAirline, flightNumber, tailNumber);
                                         }
+                                        // the aircraft's own live-resolved type (learnIcaoType - the confidence
+                                        // hierarchy above, e.g. base_container-resolved config data, not the raw
+                                        // unresolved SimConnect ATC MODEL some add-ons report) - always kept here,
+                                        // separate from flightPlan.icaoType below, so a later "fetch fresh from
+                                        // the sim" (see FlightPlanForm's Clear button) has the accurate value to
+                                        // read back rather than the raw constructor-time type or a stale one.
+                                        aircraft.originalIcaoType = learnIcaoType.Length > 0 ? learnIcaoType : type;
                                         // fill in ICAO type/airline from the live-resolved data (learnIcaoType/
                                         // resolvedIcaoAirline - see the confidence hierarchy above), but only when
                                         // not already set - this was never populated here at all before, leaving

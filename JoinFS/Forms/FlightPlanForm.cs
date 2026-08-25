@@ -16,6 +16,12 @@ namespace JoinFS
         public bool FocusSimBriefUsername { get; set; }
 
         Main main;
+        /// <summary>
+        /// Aircraft this flight plan belongs to, used by Button_Clear_Click to re-fetch the live
+        /// callsign (Sim.Aircraft.originalCallsign) - may be null (e.g. no user aircraft registered
+        /// yet), in which case Clear leaves the callsign field alone.
+        /// </summary>
+        readonly Sim.Aircraft aircraft;
 
         // fields SimBrief can supply that this dialog doesn't have a visible control for -
         // carried through to plan on OK so they still reach the network/EuroScope
@@ -23,11 +29,12 @@ namespace JoinFS
         string pendingFlightNumber;
         string pendingAlternate;
 
-        public FlightPlanForm(Main main, Sim.FlightPlan plan)
+        public FlightPlanForm(Main main, Sim.Aircraft aircraft, Sim.FlightPlan plan)
         {
             InitializeComponent();
 
             this.main = main;
+            this.aircraft = aircraft;
             this.plan = plan;
 
             // change icon
@@ -178,8 +185,19 @@ namespace JoinFS
 
         private void Button_Clear_Click(object sender, EventArgs e)
         {
-            // leaves callsign/type/rules alone (already sourced live from the sim) - only clears
-            // the route-plan fields, same ones a SimBrief import would otherwise fill in
+            // re-fetch callsign/type from the sim instead of leaving whatever's currently shown - both
+            // plan.callsign and plan.icaoType can be permanently stuck on a manually-typed or SimBrief-
+            // imported value once committed via OK (nothing in the sim-update path ever overwrites them
+            // again - see FlightPlan.callsignSetByUser and the "fill icaoType only when blank" pattern
+            // in Sim.cs). originalCallsign/originalIcaoType are the aircraft's own values as first
+            // reported by the sim for this object, kept separate from the editable plan fields for
+            // exactly this purpose.
+            if (aircraft != null)
+            {
+                Text_Callsign.Text = aircraft.originalCallsign;
+                Text_Type.Text = aircraft.originalIcaoType;
+            }
+            // clears the rest of the route-plan fields, same ones a SimBrief import would otherwise fill in
             Text_From.Text = "";
             Text_To.Text = "";
             Text_Route.Text = "";
