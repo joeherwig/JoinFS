@@ -753,7 +753,7 @@ namespace JoinFS
                 // reset flag
                 main.scheduleFlightPlan = false;
                 // file flight plan
-                if (new FlightPlanForm(main, main.sim.userFlightPlan).ShowDialog() == DialogResult.OK)
+                if (new FlightPlanForm(main, main.sim.userAircraft, main.sim.userFlightPlan).ShowDialog() == DialogResult.OK)
                 {
                     CommitUserFlightPlanChange();
                 }
@@ -1657,7 +1657,7 @@ namespace JoinFS
                 return;
             }
 
-            if (new FlightPlanForm(main, main.sim.userFlightPlan).ShowDialog() == DialogResult.OK)
+            if (new FlightPlanForm(main, main.sim.userAircraft, main.sim.userFlightPlan).ShowDialog() == DialogResult.OK)
             {
                 CommitUserFlightPlanChange();
             }
@@ -1673,7 +1673,7 @@ namespace JoinFS
             if (string.IsNullOrWhiteSpace(Settings.Default.SimBriefUsername))
             {
                 // nothing configured yet - land the pilot on the field where they'd set it
-                if (new FlightPlanForm(main, main.sim.userFlightPlan) { FocusSimBriefUsername = true }.ShowDialog() == DialogResult.OK)
+                if (new FlightPlanForm(main, main.sim.userAircraft, main.sim.userFlightPlan) { FocusSimBriefUsername = true }.ShowDialog() == DialogResult.OK)
                 {
                     CommitUserFlightPlanChange();
                 }
