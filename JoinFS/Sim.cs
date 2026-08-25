@@ -802,8 +802,12 @@ namespace JoinFS
             public bool trustingPlatformGround = false;
             /// <summary>Low-pass-filtered local-vs-remote terrain elevation offset used by the near-ground altitude blend in UpdateAircraft. NaN when not currently tracking (out of blend range, or no sample taken yet). The "GROUND ALTITUDE" probe feeding both sides has tick-to-tick noise; blending by the raw offset every update showed up as the aircraft jittering in height while sitting on/taxiing on ordinary ground.</summary>
             public double smoothedElevationOffset = double.NaN;
-            /// <summary>TEMPORARY - throttle for the diagnostic RawPos trace in UpdateAircraft, ground-jitter/model-mismatch investigation. Remove this field and its log line once diagnosed.</summary>
+            /// <summary>Low-pass-filtered ground-clearance correction (own substitute clearance minus sender's) applied in UpdateAircraft - see ground-jitter-on-model-mismatch fix. NaN when not yet sampled. Smoothed for the same reason as smoothedElevationOffset: trustPlatformGround (and the sender's own reported on-ground flag it comes from) can flicker tick-to-tick, and applying the raw target value directly would snap the substitute's altitude instantly between "as if it were the original aircraft" and "properly grounded" every time that single flag flips - visible as a sharp jitter rather than the flag's own noise being smoothed away first.</summary>
+            public double smoothedGroundClearanceCorrection = double.NaN;
+            /// <summary>TEMPORARY - throttle for the diagnostic RawPos/RawPosRelay traces in UpdateAircraft (both keyed by the sender's netTime), ground-jitter/model-mismatch investigation. Remove this field and its log lines once diagnosed.</summary>
             public double nextRawDiagLogTime = 0.0;
+            /// <summary>TEMPORARY - throttle for the diagnostic RawPosSend trace in ProcessAircraftPosition, keyed by local simTime - kept separate from nextRawDiagLogTime because that one is keyed by the unrelated netTime clock; sharing one field let whichever diagnostic ran first starve the other. Remove this field and its log line once diagnosed.</summary>
+            public double nextRawPosSendDiagLogTime = 0.0;
             public Vector oldEuler;
             public double distance = double.MaxValue;
             public bool paused = false;
@@ -2091,15 +2095,29 @@ namespace JoinFS
                     // peer pre-dating this field, or a not-yet-settled local poll, falls back to no
                     // correction rather than attempting a wrong one) and the local aircraft to have received
                     // at least one live SimConnect update of its own (SimValid).
+                    //
+                    // The target correction is low-pass filtered (same 0.15 factor/pattern as
+                    // smoothedElevationOffset below) rather than applied raw: trustPlatformGround comes
+                    // straight from the sender's own single-bit on-ground flag, which can flicker tick-to-
+                    // tick (e.g. suspension/contact noise while parked or taxiing) - applying the full
+                    // correction the instant it flips would snap the substitute's altitude abruptly between
+                    // "as if it were the original aircraft" and "properly grounded" every time that one flag
+                    // toggles, which is itself a visible jitter of exactly the size of the geometry gap
+                    // between the two aircraft.
+                    double targetGroundClearanceCorrection = 0.0;
                     if (trustPlatformGround && aircraft.SimValid)
                     {
                         double senderClearance = aircraftPosition.staticCgToGround * 0.3048;
                         double localClearance = aircraft.simPosition.staticCgToGround;
                         if (double.IsNaN(senderClearance) == false && double.IsNaN(localClearance) == false)
                         {
-                            aircraftPosition.altitude += (float)(localClearance - senderClearance);
+                            targetGroundClearanceCorrection = localClearance - senderClearance;
                         }
                     }
+                    aircraft.smoothedGroundClearanceCorrection = double.IsNaN(aircraft.smoothedGroundClearanceCorrection)
+                        ? targetGroundClearanceCorrection
+                        : aircraft.smoothedGroundClearanceCorrection + (targetGroundClearanceCorrection - aircraft.smoothedGroundClearanceCorrection) * 0.15;
+                    aircraftPosition.altitude += (float)aircraft.smoothedGroundClearanceCorrection;
 
                     // check if correction is enabled and local height is valid
                     if (Settings.Default.ElevationCorrection && aircraft.SimValid && trustPlatformElevation == false)
@@ -2405,9 +2423,9 @@ namespace JoinFS
                 // whichever aircraft this is (own aircraft or a locally-simulated one being broadcast), before
                 // anything else touches it, to catch whether SimConnect itself intermittently returns a
                 // zeroed/default "GROUND ALTITUDE" on this periodic per-object read. Remove once diagnosed.
-                if (simTime >= aircraft.nextRawDiagLogTime)
+                if (simTime >= aircraft.nextRawPosSendDiagLogTime)
                 {
-                    aircraft.nextRawDiagLogTime = simTime + 0.2;
+                    aircraft.nextRawPosSendDiagLogTime = simTime + 0.2;
                     main.MonitorNetwork("RawPosSend '" + aircraft.flightPlan.callsign + "' owner=" + aircraft.owner +
                         " rawGround=" + aircraftPosition.ground + " altitude=" + aircraftPosition.altitude.ToString("F1") + "m" +
                         " elevation=" + aircraftPosition.elevation.ToString("F1") + "m" +
