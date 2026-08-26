@@ -36,6 +36,8 @@ namespace JoinFS
         public const double TIME_ERROR_RATE = 0.02;
         public const double FEET_PER_METRE = 3.28084;
         public const double METRES_PER_FOOT = 0.3048;
+        /// <summary>How long the sender's raw "SIM ON GROUND" bit must hold its current value before trustingPlatformGround follows it - see Aircraft.pendingGroundFlag.</summary>
+        const double GroundTrustDebounceSeconds = 0.3;
 
 #endregion
 
@@ -800,6 +802,10 @@ namespace JoinFS
             public bool trustingPlatformElevation = false;
             /// <summary>True whenever this object's on-ground state is trusted from the network and forwarded to the local sim's placement of the object, for any aircraft type - independent of trustingPlatformElevation. Always requires the sender to actually report on-ground, so the local sim is never told an airborne aircraft is resting on the ground. See helicopters-on-elevated-platforms feature.</summary>
             public bool trustingPlatformGround = false;
+            /// <summary>Debounce state for trustingPlatformGround - see ground-jitter-on-spawn fix. Unlike trustingPlatformElevation (a continuous mismatch distance, smoothed via engage/release thresholds), the sender's raw "SIM ON GROUND" bit has no magnitude to apply a threshold band to - it's just noisy right after an object is created/spawned (physics still settling onto the ground). Debouncing by time instead: the raw flag must hold its current value for GroundTrustDebounceSeconds before trustingPlatformGround is allowed to follow it, so a flicker during the settle window doesn't repeatedly retarget smoothedGroundClearanceCorrection.</summary>
+            public bool pendingGroundFlag = false;
+            /// <summary>Net time (sender's clock) at which pendingGroundFlag last changed - see pendingGroundFlag. NaN before the first sample.</summary>
+            public double pendingGroundFlagSince = double.NaN;
             /// <summary>Low-pass-filtered local-vs-remote terrain elevation offset used by the near-ground altitude blend in UpdateAircraft. NaN when not currently tracking (out of blend range, or no sample taken yet). The "GROUND ALTITUDE" probe feeding both sides has tick-to-tick noise; blending by the raw offset every update showed up as the aircraft jittering in height while sitting on/taxiing on ordinary ground.</summary>
             public double smoothedElevationOffset = double.NaN;
             /// <summary>Low-pass-filtered ground-clearance correction (own substitute clearance minus sender's) applied in UpdateAircraft - see ground-jitter-on-model-mismatch fix. NaN when not yet sampled. Smoothed for the same reason as smoothedElevationOffset: trustPlatformGround (and the sender's own reported on-ground flag it comes from) can flicker tick-to-tick, and applying the raw target value directly would snap the substitute's altitude instantly between "as if it were the original aircraft" and "properly grounded" every time that single flag flips - visible as a sharp jitter rather than the flag's own noise being smoothed away first.</summary>
@@ -2084,11 +2090,28 @@ namespace JoinFS
                     // mesh, independent of SIM ON GROUND - confirmed by testing with SIM ON GROUND forced permanently
                     // unforwarded, which made no difference to that jitter on either FS2020 or FS2024.
                     int heightAdjustmentCm = GetHeightAdjustment(aircraft.subModel);
-                    bool trustPlatformGround = aircraftPosition.ground != 0;
+                    // debounce the raw on-ground bit before trusting it - see Aircraft.pendingGroundFlag. Unlike
+                    // trustPlatformElevation (a continuous mismatch distance with an engage/release threshold band),
+                    // there's no magnitude here to apply a band to - SIM ON GROUND is a single bit, and it can
+                    // flicker for a moment right after an object is created/injected while its physics settles onto
+                    // the ground. Require it to hold its current value for GroundTrustDebounceSeconds before
+                    // trustPlatformGround follows it, instead of retargeting smoothedGroundClearanceCorrection on
+                    // every flicker.
+                    bool rawGround = aircraftPosition.ground != 0;
+                    if (rawGround != aircraft.pendingGroundFlag || double.IsNaN(aircraft.pendingGroundFlagSince))
+                    {
+                        aircraft.pendingGroundFlag = rawGround;
+                        aircraft.pendingGroundFlagSince = netTime;
+                    }
+                    bool trustPlatformGround = aircraft.trustingPlatformGround;
+                    if (trustPlatformGround != aircraft.pendingGroundFlag && netTime - aircraft.pendingGroundFlagSince >= GroundTrustDebounceSeconds)
+                    {
+                        trustPlatformGround = aircraft.pendingGroundFlag;
+                    }
 
                     if (trustPlatformElevation != aircraft.trustingPlatformElevation || trustPlatformGround != aircraft.trustingPlatformGround)
                     {
-                        main.MonitorNetwork("ElevatedPlatform '" + aircraft.flightPlan.callsign + "' mismatch=" + mismatchCm.ToString("F0") + "cm threshold=" + main.settingsElevatedPlatformThreshold + "cm senderHeight=" + (double.IsNaN(senderHeight) ? "n/a" : (senderHeight * 100.0).ToString("F0") + "cm") + " elevationTrust=" + trustPlatformElevation + " groundTrust=" + trustPlatformGround);
+                        main.MonitorNetwork("ElevatedPlatform '" + aircraft.flightPlan.callsign + "' mismatch=" + mismatchCm.ToString("F0") + "cm threshold=" + main.settingsElevatedPlatformThreshold + "cm senderHeight=" + (double.IsNaN(senderHeight) ? "n/a" : (senderHeight * 100.0).ToString("F0") + "cm") + " elevationTrust=" + trustPlatformElevation + " groundTrust=" + trustPlatformGround + " rawGround=" + rawGround);
                     }
                     // TEMPORARY diagnostic (ground-jitter/model-mismatch investigation) - fires every tick
                     // (throttled to ~5/sec, not just on trust-state change) so the raw received values can be
@@ -2099,9 +2122,9 @@ namespace JoinFS
                         aircraft.nextRawDiagLogTime = netTime + 0.2;
                         main.MonitorNetwork("RawPos '" + aircraft.flightPlan.callsign + "' rawGround=" + aircraftPosition.ground +
                             " altitude=" + aircraftPosition.altitude.ToString("F1") + "m elevation=" + aircraftPosition.elevation.ToString("F1") + "m" +
-                            " staticCgToGround=" + (aircraftPosition.staticCgToGround * 0.3048).ToString("F2") + "m" +
+                            " senderStaticCgToGround=" + (aircraftPosition.staticCgToGround * 0.3048).ToString("F2") + "m" +
                             " localElevation=" + aircraft.simPosition.elevation.ToString("F1") + "m" +
-                            " subModelStaticCg=" + (double.IsNaN(aircraft.simPosition.staticCgToGround) ? "n/a" : aircraft.simPosition.staticCgToGround.ToString("F2") + "m") +
+                            " localStaticCgToGround=" + (double.IsNaN(aircraft.simPosition.staticCgToGround) ? "n/a" : aircraft.simPosition.staticCgToGround.ToString("F2") + "m") +
                             " netTime=" + netTime.ToString("F1"));
                     }
                     aircraft.trustingPlatformElevation = trustPlatformElevation;
@@ -2258,7 +2281,7 @@ namespace JoinFS
                     aircraft.nextRawDiagLogTime = netTime + 0.2;
                     main.MonitorNetwork("RawPosRelay '" + aircraft.flightPlan.callsign + "' rawGround=" + aircraftPosition.ground +
                         " altitude=" + aircraftPosition.altitude.ToString("F1") + "m elevation=" + aircraftPosition.elevation.ToString("F1") + "m" +
-                        " staticCgToGround=" + (aircraftPosition.staticCgToGround * 0.3048).ToString("F2") + "m" +
+                        " senderStaticCgToGround=" + (aircraftPosition.staticCgToGround * 0.3048).ToString("F2") + "m" +
                         " netTime=" + netTime.ToString("F1"));
                 }
                 // create message
@@ -2456,7 +2479,7 @@ namespace JoinFS
                     main.MonitorNetwork("RawPosSend '" + aircraft.flightPlan.callsign + "' owner=" + aircraft.owner +
                         " rawGround=" + aircraftPosition.ground + " altitude=" + aircraftPosition.altitude.ToString("F1") + "m" +
                         " elevation=" + aircraftPosition.elevation.ToString("F1") + "m" +
-                        " staticCgToGround=" + (aircraftPosition.staticCgToGround * 0.3048).ToString("F2") + "m" +
+                        " ownStaticCgToGround=" + (aircraftPosition.staticCgToGround * 0.3048).ToString("F2") + "m" +
                         " simTime=" + simTime.ToString("F1"));
                 }
 
