@@ -810,9 +810,9 @@ namespace JoinFS
             public double smoothedElevationOffset = double.NaN;
             /// <summary>Low-pass-filtered ground-clearance correction (own substitute clearance minus sender's) applied in UpdateAircraft - see ground-jitter-on-model-mismatch fix. NaN when not yet sampled. Smoothed for the same reason as smoothedElevationOffset: trustPlatformGround (and the sender's own reported on-ground flag it comes from) can flicker tick-to-tick, and applying the raw target value directly would snap the substitute's altitude instantly between "as if it were the original aircraft" and "properly grounded" every time that single flag flips - visible as a sharp jitter rather than the flag's own noise being smoothed away first.</summary>
             public double smoothedGroundClearanceCorrection = double.NaN;
-            /// <summary>TEMPORARY - throttle for the diagnostic RawPos/RawPosRelay traces in UpdateAircraft (both keyed by the sender's netTime), ground-jitter/model-mismatch investigation. Remove this field and its log lines once diagnosed.</summary>
+            /// <summary>Throttle for the RawPos/RawPosRelay ground-placement traces in UpdateAircraft (both keyed by the sender's netTime) - see main.MonitorNetwork's "Network" category.</summary>
             public double nextRawDiagLogTime = 0.0;
-            /// <summary>TEMPORARY - throttle for the diagnostic RawPosSend trace in ProcessAircraftPosition, keyed by local simTime - kept separate from nextRawDiagLogTime because that one is keyed by the unrelated netTime clock; sharing one field let whichever diagnostic ran first starve the other. Remove this field and its log line once diagnosed.</summary>
+            /// <summary>Throttle for the RawPosSend ground-placement trace in ProcessAircraftPosition, keyed by local simTime - kept separate from nextRawDiagLogTime because that one is keyed by the unrelated netTime clock; sharing one field let whichever trace ran first starve the other.</summary>
             public double nextRawPosSendDiagLogTime = 0.0;
             public Vector oldEuler;
             public double distance = double.MaxValue;
@@ -2123,10 +2123,10 @@ namespace JoinFS
                     {
                         main.MonitorNetwork("ElevatedPlatform '" + aircraft.flightPlan.callsign + "' mismatch=" + mismatchCm.ToString("F0") + "cm threshold=" + main.settingsElevatedPlatformThreshold + "cm senderHeight=" + (double.IsNaN(senderHeight) ? "n/a" : (senderHeight * 100.0).ToString("F0") + "cm") + " elevationTrust=" + trustPlatformElevation + " groundTrust=" + trustPlatformGround + " rawGround=" + rawGround);
                     }
-                    // TEMPORARY diagnostic (ground-jitter/model-mismatch investigation) - fires every tick
-                    // (throttled to ~5/sec, not just on trust-state change) so the raw received values can be
-                    // inspected directly, e.g. to see whether aircraftPosition.elevation is flipping between a
-                    // real terrain reading and a zeroed/default value. Remove once diagnosed.
+                    // raw received ground-placement values (throttled to ~5/sec, not just on trust-state
+                    // change like ElevatedPlatform above) - useful for diagnosing ground-clearance correction/
+                    // jitter reports, e.g. whether aircraftPosition.elevation is flipping between a real
+                    // terrain reading and a zeroed/default value, or the sender's on-ground flag is unstable.
                     if (netTime >= aircraft.nextRawDiagLogTime)
                     {
                         aircraft.nextRawDiagLogTime = netTime + 0.2;
@@ -2282,10 +2282,9 @@ namespace JoinFS
             // check if aircraft is injected and needs to be broadcast
             if (aircraft.Injected && IsBroadcast(aircraft))
             {
-                // TEMPORARY diagnostic (ground-jitter/model-mismatch investigation) - this re-broadcasts an
-                // already-received position onward to other nodes (multi-hop/relay topology); log it
-                // distinctly from RawPosSend so a relay-introduced bad value can be told apart from a
-                // freshly-read one. Remove once diagnosed.
+                // this re-broadcasts an already-received position onward to other nodes (multi-hop/relay
+                // topology); logged distinctly from RawPosSend so a relay-introduced bad value can be told
+                // apart from a freshly-read one when diagnosing ground-clearance correction/jitter reports.
                 if (netTime >= aircraft.nextRawDiagLogTime)
                 {
                     aircraft.nextRawDiagLogTime = netTime + 0.2;
@@ -2479,10 +2478,10 @@ namespace JoinFS
                 // store current time
                 aircraft.simTime = simTime;
 
-                // TEMPORARY diagnostic (ground-jitter/model-mismatch investigation) - raw SimConnect read for
-                // whichever aircraft this is (own aircraft or a locally-simulated one being broadcast), before
-                // anything else touches it, to catch whether SimConnect itself intermittently returns a
-                // zeroed/default "GROUND ALTITUDE" on this periodic per-object read. Remove once diagnosed.
+                // raw SimConnect read for whichever aircraft this is (own aircraft or a locally-simulated
+                // one being broadcast), before anything else touches it - useful for diagnosing ground-
+                // clearance correction/jitter reports, e.g. whether SimConnect itself intermittently returns
+                // a zeroed/default "GROUND ALTITUDE" on this periodic per-object read.
                 if (simTime >= aircraft.nextRawPosSendDiagLogTime)
                 {
                     aircraft.nextRawPosSendDiagLogTime = simTime + 0.2;
