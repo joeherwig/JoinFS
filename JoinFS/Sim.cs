@@ -1564,8 +1564,18 @@ namespace JoinFS
                         // largest difference in altitude before reset
                         double altitudeDeltaLimit = 50.0;
 #if (FS2020 || FS2024)
-                        // FS2020 has an issue where the aircraft remains glued to the ground, so reset much earlier when the altitude diverts on the ground
-                        if (simPosition.ground != 0) altitudeDeltaLimit = 0.2;
+                        // FS2020 has an issue where the aircraft remains glued to the ground, so reset much earlier when
+                        // the altitude diverts on the ground - but 0.2m was too tight once ground placement started
+                        // depending on a per-model computed correction (STATIC CG TO GROUND-based grounding, Elevation
+                        // Correction): any gap over 20cm between where our computed target altitude sits and where the
+                        // object's own gear/suspension physics has already settled it forced a hard position reset every
+                        // time, which the sim's own gear physics immediately fights - visible as jitter that some
+                        // substitutes (e.g. many FSLTL models) needed a large manual height adjustment to escape, because
+                        // lifting the object off the ground exempted it from this tight threshold entirely (reverting to
+                        // the loose 50m limit below) and let it resettle smoothly under the sim's own physics instead.
+                        // 1.5m still corrects a genuinely wrong/stuck placement far sooner than the airborne case, while
+                        // comfortably absorbing realistic per-model ground-clearance imprecision instead of fighting it.
+                        if (simPosition.ground != 0) altitudeDeltaLimit = 1.5;
 #endif
 
                         // check if object is beyond specific distance
