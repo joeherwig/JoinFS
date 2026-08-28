@@ -1471,7 +1471,7 @@ namespace JoinFS
                 if (targetAircraft != null)
                 {
                     // create flight plan form
-                    if (new FlightPlanForm(main, targetAircraft.flightPlan).ShowDialog() == DialogResult.OK)
+                    if (new FlightPlanForm(main, targetAircraft, targetAircraft.flightPlan).ShowDialog() == DialogResult.OK)
                     {
                         lock (main.conch)
                         {
