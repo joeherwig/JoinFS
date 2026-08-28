@@ -1575,7 +1575,15 @@ namespace JoinFS
                         // the loose 50m limit below) and let it resettle smoothly under the sim's own physics instead.
                         // 1.5m still corrects a genuinely wrong/stuck placement far sooner than the airborne case, while
                         // comfortably absorbing realistic per-model ground-clearance imprecision instead of fighting it.
-                        if (simPosition.ground != 0) altitudeDeltaLimit = 1.5;
+                        //
+                        // simPosition.ground is the SimConnect read-back of the injected object's own on-ground bit,
+                        // and MSFS2024 frequently never sets it for an injected object - a parked helicopter reports
+                        // rawGround=0 indefinitely. That left this at the loose 50m airborne limit and ran the
+                        // full-gain vertical catch-up below against the sim's ground-contact collision as a bounce
+                        // (the MSFS2024 parked-helicopter jitter). Fall back to the sender's own debounced on-ground
+                        // flag when the local read-back doesn't confirm it.
+                        bool onGround = simPosition.ground != 0 || obj.trustingPlatformGround;
+                        if (onGround) altitudeDeltaLimit = 1.5;
 #endif
 
                         // check if object is beyond specific distance
@@ -1598,6 +1606,21 @@ namespace JoinFS
                             // get delta between current and network orientations
                             Vector deltaAngles = Vector.AnglesDelta(simPosition.angles, netPosition.angles);
 
+#if (FS2020 || FS2024)
+                            // On the ground, the sim's own ground-contact physics owns the vertical axis. The
+                            // full-gain catch-up below (a velocity impulse proportional to the residual altitude
+                            // error, applied every frame) fights that collision as a vertical shimmer - the
+                            // MSFS2024 parked-helicopter jitter, where the model sits a few cm into the local mesh,
+                            // the sim's terrain-penetration correction lifts it, and this pushes it back down. Within
+                            // a small band hand the vertical axis entirely to the sim; beyond it ease in gently
+                            // rather than at full gain (a gross error is still snapped by the 1.5m hard-reset limit
+                            // above). Horizontal catch-up is unchanged.
+                            if (onGround)
+                            {
+                                deltaGeo.y = Math.Abs(deltaGeo.y) < 0.15 ? 0.0 : deltaGeo.y * 0.2;
+                                netVelocity.linear.y = 0.0;
+                            }
+#endif
                             // add delta to velocity to catch up
                             netVelocity.linear += deltaGeo * 1.5;
 
@@ -2075,7 +2098,19 @@ namespace JoinFS
                         mismatchCm = Math.Abs(localHeight - senderHeight) * 100.0;
 
                         bool nearGround = aircraftPosition.ground != 0 || senderHeight < 50.0;
-                        bool senderIndicatesElevation = senderHeight * 100.0 >= main.settingsElevatedPlatformThreshold;
+                        // "indicates elevation" has to mean the sender's own gear is resting meaningfully above the
+                        // sender's own bare terrain - i.e. on a structure. senderHeight alone (altitude - GROUND
+                        // ALTITUDE) is ~= the aircraft's static CG-to-ground clearance even on perfectly flat ground
+                        // (about 1.5 m for a helicopter, 3-5 m for an airliner), so a flat threshold on it is
+                        // satisfied by essentially every grounded aircraft and does no filtering at all - which left
+                        // a routine cross-install terrain-mesh mismatch (>= threshold) as the only real gate and made
+                        // elevation-trust engage on ordinary ground, burying the substitute below the local mesh and
+                        // fighting the sim's terrain-penetration correction as jitter. Subtracting the sender's own
+                        // reported clearance makes this ~0 on ordinary ground and only large on a genuine raised
+                        // platform. Falls back to the raw check for a pre-21008 peer that doesn't send its clearance.
+                        double senderClearance = aircraftPosition.staticCgToGround * 0.3048;
+                        double senderStructureHeightCm = (double.IsNaN(senderClearance) ? senderHeight : senderHeight - senderClearance) * 100.0;
+                        bool senderIndicatesElevation = senderStructureHeightCm >= main.settingsElevatedPlatformThreshold;
                         double releaseThreshold = main.settingsElevatedPlatformThreshold * 0.5;
 
                         if (nearGround && senderIndicatesElevation && mismatchCm >= main.settingsElevatedPlatformThreshold)
