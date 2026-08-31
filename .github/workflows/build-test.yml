@@ -25,7 +25,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -55,7 +55,7 @@ jobs:
           dotnet build JoinFS.wixproj -c ${{ matrix.configuration }}
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: JoinFS-${{ matrix.configuration }}
           path: JoinFS\Installer\bin\${{ matrix.configuration }}\*
@@ -70,7 +70,7 @@ jobs:
     
     steps:
     - name: Checkout
-      uses: actions/checkout@v5
+      uses: actions/checkout@v7
     
     - name: Set VERSION variable
       run: |
@@ -82,7 +82,7 @@ jobs:
         fi
     
     - name: Download all artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         path: artifacts
     
