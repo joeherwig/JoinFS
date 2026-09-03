@@ -32,6 +32,8 @@ namespace JoinFS
         const float OBJECT_EXPIRE_TIME = 10.0f;
 #endif
         const float NEW_OBJECT_EXPIRE_TIME = 60.0f;
+        /// <summary>Max auto-retries of an injection the sim refused (SimConnect exception 22) before giving up on that object - see Fix 3. The delay between retries is Main.settingsInjectionRetrySeconds (-injectionretryseconds, default 10s).</summary>
+        const int FAILED_RETRY_MAX = 30;
 
         public const double TIME_ERROR_RATE = 0.02;
         public const double FEET_PER_METRE = 3.28084;
@@ -168,6 +170,8 @@ namespace JoinFS
             OBJECT_REMOVED,
             FRAME,
             PAUSE,
+            SIM_START,
+            SIM_STOP,
             RUDDER_SET,
             ELEVATOR_SET,
             AILERON_SET,
@@ -200,6 +204,8 @@ namespace JoinFS
                 Sim.Event.OBJECT_REMOVED => "OBJECT_REMOVED",
                 Sim.Event.FRAME => "FRAME",
                 Sim.Event.PAUSE => "PAUSE",
+                Sim.Event.SIM_START => "SIM_START",
+                Sim.Event.SIM_STOP => "SIM_STOP",
                 Sim.Event.RUDDER_SET => "RUDDER_SET",
                 Sim.Event.ELEVATOR_SET => "ELEVATOR_SET",
                 Sim.Event.AILERON_SET => "AILERON_SET",
@@ -786,7 +792,18 @@ namespace JoinFS
             public int typerole = Substitution.TypeRole_SingleProp;
             public VariableMgr.Set variableSet = null;
             public double variableStartTime;
+            /// <summary>
+            /// True when the sim refused to create this object (SimConnect exception 22). Historically
+            /// latched forever, so an injection attempted while MSFS was still on the menu / loading a
+            /// flight never retried and no traffic appeared until the user toggled [Sim] - see Fix 3.
+            /// Now self-healing: the injection finder re-arms it after FAILED_RETRY_SECONDS, up to
+            /// FAILED_RETRY_MAX attempts, and ProcessOpen / a SimStart event clear it outright.
+            /// </summary>
             public bool failed = false;
+            /// <summary>main.ElapsedTime at which <see cref="failed"/> was last set - see Fix 3.</summary>
+            public double failedTime = 0.0;
+            /// <summary>How many times injection of this object has been refused - caps the auto-retry so a genuinely bad model eventually stops - see Fix 3.</summary>
+            public int failedCount = 0;
             public double expireTime = 0.0;
             public bool broadcast = false;
             public double netStateTime = 0.0;
@@ -4377,6 +4394,19 @@ namespace JoinFS
             // get event ID
             Event e = (Event)eventId;
 
+            // check for sim start/stop - re-arm any failed injections so traffic appears once the user
+            // is actually in a flight, without needing a [Sim] toggle (see Fix 3)
+            if (e == Event.SIM_START || e == Event.SIM_STOP)
+            {
+                simRunning = (e == Event.SIM_START);
+                main.MonitorEvent("Simulator " + (simRunning ? "started" : "stopped") + " (SimConnect event)");
+                if (simRunning)
+                {
+                    RearmFailedInjections("SimStart");
+                }
+                return;
+            }
+
             // check for pause event
             if (e == Event.PAUSE)
             {
@@ -4445,6 +4475,32 @@ namespace JoinFS
         string simulatorName = "";
         string simulatorVersion = "0";
 
+        /// <summary>Tracks the SimStart/SimStop system events for logging/diagnostics only - the injection branch is never gated on it (see Fix 3).</summary>
+        public bool simRunning = false;
+
+        /// <summary>
+        /// Clear latched injection-failure state on every injected object so the finder retries them
+        /// immediately - see Fix 3. Called from ProcessOpen and on a SimStart event.
+        /// </summary>
+        void RearmFailedInjections(string reason)
+        {
+            int count = 0;
+            foreach (var obj in objectList)
+            {
+                if (obj.Injected && (obj.failed || obj.failedCount > 0))
+                {
+                    obj.failed = false;
+                    obj.failedTime = 0.0;
+                    obj.failedCount = 0;
+                    count++;
+                }
+            }
+            if (count > 0)
+            {
+                main.MonitorEvent("Re-armed " + count + " failed injection(s) (" + reason + ")");
+            }
+        }
+
         /// <summary>
         /// Get simulator name
         /// </summary>
@@ -4489,6 +4545,11 @@ namespace JoinFS
             // store simulator details
             simulatorName = name;
             simulatorVersion = appVerMaj + "." + appVerMin;
+
+            // a fresh SimConnect OPEN means we're (re)connected - clear any latched injection failures
+            // from a previous session/attempt so traffic doesn't wait on the substitution reload's flush
+            // or a [Sim] toggle (see Fix 3)
+            RearmFailedInjections("ProcessOpen");
 
             // load models for this version
             main.ScheduleSubstitutionLoad();
@@ -4625,8 +4686,12 @@ namespace JoinFS
                             main.MonitorEvent("ERROR - Failed to inject object - User '" + ((obj.owner == Obj.Owner.Network) ? obj.ownerNuid.ToString() : "Me") + "' - ID '" + obj.simId + "' Sub - '" + obj.ModelTitle + "'");
                         }
 
-                        // failed
+                        // failed - but not permanently. The most common cause is MSFS still sitting on
+                        // the menu / loading a flight when the attempt was made; record the time and
+                        // count so the injection finder can re-arm this after a backoff (see Fix 3).
                         obj.failed = true;
+                        obj.failedTime = main.ElapsedTime;
+                        obj.failedCount++;
                     }
                     else
                     {
@@ -5480,12 +5545,22 @@ namespace JoinFS
             }
             else if (Connected)
             {
-                // find object that needs creating
-                creatingObject = objectList.Find(o => o.owner != Obj.Owner.Me && o.Created == false && o.failed == false && main.log.IgnoreNode(o.ownerNuid) == false && main.log.IgnoreName(o.ownerModel) == false && o != enteredAircraft && o.distance * 0.00053995680346 < activityCircle);
+                // find object that needs creating. A prior injection failure (SimConnect exception 22 -
+                // usually MSFS still loading) no longer bars an object forever: it's eligible again once
+                // settingsInjectionRetrySeconds have passed, up to FAILED_RETRY_MAX attempts (see Fix 3).
+                creatingObject = objectList.Find(o => o.owner != Obj.Owner.Me && o.Created == false
+                    && (o.failed == false || (main.ElapsedTime - o.failedTime > main.settingsInjectionRetrySeconds && o.failedCount < FAILED_RETRY_MAX))
+                    && main.log.IgnoreNode(o.ownerNuid) == false && main.log.IgnoreName(o.ownerModel) == false && o != enteredAircraft && o.distance * 0.00053995680346 < activityCircle);
 
                 // check for object
                 if (creatingObject != null)
                 {
+                    // clear a re-armed failure flag so this attempt starts clean
+                    if (creatingObject.failed)
+                    {
+                        creatingObject.failed = false;
+                        main.MonitorEvent("Retrying injection (attempt " + (creatingObject.failedCount + 1) + ") - User '" + ((creatingObject.owner == Obj.Owner.Network) ? creatingObject.ownerNuid.ToString() : "Me") + "' - Sub '" + creatingObject.ModelTitle + "'");
+                    }
 #if XPLANE || CONSOLE
                     // set timer
                     creatingObjectExpireTime = main.ElapsedTime + NEW_OBJECT_EXPIRE_TIME;

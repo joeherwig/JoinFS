@@ -248,6 +248,11 @@ namespace JoinFS
                 sc.SubscribeToSystemEvent(Sim.Event.OBJECT_REMOVED, "ObjectRemoved");
                 sc.SubscribeToSystemEvent(Sim.Event.FRAME, "Frame");
                 sc.SubscribeToSystemEvent(Sim.Event.PAUSE, "Pause");
+                // SimStart/SimStop - used only to re-arm failed injections (see Fix 3), never to gate
+                // the injection branch: SimStart semantics vary between MSFS builds and a missed event
+                // would suppress all traffic, which the injection-finder backoff already guards against.
+                sc.SubscribeToSystemEvent(Sim.Event.SIM_START, "SimStart");
+                sc.SubscribeToSystemEvent(Sim.Event.SIM_STOP, "SimStop");
             }
             catch (COMException ex)
             {
@@ -691,6 +696,13 @@ namespace JoinFS
 
         public void CreateObject(Sim.Obj obj)
         {
+            // Regime A ground spawn (sender on ordinary ground, not on an elevated platform): let the sim
+            // place the object on its own gear from the start instead of spawning it airborne and dropping
+            // it - a visible bounce on first appearance for a large substitute (see Fix 1e). A Regime B
+            // object (elevated platform / rig / ship deck) still spawns airborne at the sender's altitude
+            // and is held there by position control.
+            bool groundSpawn = obj.trustingPlatformGround && obj.trustingPlatformElevation == false;
+
             // create sim position
             SIMCONNECT_DATA_INITPOSITION initPosition = new()
             {
@@ -698,11 +710,21 @@ namespace JoinFS
                 Latitude = obj.netPosition.geo.z * (180.0 / Math.PI),
                 Longitude = obj.netPosition.geo.x * (180.0 / Math.PI),
                 Altitude = obj.netPosition.geo.y * Sim.FEET_PER_METRE,
-                Pitch = obj.netPosition.angles.x * (180.0 / Math.PI),
-                Bank = obj.netPosition.angles.z * (180.0 / Math.PI),
+                Pitch = groundSpawn ? 0.0 : obj.netPosition.angles.x * (180.0 / Math.PI),
+                Bank = groundSpawn ? 0.0 : obj.netPosition.angles.z * (180.0 / Math.PI),
                 Heading = obj.netPosition.angles.y * (180.0 / Math.PI),
-                OnGround = 0
+                OnGround = groundSpawn ? 1u : 0u
             };
+
+            // Defer until SimConnect has actually sent OPEN. There's a window between simconnect != null
+            // (Sim.Connected flips true) and RecvOpen where CreateObject would fire a COMException - use
+            // the same _pendingRequests pattern as RequestSimulatorModels (see Fix 3c).
+            if (_isSimOpen == false)
+            {
+                _pendingRequests.Add(() => CreateObject(obj));
+                main.MonitorEvent("SimConnect not ready. Injection of '" + obj.ModelTitle + "' queued.");
+                return;
+            }
 
             try
             {
