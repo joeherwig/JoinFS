@@ -484,7 +484,9 @@ namespace JoinFS
 
         public void SetData(Enum def, uint simId, object data)
         {
-            if ((Sim.Definitions)def != Sim.Definitions.OBJECT_VELOCITY)
+            // OBJECT_VELOCITY and OBJECT_GEAR are written every frame for on-ground objects - don't flood
+            // the Network monitor category with them
+            if ((Sim.Definitions)def != Sim.Definitions.OBJECT_VELOCITY && (Sim.Definitions)def != Sim.Definitions.OBJECT_GEAR)
             {
                 main.MonitorNetwork("SetData ID '" + simId + "' - Data '" + Sim.DefinitionToString((Sim.Definitions)def) + "'");
             }
