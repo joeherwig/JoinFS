@@ -799,8 +799,8 @@ namespace JoinFS
             /// True when the sim refused to create this object (SimConnect exception 22). Historically
             /// latched forever, so an injection attempted while MSFS was still on the menu / loading a
             /// flight never retried and no traffic appeared until the user toggled [Sim] - see Fix 3.
-            /// Now self-healing: the injection finder re-arms it after FAILED_RETRY_SECONDS, up to
-            /// FAILED_RETRY_MAX attempts, and ProcessOpen / a SimStart event clear it outright.
+            /// Now self-healing: the injection finder re-arms it after Main.settingsInjectionRetrySeconds,
+            /// up to FAILED_RETRY_MAX attempts, and ProcessOpen / a SimStart event clear it outright.
             /// </summary>
             public bool failed = false;
             /// <summary>main.ElapsedTime at which <see cref="failed"/> was last set - see Fix 3.</summary>
