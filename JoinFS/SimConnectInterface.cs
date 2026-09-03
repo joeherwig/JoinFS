@@ -142,6 +142,9 @@ namespace JoinFS
                 sc.AddToDataDefinition(Sim.Definitions.OBJECT_EULER, "Plane Heading Degrees True", "radians", SIMCONNECT_DATATYPE.FLOAT32, 0.0f, SimConnect.SIMCONNECT_UNUSED);
                 sc.AddToDataDefinition(Sim.Definitions.OBJECT_EULER, "Plane Bank Degrees", "radians", SIMCONNECT_DATATYPE.FLOAT32, 0.0f, SimConnect.SIMCONNECT_UNUSED);
 
+                // define a one-field gear-handle structure (see Fix 1f)
+                sc.AddToDataDefinition(Sim.Definitions.OBJECT_GEAR, "GEAR HANDLE POSITION", "bool", SIMCONNECT_DATATYPE.INT32, 0.0f, SimConnect.SIMCONNECT_UNUSED);
+
                 // define a position velocity variables structure
                 sc.AddToDataDefinition(Sim.Definitions.AIRCRAFT_POSITION, "Plane Latitude", "radians", SIMCONNECT_DATATYPE.FLOAT64, 0.0f, SimConnect.SIMCONNECT_UNUSED);
                 sc.AddToDataDefinition(Sim.Definitions.AIRCRAFT_POSITION, "Plane Longitude", "radians", SIMCONNECT_DATATYPE.FLOAT64, 0.0f, SimConnect.SIMCONNECT_UNUSED);
@@ -187,6 +190,7 @@ namespace JoinFS
                 sc.RegisterDataDefineStruct<Sim.ObjectPositionUpdate>(Sim.Definitions.OBJECT_POSITION_UPDATE);
                 sc.RegisterDataDefineStruct<Sim.ObjectVelocity>(Sim.Definitions.OBJECT_VELOCITY);
                 sc.RegisterDataDefineStruct<Sim.ObjectEuler>(Sim.Definitions.OBJECT_EULER);
+                sc.RegisterDataDefineStruct<Sim.IntegerStruct>(Sim.Definitions.OBJECT_GEAR);
                 sc.RegisterDataDefineStruct<Sim.AircraftPosition>(Sim.Definitions.AIRCRAFT_POSITION);
                 sc.RegisterDataDefineStruct<Sim.AircraftSetId>(Sim.Definitions.AIRCRAFT_SET_ID);
                 sc.RegisterDataDefineStruct<Object[]>(Sim.Definitions.AIRCRAFT_WAYPOINTS);

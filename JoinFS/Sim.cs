@@ -56,6 +56,8 @@ namespace JoinFS
             OBJECT_POSITION_UPDATE,
             OBJECT_VELOCITY,
             OBJECT_EULER,
+            /// <summary>Dedicated one-field "GEAR HANDLE POSITION" write - used to force the gear down on an injected substitute while the sender is on the ground, bypassing the model-variable change/delay gate so the sim's per-frame AI gear-phase logic can't win (see Fix 1f).</summary>
+            OBJECT_GEAR,
             AIRCRAFT_POSITION,
             AIRCRAFT_GET_INFO,
             AIRCRAFT_SET_ID,
@@ -240,6 +242,7 @@ namespace JoinFS
                 Sim.Definitions.OBJECT_POSITION => "OBJECT_POSITION",
                 Sim.Definitions.OBJECT_VELOCITY => "OBJECT_VELOCITY",
                 Sim.Definitions.OBJECT_EULER => "OBJECT_EULER",
+                Sim.Definitions.OBJECT_GEAR => "OBJECT_GEAR",
                 Sim.Definitions.AIRCRAFT_POSITION => "AIRCRAFT_POSITION",
                 Sim.Definitions.AIRCRAFT_GET_INFO => "AIRCRAFT_GET_INFO",
                 Sim.Definitions.AIRCRAFT_SET_ID => "AIRCRAFT_SET_ID",
@@ -827,6 +830,8 @@ namespace JoinFS
             public double smoothedElevationOffset = double.NaN;
             /// <summary>Low-pass-filtered ground-clearance correction (own substitute clearance minus sender's) applied in UpdateAircraft - see ground-jitter-on-model-mismatch fix. NaN when not yet sampled. Smoothed for the same reason as smoothedElevationOffset: trustPlatformGround (and the sender's own reported on-ground flag it comes from) can flicker tick-to-tick, and applying the raw target value directly would snap the substitute's altitude instantly between "as if it were the original aircraft" and "properly grounded" every time that single flag flips - visible as a sharp jitter rather than the flag's own noise being smoothed away first.</summary>
             public double smoothedGroundClearanceCorrection = double.NaN;
+            /// <summary>Low-pass-filtered absolute on-ground target altitude for Regime A (ordinary ground, not an elevated platform) - local GROUND ALTITUDE probe + this substitute's own STATIC CG TO GROUND. NaN when not in Regime A. Unlike smoothedGroundClearanceCorrection this has no dependence on the sender's own clearance, so a large size mismatch between reported and substituted model no longer produces a multi-metre offset (Fix 2). Only a seed - the sim owns the vertical axis in Regime A (Fix 1c).</summary>
+            public double smoothedGroundAltitude = double.NaN;
             /// <summary>Throttle for the RawPos/RawPosRelay ground-placement traces in UpdateAircraft (both keyed by the sender's netTime) - see main.MonitorNetwork's "Network" category.</summary>
             public double nextRawDiagLogTime = 0.0;
             /// <summary>Throttle for the RawPosSend ground-placement trace in ProcessAircraftPosition, keyed by local simTime - kept separate from nextRawDiagLogTime because that one is keyed by the unrelated netTime clock; sharing one field let whichever trace ran first starve the other.</summary>
@@ -955,6 +960,15 @@ namespace JoinFS
 
                 // reset sim ID
                 obj.simId = uint.MaxValue;
+                // the object may be recreated with a drastically different-sized model - drop the
+                // converged ground-placement state so the first fresh sample of the new model seeds
+                // directly instead of easing across from the old model's value (see Fix 1/2)
+                if (obj is Aircraft groundAircraft)
+                {
+                    groundAircraft.smoothedGroundAltitude = double.NaN;
+                    groundAircraft.smoothedGroundClearanceCorrection = double.NaN;
+                    groundAircraft.smoothedElevationOffset = double.NaN;
+                }
                 // create variables
                 CreateModelVariables(obj);
             }
@@ -1301,7 +1315,12 @@ namespace JoinFS
                 // helicopters-on-elevated-platforms feature)
                 ObjectPositionUpdate update = new(ref position)
                 {
-                    ground = obj.trustingPlatformGround ? 1 : 0
+                    // Regime A (ordinary ground): forward SIM ON GROUND so the sim re-seats the object on
+                    // its own gear. Regime B (elevated platform - trustingPlatformElevation): withhold it.
+                    // In Regime B the object is held above absent local geometry purely by position control;
+                    // telling the local sim it's "on ground" invites it to re-seat the object on the terrain
+                    // far below every frame JoinFS isn't actively forcing - the platform-jitter bug (Fix 1d).
+                    ground = (obj.trustingPlatformGround && obj.trustingPlatformElevation == false) ? 1 : 0
                 };
                 simconnect.SetData(Definitions.OBJECT_POSITION_UPDATE, obj.simId, update);
                 // update stored position
@@ -1600,12 +1619,49 @@ namespace JoinFS
                         // (the MSFS2024 parked-helicopter jitter). Fall back to the sender's own debounced on-ground
                         // flag when the local read-back doesn't confirm it.
                         bool onGround = simPosition.ground != 0 || obj.trustingPlatformGround;
-                        if (onGround) altitudeDeltaLimit = 1.5;
+                        // two on-ground regimes (see Fix 1/2):
+                        //  Regime A - ordinary ground: the sim's own gear-contact physics owns the vertical
+                        //    axis AND pitch/bank; JoinFS commands only horizontal position + heading, and
+                        //    the vertical hard-reset tolerance is deliberately generous (divergence is now
+                        //    expected). This is what fixes nose-gear-up and the size-mismatch jitter.
+                        //  Regime B - elevated platform: nothing is handed to the sim; full position (incl.
+                        //    altitude) and full sender attitude are forced every frame with a tight reset,
+                        //    so the sim can never drop the object onto the absent terrain below.
+                        bool regimeB = onGround && obj.trustingPlatformElevation;
+                        bool regimeA = onGround && obj.trustingPlatformElevation == false;
+                        if (regimeA) altitudeDeltaLimit = main.settingsGroundAltitudeDeltaLimit;
+                        else if (regimeB) altitudeDeltaLimit = 0.2;
+
+                        // While the sender is on the ground, force the substitute's gear handle down every
+                        // tick, bypassing the model-variable change/delay gate (SLAVE_DELAY) so the injected
+                        // AI aircraft's own per-frame gear-phase logic can't retract it - see Fix 1f. On the
+                        // ground the gear must be down for the contact points to resolve; this is correct for
+                        // a fixed-gear original and for a retractable original that has landed. Planes only -
+                        // a helicopter substitute has no retractable gear (skids), so this would be a no-op.
+                        if (onGround && obj is Plane)
+                        {
+                            simconnect.SetData(Definitions.OBJECT_GEAR, obj.simId, new IntegerStruct { value = 1 });
+                        }
 #endif
 
                         // check if object is beyond specific distance
                         if (distance > 50.0 || Math.Abs(simPosition.geo.y - netPosition.geo.y) > altitudeDeltaLimit)
                         {
+#if (FS2020 || FS2024)
+                            if (regimeA)
+                            {
+                                // reseed horizontal position + the Fix 1b altitude target, hand pitch/bank
+                                // back to the sim (its own contact-point read-back), command heading only
+                                Vector resetAngles = new(simPosition.angles.x, netPosition.angles.y, simPosition.angles.z);
+                                UpdateObject(obj, netPosition);
+                                netVelocity.linear.y = 0.0;
+                                simconnect.SetData(Definitions.OBJECT_VELOCITY, obj.simId, new ObjectVelocity(netVelocity.linear, netVelocity.angular, netVelocity.acc));
+                                simconnect.SetData(Definitions.OBJECT_EULER, obj.simId, new ObjectEuler(resetAngles));
+                                obj.simPosition.angles = resetAngles;
+                            }
+                            else
+                            {
+#endif
                             // reset to target position
                             UpdateObject(obj, netPosition);
                             // update sim velocity
@@ -1614,6 +1670,7 @@ namespace JoinFS
                             // set orientation
                             simconnect.SetData(Definitions.OBJECT_EULER, obj.simId, new ObjectEuler(netPosition.angles));
                             obj.simPosition.angles = netPosition.angles.Clone();
+                            }
 #endif
                         }
                         else
@@ -1624,19 +1681,30 @@ namespace JoinFS
                             Vector deltaAngles = Vector.AnglesDelta(simPosition.angles, netPosition.angles);
 
 #if (FS2020 || FS2024)
-                            // On the ground, the sim's own ground-contact physics owns the vertical axis. The
-                            // full-gain catch-up below (a velocity impulse proportional to the residual altitude
-                            // error, applied every frame) fights that collision as a vertical shimmer - the
-                            // MSFS2024 parked-helicopter jitter, where the model sits a few cm into the local mesh,
-                            // the sim's terrain-penetration correction lifts it, and this pushes it back down. Within
-                            // a small band hand the vertical axis entirely to the sim; beyond it ease in gently
-                            // rather than at full gain (a gross error is still snapped by the 1.5m hard-reset limit
-                            // above). Horizontal catch-up is unchanged.
-                            if (onGround)
+                            // Regime A: the sim's own ground-contact physics owns the vertical axis and
+                            // pitch/bank entirely. Hand both off - zero the vertical catch-up, and don't add
+                            // the pitch/bank components of the angular catch-up (a substitute with a longer
+                            // nose-to-CG moment arm than the original turns even a small forced-pitch mismatch
+                            // into a large gap at the nose gear - "nose gear lifted a bit"). JoinFS commands
+                            // horizontal position + heading only.
+                            // Regime B: hold the sender's altitude and full attitude - the object floats above
+                            // absent local geometry purely by position control.
+                            if (regimeA)
                             {
-                                deltaGeo.y = Math.Abs(deltaGeo.y) < 0.15 ? 0.0 : deltaGeo.y * 0.2;
+                                deltaGeo.y = 0.0;
+                                netVelocity.linear.y = 0.0;
+                                deltaAngles.x = 0.0;
+                                deltaAngles.z = 0.0;
+                            }
+                            else if (regimeB)
+                            {
+                                deltaGeo.y = Math.Abs(deltaGeo.y) < 0.05 ? 0.0 : deltaGeo.y;
                                 netVelocity.linear.y = 0.0;
                             }
+                            // orientation the sim is allowed to see this frame
+                            Vector groundAngles = regimeA
+                                ? new Vector(simPosition.angles.x, netPosition.angles.y, simPosition.angles.z)
+                                : netPosition.angles;
 #endif
                             // add delta to velocity to catch up
                             netVelocity.linear += deltaGeo * 1.5;
@@ -1651,15 +1719,21 @@ namespace JoinFS
                                 }
 #if (FS2020 || FS2024)
                                 // set orientation
-                                simconnect.SetData(Definitions.OBJECT_EULER, obj.simId, new ObjectEuler(netPosition.angles));
-                                obj.simPosition.angles = netPosition.angles.Clone();
+                                simconnect.SetData(Definitions.OBJECT_EULER, obj.simId, new ObjectEuler(groundAngles));
+                                obj.simPosition.angles = groundAngles.Clone();
 #endif
                             }
                             else
                             {
+#if (FS2020 || FS2024)
+                                // set orientation
+                                simconnect.SetData(Definitions.OBJECT_EULER, obj.simId, new ObjectEuler(groundAngles));
+                                obj.simPosition.angles = groundAngles.Clone();
+#else
                                 // set orientation
                                 simconnect.SetData(Definitions.OBJECT_EULER, obj.simId, new ObjectEuler(netPosition.angles));
                                 obj.simPosition.angles = netPosition.angles.Clone();
+#endif
                             }
 
                             // update sim velocity
@@ -2179,7 +2253,8 @@ namespace JoinFS
                     // change like ElevatedPlatform above) - useful for diagnosing ground-clearance correction/
                     // jitter reports, e.g. whether aircraftPosition.elevation is flipping between a real
                     // terrain reading and a zeroed/default value, or the sender's on-ground flag is unstable.
-                    if (netTime >= aircraft.nextRawDiagLogTime)
+                    // Opt-in only (-tracediagnostics) - it must not ship firing every tick (see Fix 1b / Fix 4).
+                    if (main.settingsTraceDiagnostics && netTime >= aircraft.nextRawDiagLogTime)
                     {
                         aircraft.nextRawDiagLogTime = netTime + 0.2;
                         main.MonitorNetwork("RawPos '" + aircraft.flightPlan.callsign + "' rawGround=" + aircraftPosition.ground +
@@ -2192,44 +2267,54 @@ namespace JoinFS
                     aircraft.trustingPlatformElevation = trustPlatformElevation;
                     aircraft.trustingPlatformGround = trustPlatformGround;
 
-                    // ground the substitute using its own STATIC CG TO GROUND, not the sender's - see
-                    // ground-jitter-on-model-mismatch fix. Strictly gated on the sender's own reported
-                    // on-ground state: an airborne aircraft must never be pulled toward a ground-relative
-                    // correction, regardless of how close to the ground it might numerically appear. When
-                    // on-ground, the sender's reported altitude corresponds to their own gear resting on the
-                    // real terrain (terrainElevation ~= altitude - senderClearance); re-deriving that same
-                    // terrain point but adding back the *substitute's own* clearance places the substitute's
-                    // gear on that same terrain point, regardless of whether the substitute is bigger or
-                    // smaller than the original aircraft - no matter which model the matcher happened to
-                    // pick. This is independent of, and complementary to, the ElevationCorrection bare-
-                    // terrain-datum blend below (that one compensates for cross-install terrain-mesh noise,
-                    // not model geometry). Requires both sides' clearance to be known (not NaN - an older
-                    // peer pre-dating this field, or a not-yet-settled local poll, falls back to no
-                    // correction rather than attempting a wrong one) and the local aircraft to have received
-                    // at least one live SimConnect update of its own (SimValid).
+                    // On-ground handling splits into two explicit regimes, keyed by trustPlatformElevation
+                    // (see Fix 1/2):
                     //
-                    // The target correction is low-pass filtered (same 0.15 factor/pattern as
-                    // smoothedElevationOffset below) rather than applied raw: trustPlatformGround comes
-                    // straight from the sender's own single-bit on-ground flag, which can flicker tick-to-
-                    // tick (e.g. suspension/contact noise while parked or taxiing) - applying the full
-                    // correction the instant it flips would snap the substitute's altitude abruptly between
-                    // "as if it were the original aircraft" and "properly grounded" every time that one flag
-                    // toggles, which is itself a visible jitter of exactly the size of the geometry gap
-                    // between the two aircraft.
-                    double targetGroundClearanceCorrection = 0.0;
-                    if (trustPlatformGround && aircraft.SimValid)
+                    //  Regime A - ordinary ground (trustPlatformGround, NOT trustPlatformElevation): the
+                    //    sim's own gear-contact physics owns the vertical axis. JoinFS only seeds an
+                    //    absolute local target here - local GROUND ALTITUDE probe + this substitute's OWN
+                    //    STATIC CG TO GROUND - and hands the axis to the sim from UpdateSimObjectVelocity.
+                    //    Crucially this target has NO dependence on the sender's own clearance, so a
+                    //    drastically different-sized substitute (C172 -> C-17 / B748) no longer generates a
+                    //    multi-metre smoothed offset that the catch-up then fights (Fix 2). Low-pass
+                    //    filtered (same 0.15 factor as smoothedElevationOffset) because trustPlatformGround
+                    //    comes from the sender's single-bit on-ground flag, which flickers tick-to-tick.
+                    //
+                    //  Regime B - elevated platform / ship deck / rig (trustPlatformElevation): the sender
+                    //    sits above absent local geometry, so keep the sender's raw altitude with no
+                    //    clearance correction and no terrain blend, and hold it there purely by position
+                    //    control (SIM ON GROUND withheld, Fix 1d; tight vertical reset, Fix 1c).
+                    //
+                    //  Neither - airborne, or ground not trusted: unchanged legacy per-model clearance
+                    //    correction path, which decays to zero whenever the sender reports airborne.
+                    bool regimeA = trustPlatformGround && trustPlatformElevation == false;
+                    if (regimeA && aircraft.SimValid && double.IsNaN(aircraft.simPosition.staticCgToGround) == false && double.IsNaN(aircraft.simPosition.elevation) == false)
                     {
-                        double senderClearance = aircraftPosition.staticCgToGround * 0.3048;
-                        double localClearance = aircraft.simPosition.staticCgToGround;
-                        if (double.IsNaN(senderClearance) == false && double.IsNaN(localClearance) == false)
+                        double targetAltitude = aircraft.simPosition.elevation + aircraft.simPosition.staticCgToGround;
+                        aircraft.smoothedGroundAltitude = double.IsNaN(aircraft.smoothedGroundAltitude)
+                            ? targetAltitude
+                            : aircraft.smoothedGroundAltitude + (targetAltitude - aircraft.smoothedGroundAltitude) * 0.15;
+                        aircraftPosition.altitude = (float)aircraft.smoothedGroundAltitude;
+                        // the legacy correction path is not in use while in Regime A
+                        aircraft.smoothedGroundClearanceCorrection = double.NaN;
+                    }
+                    else
+                    {
+                        // out of Regime A - forget the seeded target so a later re-entry starts fresh
+                        aircraft.smoothedGroundAltitude = double.NaN;
+
+                        // Regime B keeps the sender's raw altitude verbatim (target 0). The "neither" case
+                        // also lands here: trustPlatformGround false => target 0, decaying any prior
+                        // correction back toward zero.
+                        double targetGroundClearanceCorrection = 0.0;
+                        aircraft.smoothedGroundClearanceCorrection = double.IsNaN(aircraft.smoothedGroundClearanceCorrection)
+                            ? targetGroundClearanceCorrection
+                            : aircraft.smoothedGroundClearanceCorrection + (targetGroundClearanceCorrection - aircraft.smoothedGroundClearanceCorrection) * 0.15;
+                        if (double.IsNaN(aircraft.smoothedGroundClearanceCorrection) == false)
                         {
-                            targetGroundClearanceCorrection = localClearance - senderClearance;
+                            aircraftPosition.altitude += (float)aircraft.smoothedGroundClearanceCorrection;
                         }
                     }
-                    aircraft.smoothedGroundClearanceCorrection = double.IsNaN(aircraft.smoothedGroundClearanceCorrection)
-                        ? targetGroundClearanceCorrection
-                        : aircraft.smoothedGroundClearanceCorrection + (targetGroundClearanceCorrection - aircraft.smoothedGroundClearanceCorrection) * 0.15;
-                    aircraftPosition.altitude += (float)aircraft.smoothedGroundClearanceCorrection;
 
                     // check if correction is enabled and local height is valid
                     if (Settings.Default.ElevationCorrection && aircraft.SimValid && trustPlatformElevation == false)
@@ -2337,7 +2422,7 @@ namespace JoinFS
                 // this re-broadcasts an already-received position onward to other nodes (multi-hop/relay
                 // topology); logged distinctly from RawPosSend so a relay-introduced bad value can be told
                 // apart from a freshly-read one when diagnosing ground-clearance correction/jitter reports.
-                if (netTime >= aircraft.nextRawDiagLogTime)
+                if (main.settingsTraceDiagnostics && netTime >= aircraft.nextRawDiagLogTime)
                 {
                     aircraft.nextRawDiagLogTime = netTime + 0.2;
                     main.MonitorNetwork("RawPosRelay '" + aircraft.flightPlan.callsign + "' rawGround=" + aircraftPosition.ground +
@@ -2534,7 +2619,7 @@ namespace JoinFS
                 // one being broadcast), before anything else touches it - useful for diagnosing ground-
                 // clearance correction/jitter reports, e.g. whether SimConnect itself intermittently returns
                 // a zeroed/default "GROUND ALTITUDE" on this periodic per-object read.
-                if (simTime >= aircraft.nextRawPosSendDiagLogTime)
+                if (main.settingsTraceDiagnostics && simTime >= aircraft.nextRawPosSendDiagLogTime)
                 {
                     aircraft.nextRawPosSendDiagLogTime = simTime + 0.2;
                     main.MonitorNetwork("RawPosSend '" + aircraft.flightPlan.callsign + "' owner=" + aircraft.owner +
