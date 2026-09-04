@@ -40,6 +40,8 @@ namespace JoinFS
         public const double METRES_PER_FOOT = 0.3048;
         /// <summary>How long the sender's raw "SIM ON GROUND" bit must hold its current value before trustingPlatformGround follows it - see Aircraft.pendingGroundFlag.</summary>
         const double GroundTrustDebounceSeconds = 0.3;
+        /// <summary>How long a freshly (re)created Regime A ground object is left alone vertically after spawn, before JoinFS's own vertical correction (see UpdateSimObjectVelocity) is allowed to engage - see Obj.verticalCorrectionSuppressedUntil. Gives the sim's own gear-compression/attitude settle (e.g. a taildragger's tail lowering) time to finish on its own, undisturbed by a competing correction toward a single fixed target altitude that doesn't account for the aircraft's current, still-changing pitch. The hard-reset safety net (genuinely wrong placement) is unaffected - only the gentle catch-up nudge is suppressed.</summary>
+        const double VerticalSettleGraceSeconds = 8.0;
 
 #endregion
 
@@ -811,6 +813,10 @@ namespace JoinFS
             public bool gearForcedDown = false;
             /// <summary>main.ElapsedTime of the next allowed OBJECT_GEAR refresh write - see gearForcedDown.</summary>
             public double nextGearForceTime = 0.0;
+            /// <summary>Hysteresis state for the Regime A on-ground vertical correction - see UpdateSimObjectVelocity. True while actively correcting a persistent gap; only clears once the error has closed to well inside the engage threshold, so the correction can't limit-cycle right at that threshold's edge.</summary>
+            public bool verticalCorrectionActive = false;
+            /// <summary>main.ElapsedTime before which the Regime A vertical catch-up correction is fully suppressed - see VerticalSettleGraceSeconds. Set on every fresh spawn/re-creation so the sim's own attitude/gear settle gets a clear run first.</summary>
+            public double verticalCorrectionSuppressedUntil = 0.0;
             public double expireTime = 0.0;
             public bool broadcast = false;
             public double netStateTime = 0.0;
@@ -973,6 +979,20 @@ namespace JoinFS
                     groundAircraft.smoothedGroundClearanceCorrection = double.NaN;
                     groundAircraft.smoothedElevationOffset = double.NaN;
                 }
+                // obj.simPosition (and the SimValid it gates on) still reflect the OLD model until the
+                // recreated object's own first AIRCRAFT_POSITION poll arrives. Without this, the Regime A
+                // altitude seed (Fix 1b) would briefly use the OLD model's now-irrelevant STATIC CG TO
+                // GROUND/elevation for the NEW model on top of the inherent one-poll-cycle bootstrap delay
+                // every fresh spawn already has ("spawns 0.5-2m off, then settles") - and for a size
+                // mismatch between successive substitutes, that stale value can be a much worse guess than
+                // even the sender's own raw altitude. Blanking simPosition drops SimValid back to false and
+                // staticCgToGround back to NaN, so the very first spawn falls back to the sender's raw
+                // altitude bootstrap instead - the same, smaller gap a brand-new aircraft's first-ever spawn
+                // already has - until the new model's own first poll response arrives.
+                obj.simPosition = new Pos();
+                obj.simTime = 0.0;
+                // a new model shouldn't inherit the old model's vertical-correction hysteresis state
+                obj.verticalCorrectionActive = false;
                 // create variables
                 CreateModelVariables(obj);
             }
@@ -1667,9 +1687,19 @@ namespace JoinFS
                             if (regimeA)
                             {
                                 // reseed horizontal position + the Fix 1b altitude target, hand pitch/bank
-                                // back to the sim (its own contact-point read-back), command heading only
+                                // back to the sim (its own contact-point read-back), command heading only.
+                                // BUG FIX: UpdateObject(obj, netPosition) builds its OBJECT_POSITION_UPDATE
+                                // straight from netPosition.angles - the SENDER's raw pitch/bank - not the
+                                // resetAngles computed below. Sending that first and only correcting to
+                                // resetAngles a moment later (via the separate OBJECT_EULER call) snapped a
+                                // large-mismatch substitute (e.g. a taildragger replacing a tricycle-gear
+                                // original) toward the sender's attitude and back on every hard-reset during
+                                // the settle, compounding the sim's own gear-physics bounce. Give the reset
+                                // position the corrected angles up front so both SetData calls agree.
                                 Vector resetAngles = new(simPosition.angles.x, netPosition.angles.y, simPosition.angles.z);
-                                UpdateObject(obj, netPosition);
+                                Pos resetPosition = netPosition.Clone();
+                                resetPosition.angles = resetAngles;
+                                UpdateObject(obj, resetPosition);
                                 netVelocity.linear.y = 0.0;
                                 simconnect.SetData(Definitions.OBJECT_VELOCITY, obj.simId, new ObjectVelocity(netVelocity.linear, netVelocity.angular, netVelocity.acc));
                                 simconnect.SetData(Definitions.OBJECT_EULER, obj.simId, new ObjectEuler(resetAngles));
@@ -1714,7 +1744,57 @@ namespace JoinFS
                             // absent local geometry purely by position control.
                             if (regimeA)
                             {
-                                deltaGeo.y = Math.Abs(deltaGeo.y) < 0.15 ? 0.0 : deltaGeo.y * 0.2;
+                                // A true dead-band (zero correction below 0.15m) can produce its own
+                                // limit-cycle for some substitutes: whatever the sim's own physics naturally
+                                // settles this specific model to (tire compression, terrain-penetration
+                                // handling, etc.) doesn't sit exactly at our computed target - for a large/
+                                // heavy substitute the gap can persistently exceed the dead-band's lower
+                                // edge, so the object sinks in unopposed until it crosses -0.15m, correction
+                                // kicks in and pushes it back up past the edge, cuts off completely again,
+                                // and it sinks back in - a sustained hop bounded almost exactly by the
+                                // dead-band boundary (DC-3/Savage Gravel field reports).
+                                //
+                                // A plain always-on weak gain inside the band (tried first) removed that
+                                // edge, but replaced it with a small continuous fight against the sim's own
+                                // settling for EVERY on-ground substitute, not just the mismatched ones -
+                                // reintroducing jitter broadly. Use hysteresis instead: engage correction at
+                                // the same 0.15m threshold as before, but once engaged, don't release it
+                                // again until the error is much smaller (0.03m) rather than immediately at
+                                // the 0.15m edge. A substitute that never leaves the 0.15m band gets zero
+                                // ongoing correction, exactly as before (no new jitter); one with a
+                                // persistent gap gets pulled all the way in before release, instead of
+                                // stopping right at the edge and falling back out (no more boundary hop).
+                                //
+                                // Separately: for a large gear-geometry mismatch (e.g. a tricycle original
+                                // substituted by a taildragger), the sim's own attitude settle (tail lowering
+                                // onto its wheel) and JoinFS's vertical correction toward a single FIXED
+                                // target altitude are fighting a coupling neither side accounts for - the
+                                // true CG-to-ground height for a taildragger genuinely depends on its current
+                                // pitch, but our target doesn't change as pitch rotates. That shows up as the
+                                // object settling near-level first (matching the target reasonably well at
+                                // that attitude), then sinking a further few cm exactly as the tailwheel
+                                // reaches the ground and pitch stops changing - visible as jitter right at
+                                // that handoff. Give every freshly (re)created object a clear run to finish
+                                // its own attitude settle before JoinFS's vertical nudge engages at all (the
+                                // hard-reset safety net above is unaffected - only this gentle catch-up is
+                                // suppressed).
+                                if (main.ElapsedTime < obj.verticalCorrectionSuppressedUntil)
+                                {
+                                    deltaGeo.y = 0.0;
+                                }
+                                else
+                                {
+                                    double absDeltaY = Math.Abs(deltaGeo.y);
+                                    if (absDeltaY > 0.15)
+                                    {
+                                        obj.verticalCorrectionActive = true;
+                                    }
+                                    else if (absDeltaY < 0.03)
+                                    {
+                                        obj.verticalCorrectionActive = false;
+                                    }
+                                    deltaGeo.y = obj.verticalCorrectionActive ? deltaGeo.y * 0.2 : 0.0;
+                                }
                                 netVelocity.linear.y = 0.0;
                                 deltaAngles.x = 0.0;
                                 deltaAngles.z = 0.0;
@@ -1728,6 +1808,21 @@ namespace JoinFS
                             Vector groundAngles = regimeA
                                 ? new Vector(simPosition.angles.x, netPosition.angles.y, simPosition.angles.z)
                                 : netPosition.angles;
+                            // Regime A: simPosition.angles only actually changes at the (much slower) local
+                            // poll rate feeding it - the extrapolation above carries it forward essentially
+                            // unchanged between polls since JoinFS deliberately drives no pitch/bank rate of
+                            // its own here. Re-sending the identical value every visual frame (30-60Hz)
+                            // anyway is a known class of AI-object animation bug: SetDataOnSimObject on
+                            // orientation can restart whatever in-flight interpolation/settle animation the
+                            // sim is running, even when the value hasn't materially changed, which could be
+                            // fighting - not just failing to help - a slow gear-compression settle (e.g. a
+                            // taildragger's tail taking a long time to come down after a substitution). Only
+                            // re-send when it actually moved.
+                            const double groundEulerEpsilon = 0.05 * Math.PI / 180.0;
+                            bool sendGroundEuler = regimeA == false
+                                || Math.Abs(Vector.AngleDelta(obj.simPosition.angles.x, groundAngles.x)) > groundEulerEpsilon
+                                || Math.Abs(Vector.AngleDelta(obj.simPosition.angles.y, groundAngles.y)) > groundEulerEpsilon
+                                || Math.Abs(Vector.AngleDelta(obj.simPosition.angles.z, groundAngles.z)) > groundEulerEpsilon;
 #endif
                             // add delta to velocity to catch up
                             netVelocity.linear += deltaGeo * 1.5;
@@ -1742,8 +1837,11 @@ namespace JoinFS
                                 }
 #if (FS2020 || FS2024)
                                 // set orientation
-                                simconnect.SetData(Definitions.OBJECT_EULER, obj.simId, new ObjectEuler(groundAngles));
-                                obj.simPosition.angles = groundAngles.Clone();
+                                if (sendGroundEuler)
+                                {
+                                    simconnect.SetData(Definitions.OBJECT_EULER, obj.simId, new ObjectEuler(groundAngles));
+                                    obj.simPosition.angles = groundAngles.Clone();
+                                }
 #endif
                             }
                             else
@@ -4420,6 +4518,9 @@ namespace JoinFS
                             obj.simId = objectId;
                             // take control
                             obj.takeControl = true;
+                            // give the sim's own attitude/gear settle a clear run before JoinFS's vertical
+                            // correction starts nudging toward a fixed target - see VerticalSettleGraceSeconds
+                            obj.verticalCorrectionSuppressedUntil = main.ElapsedTime + VerticalSettleGraceSeconds;
                             // reset object
                             ResetObject(obj);
                             // create variables
