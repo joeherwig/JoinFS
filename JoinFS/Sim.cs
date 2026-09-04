@@ -807,6 +807,10 @@ namespace JoinFS
             public double failedTime = 0.0;
             /// <summary>How many times injection of this object has been refused - caps the auto-retry so a genuinely bad model eventually stops - see Fix 3.</summary>
             public int failedCount = 0;
+            /// <summary>True once the on-ground gear-down force (Fix 1f) has been sent for the current ground stay - lets the per-tick check throttle to nextGearForceTime instead of writing OBJECT_GEAR every frame.</summary>
+            public bool gearForcedDown = false;
+            /// <summary>main.ElapsedTime of the next allowed OBJECT_GEAR refresh write - see gearForcedDown.</summary>
+            public double nextGearForceTime = 0.0;
             public double expireTime = 0.0;
             public bool broadcast = false;
             public double netStateTime = 0.0;
@@ -1632,15 +1636,27 @@ namespace JoinFS
                         if (regimeA) altitudeDeltaLimit = main.settingsGroundAltitudeDeltaLimit;
                         else if (regimeB) altitudeDeltaLimit = 0.2;
 
-                        // While the sender is on the ground, force the substitute's gear handle down every
-                        // tick, bypassing the model-variable change/delay gate (SLAVE_DELAY) so the injected
-                        // AI aircraft's own per-frame gear-phase logic can't retract it - see Fix 1f. On the
+                        // While the sender is on the ground, force the substitute's gear handle down,
+                        // bypassing the model-variable change/delay gate (SLAVE_DELAY) so the injected AI
+                        // aircraft's own per-frame gear-phase logic can't retract it - see Fix 1f. On the
                         // ground the gear must be down for the contact points to resolve; this is correct for
                         // a fixed-gear original and for a retractable original that has landed. Planes only -
                         // a helicopter substitute has no retractable gear (skids), so this would be a no-op.
+                        // Throttled to once/second (not every tick, unlike the first cut of this fix) -
+                        // there's no need to fight the AI logic more often than that, and it cuts a brand
+                        // new per-frame native SetDataOnSimObject call down to a rare one.
                         if (onGround && obj is Plane)
                         {
-                            simconnect.SetData(Definitions.OBJECT_GEAR, obj.simId, new IntegerStruct { value = 1 });
+                            if (obj.gearForcedDown == false || main.ElapsedTime >= obj.nextGearForceTime)
+                            {
+                                simconnect.SetData(Definitions.OBJECT_GEAR, obj.simId, new IntegerStruct { value = 1 });
+                                obj.gearForcedDown = true;
+                                obj.nextGearForceTime = main.ElapsedTime + 1.0;
+                            }
+                        }
+                        else
+                        {
+                            obj.gearForcedDown = false;
                         }
 #endif
 
@@ -1681,17 +1697,24 @@ namespace JoinFS
                             Vector deltaAngles = Vector.AnglesDelta(simPosition.angles, netPosition.angles);
 
 #if (FS2020 || FS2024)
-                            // Regime A: the sim's own ground-contact physics owns the vertical axis and
-                            // pitch/bank entirely. Hand both off - zero the vertical catch-up, and don't add
-                            // the pitch/bank components of the angular catch-up (a substitute with a longer
-                            // nose-to-CG moment arm than the original turns even a small forced-pitch mismatch
-                            // into a large gap at the nose gear - "nose gear lifted a bit"). JoinFS commands
-                            // horizontal position + heading only.
+                            // BUG FIX (post-26.5.1-hotfix regression): hard-zeroing deltaGeo.y here (as an
+                            // earlier version of this branch did) deletes the corrective error term itself,
+                            // not just the base extrapolated velocity - since JoinFS is the one authoritatively
+                            // commanding OBJECT_VELOCITY every tick, that froze the object at whatever altitude
+                            // it happened to be when the branch engaged (no other force was left to move it),
+                            // with only the then-3m hard-reset as an escape hatch - producing a sawtooth of
+                            // "drift up to just under the reset threshold, snap back, repeat" that read as a
+                            // constant ~3m-high float with heavy jitter. Restore the proven dead-band + reduced-
+                            // gain correction (same as the pre-regime baseline): the error term survives, just
+                            // damped, so the object actually converges onto the Fix 1b seed instead of freezing.
+                            // Regime A also hands pitch/bank to the sim (don't add those angular-catch-up
+                            // components - a substitute with a longer nose-to-CG moment arm than the original
+                            // turns even a small forced-pitch mismatch into a large gap at the nose gear).
                             // Regime B: hold the sender's altitude and full attitude - the object floats above
                             // absent local geometry purely by position control.
                             if (regimeA)
                             {
-                                deltaGeo.y = 0.0;
+                                deltaGeo.y = Math.Abs(deltaGeo.y) < 0.15 ? 0.0 : deltaGeo.y * 0.2;
                                 netVelocity.linear.y = 0.0;
                                 deltaAngles.x = 0.0;
                                 deltaAngles.z = 0.0;

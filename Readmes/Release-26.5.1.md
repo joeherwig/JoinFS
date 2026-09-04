@@ -8,7 +8,7 @@
 
 Three test-phase tunables were added (no Settings-dialog entry, matching the existing elevated-platform flags):
 
-- `-groundaltitudedeltalimit <m>` - vertical divergence tolerance before an on-ground substitute on ordinary ground is snapped back to its target (default `3.0`).
+- `-groundaltitudedeltalimit <m>` - vertical divergence tolerance before an on-ground substitute on ordinary ground is snapped back to its target (default `1.5`).
 - `-injectionretryseconds <s>` - delay before retrying an injection the simulator refused while still loading (default `10`).
 - `-tracediagnostics` - enables first-chance exception logging to `firstchance-<port>.txt` and the per-tick ground-placement trace in the Monitor window's Network category. Off by default.
 

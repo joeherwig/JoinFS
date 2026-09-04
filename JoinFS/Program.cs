@@ -126,8 +126,8 @@ namespace JoinFS
         public int settingsElevatedPlatformThreshold = 50; // cm
 
         // 26.5.1 hotfix test-phase tunables - command-line only, not persisted (see Release-26.5.1 notes)
-        /// <summary>Regime A on-ground vertical hard-reset tolerance in metres - see Sim.UpdateSimObjectVelocity. Vertical divergence on ordinary ground is expected now the sim owns that axis, so this is deliberately generous.</summary>
-        public double settingsGroundAltitudeDeltaLimit = 3.0;
+        /// <summary>Regime A on-ground vertical hard-reset tolerance in metres - see Sim.UpdateSimObjectVelocity. Matches the proven pre-regime baseline (1.5m): the continuous dead-band + reduced-gain correction handles ordinary convergence, so this only needs to catch a genuinely wrong/stuck placement.</summary>
+        public double settingsGroundAltitudeDeltaLimit = 1.5;
         /// <summary>Seconds between retries of an injection that MSFS rejected while still on the menu / loading - see Sim FAILED_RETRY.</summary>
         public double settingsInjectionRetrySeconds = 10.0;
         /// <summary>Enables FirstChanceException logging to firstchance-&lt;port&gt;.txt and the per-tick RawPos ground diagnostic. Off by default.</summary>
@@ -706,7 +706,7 @@ namespace JoinFS
                                 Console.WriteLine("  --websocketlog         Log WebSocket events and webhook calls (default false)");
                                 Console.WriteLine("  --elevatedplatformrecognition <true|false>       Confirm on-ground mismatches (any aircraft type) against local radar altitude instead of always trusting local terrain mesh (default true)");
                                 Console.WriteLine("  --elevatedplatformthreshold <cm>                 Minimum elevation mismatch before elevated platform recognition engages (default 50)");
-                                Console.WriteLine("  --groundaltitudedeltalimit <m>                   Regime A on-ground vertical hard-reset tolerance (default 3.0)");
+                                Console.WriteLine("  --groundaltitudedeltalimit <m>                   Regime A on-ground vertical hard-reset tolerance (default 1.5)");
                                 Console.WriteLine("  --injectionretryseconds <s>                      Delay before retrying an injection MSFS rejected while loading (default 10)");
                                 Console.WriteLine("  --tracediagnostics                               Enable first-chance exception logging and the per-tick ground-placement trace (default off)");
                                 Console.WriteLine("");
