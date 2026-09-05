@@ -846,6 +846,8 @@ namespace JoinFS
             public double nextRawDiagLogTime = 0.0;
             /// <summary>Throttle for the RawPosSend ground-placement trace in ProcessAircraftPosition, keyed by local simTime - kept separate from nextRawDiagLogTime because that one is keyed by the unrelated netTime clock; sharing one field let whichever trace ran first starve the other.</summary>
             public double nextRawPosSendDiagLogTime = 0.0;
+            /// <summary>Throttle for the VerticalCorrection ground-placement trace in UpdateSimObjectVelocity, keyed by main.ElapsedTime - kept separate from the other two RawPos*/VerticalCorrection throttles because each fires from a different clock/loop.</summary>
+            public double nextVerticalCorrectionDiagLogTime = 0.0;
             public Vector oldEuler;
             public double distance = double.MaxValue;
             public bool paused = false;
@@ -1778,7 +1780,9 @@ namespace JoinFS
                                 // its own attitude settle before JoinFS's vertical nudge engages at all (the
                                 // hard-reset safety net above is unaffected - only this gentle catch-up is
                                 // suppressed).
-                                if (main.ElapsedTime < obj.verticalCorrectionSuppressedUntil)
+                                bool verticalCorrectionSuppressed = main.ElapsedTime < obj.verticalCorrectionSuppressedUntil;
+                                double rawDeltaYForDiag = deltaGeo.y;
+                                if (verticalCorrectionSuppressed)
                                 {
                                     deltaGeo.y = 0.0;
                                 }
@@ -1794,6 +1798,18 @@ namespace JoinFS
                                         obj.verticalCorrectionActive = false;
                                     }
                                     deltaGeo.y = obj.verticalCorrectionActive ? deltaGeo.y * 0.2 : 0.0;
+                                }
+                                // diagnostic only - see the hop-up-and-float-down field reports. Reveals whether
+                                // verticalCorrectionActive is genuinely releasing (settling) or stuck permanently
+                                // engaged (never converging inside the 0.03m release threshold, so the correction
+                                // fights the sim's own settling forever instead of going quiet).
+                                if (main.settingsTraceDiagnostics && main.ElapsedTime >= obj.nextVerticalCorrectionDiagLogTime)
+                                {
+                                    obj.nextVerticalCorrectionDiagLogTime = main.ElapsedTime + 0.2;
+                                    main.MonitorNetwork("VerticalCorrection '" + (obj is Aircraft vcAircraft ? vcAircraft.flightPlan.callsign : obj.simId.ToString()) + "' model='" + obj.ModelTitle + "'" +
+                                        " suppressed=" + verticalCorrectionSuppressed + " active=" + obj.verticalCorrectionActive +
+                                        " rawDeltaY=" + rawDeltaYForDiag.ToString("F3") + "m appliedDeltaY=" + deltaGeo.y.ToString("F3") + "m" +
+                                        " elapsedTime=" + main.ElapsedTime.ToString("F1"));
                                 }
                                 netVelocity.linear.y = 0.0;
                                 deltaAngles.x = 0.0;
@@ -2321,11 +2337,39 @@ namespace JoinFS
                         // reported clearance makes this ~0 on ordinary ground and only large on a genuine raised
                         // platform. Falls back to the raw check for a pre-21008 peer that doesn't send its clearance.
                         double senderClearance = aircraftPosition.staticCgToGround * 0.3048;
-                        double senderStructureHeightCm = (double.IsNaN(senderClearance) ? senderHeight : senderHeight - senderClearance) * 100.0;
-                        bool senderIndicatesElevation = senderStructureHeightCm >= main.settingsElevatedPlatformThreshold;
+                        bool senderClearanceKnown = double.IsNaN(senderClearance) == false;
+                        double senderStructureHeightCm = (senderClearanceKnown ? senderHeight - senderClearance : senderHeight) * 100.0;
                         double releaseThreshold = main.settingsElevatedPlatformThreshold * 0.5;
 
-                        if (nearGround && senderIndicatesElevation && mismatchCm >= main.settingsElevatedPlatformThreshold)
+                        // BUG FIX (EDDW-rooftop field report): mismatchCm compares the LOCAL and SENDER
+                        // bare-terrain ("GROUND ALTITUDE") readings, which deliberately excludes scenery/
+                        // buildings on BOTH sides - so it stays near-zero even for a genuinely elevated
+                        // structure (a rooftop landable on the sender's install but not modelled at all on
+                        // the receiver's), because both installs are reading the same underlying bare
+                        // terrain regardless of whether either one has real collision geometry for the
+                        // building on top of it. Requiring mismatchCm >= threshold to engage - as this used
+                        // to do unconditionally - meant elevation-trust could never engage for exactly the
+                        // "structure missing on one side" case this feature exists for (observed: mismatch
+                        // 18cm against a 50cm threshold, despite the sender sitting 3.71m above bare
+                        // terrain). senderStructureHeightCm is already self-consistent and immune to that
+                        // cross-install noise (see the comment above) whenever the sender is a modern peer
+                        // that reports its own clearance - use it alone, with its own hysteresis band, in
+                        // that case. Only fall back to the weaker mismatchCm-based check (which needs the
+                        // corroborating cross-install signal, since raw senderHeight alone is satisfied by
+                        // essentially any grounded aircraft) for an older peer that doesn't send clearance.
+                        if (senderClearanceKnown)
+                        {
+                            if (nearGround && senderStructureHeightCm >= main.settingsElevatedPlatformThreshold)
+                            {
+                                trustPlatformElevation = true;
+                            }
+                            else if (nearGround == false || senderStructureHeightCm < releaseThreshold)
+                            {
+                                trustPlatformElevation = false;
+                            }
+                            // else: still near ground with a structure height inside the hysteresis band - keep the previous decision
+                        }
+                        else if (nearGround && mismatchCm >= main.settingsElevatedPlatformThreshold)
                         {
                             trustPlatformElevation = true;
                         }
@@ -2378,7 +2422,7 @@ namespace JoinFS
                     if (main.settingsTraceDiagnostics && netTime >= aircraft.nextRawDiagLogTime)
                     {
                         aircraft.nextRawDiagLogTime = netTime + 0.2;
-                        main.MonitorNetwork("RawPos '" + aircraft.flightPlan.callsign + "' rawGround=" + aircraftPosition.ground +
+                        main.MonitorNetwork("RawPos '" + aircraft.flightPlan.callsign + "' model='" + aircraft.ModelTitle + "' rawGround=" + aircraftPosition.ground +
                             " altitude=" + aircraftPosition.altitude.ToString("F1") + "m elevation=" + aircraftPosition.elevation.ToString("F1") + "m" +
                             " senderStaticCgToGround=" + (aircraftPosition.staticCgToGround * 0.3048).ToString("F2") + "m" +
                             " localElevation=" + aircraft.simPosition.elevation.ToString("F1") + "m" +
@@ -2416,8 +2460,10 @@ namespace JoinFS
                             ? targetAltitude
                             : aircraft.smoothedGroundAltitude + (targetAltitude - aircraft.smoothedGroundAltitude) * 0.15;
                         aircraftPosition.altitude = (float)aircraft.smoothedGroundAltitude;
-                        // the legacy correction path is not in use while in Regime A
+                        // neither legacy correction path is in use while in Regime A - see the
+                        // ElevationCorrection exclusion below for smoothedElevationOffset specifically.
                         aircraft.smoothedGroundClearanceCorrection = double.NaN;
+                        aircraft.smoothedElevationOffset = double.NaN;
                     }
                     else
                     {
@@ -2438,7 +2484,19 @@ namespace JoinFS
                     }
 
                     // check if correction is enabled and local height is valid
-                    if (Settings.Default.ElevationCorrection && aircraft.SimValid && trustPlatformElevation == false)
+                    // BUG FIX (never-settles / periodic-wobble field reports): this legacy per-model
+                    // clearance blend was only ever meant for the "Neither - airborne, or ground not
+                    // trusted" case (see the Regime A/B comment above) - trustPlatformElevation == false
+                    // alone doesn't exclude Regime A, since Regime A is defined as trustPlatformGround &&
+                    // trustPlatformElevation == false. That let this block run on every Regime A tick too,
+                    // stacking a second, independently-smoothed correction (smoothedElevationOffset) on top
+                    // of the altitude Regime A had just seeded from smoothedGroundAltitude - and since height
+                    // here is computed from the altitude this same block is about to modify, the two fed
+                    // back into each other and the sim's own per-model gear-contact settling, producing a
+                    // persistent hunting oscillation whose period varied by substitute instead of ever
+                    // converging. Regime A already owns ground placement entirely on its own - explicitly
+                    // exclude it here so this legacy path only runs where it was actually designed to.
+                    if (Settings.Default.ElevationCorrection && aircraft.SimValid && trustPlatformElevation == false && regimeA == false)
                     {
                         // calculate height
                         double height = aircraftPosition.altitude - aircraftPosition.elevation;
@@ -2743,7 +2801,7 @@ namespace JoinFS
                 if (main.settingsTraceDiagnostics && simTime >= aircraft.nextRawPosSendDiagLogTime)
                 {
                     aircraft.nextRawPosSendDiagLogTime = simTime + 0.2;
-                    main.MonitorNetwork("RawPosSend '" + aircraft.flightPlan.callsign + "' owner=" + aircraft.owner +
+                    main.MonitorNetwork("RawPosSend '" + aircraft.flightPlan.callsign + "' owner=" + aircraft.owner + " model='" + aircraft.ModelTitle + "'" +
                         " rawGround=" + aircraftPosition.ground + " altitude=" + aircraftPosition.altitude.ToString("F1") + "m" +
                         " elevation=" + aircraftPosition.elevation.ToString("F1") + "m" +
                         " ownStaticCgToGround=" + (aircraftPosition.staticCgToGround * 0.3048).ToString("F2") + "m" +

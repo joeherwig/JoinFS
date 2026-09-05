@@ -702,24 +702,31 @@ namespace JoinFS
 
         public void CreateObject(Sim.Obj obj)
         {
-            // Regime A ground spawn (sender on ordinary ground, not on an elevated platform): let the sim
-            // place the object on its own gear from the start instead of spawning it airborne and dropping
-            // it - a visible bounce on first appearance for a large substitute (see Fix 1e). A Regime B
-            // object (elevated platform / rig / ship deck) still spawns airborne at the sender's altitude
-            // and is held there by position control.
-            bool groundSpawn = obj.trustingPlatformGround && obj.trustingPlatformElevation == false;
-
-            // create sim position
+            // NOTE: this used to set OnGround=1 for a Regime A ground spawn (sender on ordinary ground,
+            // not on an elevated platform) so the sim would place the object on its own gear from the
+            // start, avoiding a visible drop/bounce for a large substitute on first appearance. Reverted:
+            // obj.trustingPlatformElevation can only ever be true once the object is SimValid - i.e. once
+            // it's already been created and polled locally at least once - which is structurally
+            // impossible at this point, since the object doesn't exist in the sim yet. So a helicopter's
+            // very first injection while it's already resting on an elevated platform (rooftop/helipad/
+            // ship deck) always looked like an ordinary ground spawn here, forcing OnGround=1 and letting
+            // the sim snap it onto LOCAL terrain far below - and once "on ground" in that sense, it could
+            // fail to lift back off even after elevation-trust correctly engaged a moment later (MSFS/
+            // FS2020 is known to "stick" an object once marked on-ground - see the FS2020 comment in
+            // UpdateSimObjectVelocity). Always spawning airborne (OnGround=0) is a minor regression for
+            // the ordinary-ground bounce case, but Regime A's own convergence (grace period + hysteresis
+            // in UpdateSimObjectVelocity) settles that quickly and correctly either way; silently breaking
+            // elevated-platform landings was not an acceptable trade-off for saving that.
             SIMCONNECT_DATA_INITPOSITION initPosition = new()
             {
                 Airspeed = 0,
                 Latitude = obj.netPosition.geo.z * (180.0 / Math.PI),
                 Longitude = obj.netPosition.geo.x * (180.0 / Math.PI),
                 Altitude = obj.netPosition.geo.y * Sim.FEET_PER_METRE,
-                Pitch = groundSpawn ? 0.0 : obj.netPosition.angles.x * (180.0 / Math.PI),
-                Bank = groundSpawn ? 0.0 : obj.netPosition.angles.z * (180.0 / Math.PI),
+                Pitch = obj.netPosition.angles.x * (180.0 / Math.PI),
+                Bank = obj.netPosition.angles.z * (180.0 / Math.PI),
                 Heading = obj.netPosition.angles.y * (180.0 / Math.PI),
-                OnGround = groundSpawn ? 1u : 0u
+                OnGround = 0
             };
 
             // Defer until SimConnect has actually sent OPEN. There's a window between simconnect != null
