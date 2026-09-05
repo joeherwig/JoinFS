@@ -1138,10 +1138,14 @@ namespace JoinFS
                         {
                             // allow substitution
                             Context_Aircraft_Substitute.Enabled = true;
-                            // allow explaining how the current model match was chosen
-                            Context_Aircraft_ExplainMatch.Enabled = aircraft.subModel != null && aircraft.subTrace != null;
-                            // enable flight plan
-                            Context_Aircraft_FlightPlan.Enabled = true;
+                            // allow explaining how the current model match was chosen - for the user's own
+                            // aircraft (which never goes through Match()/subTrace, only Masquerade()) this
+                            // runs the real scorer on demand as a diagnostic preview instead (see
+                            // Context_Aircraft_ExplainMatch_Click)
+                            Context_Aircraft_ExplainMatch.Enabled = (aircraft.subModel != null && aircraft.subTrace != null) || aircraft.owner == Sim.Obj.Owner.Me;
+                            // enable flight plan - not for remote aircraft, whose plans aren't locally
+                            // editable; opening it would otherwise silently fall back to showing your own
+                            Context_Aircraft_FlightPlan.Enabled = aircraft.owner != Sim.Obj.Owner.Network;
                             // enable variables
                             Context_Aircraft_Variables.Enabled = true;
 
@@ -1274,7 +1278,7 @@ namespace JoinFS
             }
         }
 
-        private void Context_Aircraft_ExplainMatch_Click(object sender, EventArgs e)
+        private async void Context_Aircraft_ExplainMatch_Click(object sender, EventArgs e)
         {
             Sim.Aircraft aircraft;
 
@@ -1284,8 +1288,26 @@ namespace JoinFS
                 aircraft = GetAircraft(GetSelectedItem());
             }
 
-            // check for a computed match to explain
-            if (aircraft != null && aircraft.subTrace != null)
+            if (aircraft == null)
+            {
+                return;
+            }
+
+            if (aircraft.owner == Sim.Obj.Owner.Me)
+            {
+                // the user's own aircraft never goes through Match()/subTrace for real (Masquerade() drives
+                // what's actually broadcast to peers) - run the real scorer on demand instead, purely as a
+                // diagnostic preview. Deliberately not held under main.conch across the await, matching
+                // SubstitutionForm's existing async-from-form-event-handler convention. Never touches
+                // aircraft.subModel/subType/subTrace, so it can't affect what peers actually see.
+#if FS2024
+                var (model, type, trace) = await main.substitution.Match(aircraft.ownerModel, aircraft.ownerLivery, aircraft.ownerIcaoType, aircraft.ownerIcaoAirline, aircraft.ownerClassCode, aircraft.ownerWtc, aircraft.ownerClassCodeConfirmed, aircraft.typerole, aircraft.flightPlan.registration);
+#else
+                var (model, type, trace) = await main.substitution.Match(aircraft.ownerModel, aircraft.ownerIcaoType, aircraft.ownerIcaoAirline, aircraft.ownerClassCode, aircraft.ownerWtc, aircraft.ownerClassCodeConfirmed, aircraft.typerole, aircraft.flightPlan.registration);
+#endif
+                new MatchExplainForm(main, aircraft, model, type, trace).ShowDialog();
+            }
+            else if (aircraft.subTrace != null)
             {
                 new MatchExplainForm(main, aircraft).ShowDialog();
             }
@@ -1449,7 +1471,7 @@ namespace JoinFS
                 if (targetAircraft != null)
                 {
                     // create flight plan form
-                    if (new FlightPlanForm(main, targetAircraft.flightPlan).ShowDialog() == DialogResult.OK)
+                    if (new FlightPlanForm(main, targetAircraft, targetAircraft.flightPlan).ShowDialog() == DialogResult.OK)
                     {
                         lock (main.conch)
                         {

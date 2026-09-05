@@ -16,20 +16,25 @@ namespace JoinFS
         public bool FocusSimBriefUsername { get; set; }
 
         Main main;
+        /// <summary>
+        /// Aircraft this flight plan belongs to, used by Button_Clear_Click to re-fetch the live
+        /// callsign (Sim.Aircraft.originalCallsign) - may be null (e.g. no user aircraft registered
+        /// yet), in which case Clear leaves the callsign field alone.
+        /// </summary>
+        readonly Sim.Aircraft aircraft;
 
         // fields SimBrief can supply that this dialog doesn't have a visible control for -
         // carried through to plan on OK so they still reach the network/EuroScope
         string pendingRegistration;
-        string pendingIcaoAirline;
         string pendingFlightNumber;
         string pendingAlternate;
-        string pendingAltitude;
 
-        public FlightPlanForm(Main main, Sim.FlightPlan plan)
+        public FlightPlanForm(Main main, Sim.Aircraft aircraft, Sim.FlightPlan plan)
         {
             InitializeComponent();
 
             this.main = main;
+            this.aircraft = aircraft;
             this.plan = plan;
 
             // change icon
@@ -45,11 +50,13 @@ namespace JoinFS
             Combo_Rules.Font = main.dataFont;
             Text_Route.Font = main.dataFont;
             Text_Remarks.Font = main.dataFont;
+            Text_Altitude.Font = main.dataFont;
             Text_SimBriefUsername.Font = main.dataFont;
 
             if (Settings.Default.ToolTips)
             {
                 ToolTip tip = new() { ShowAlways = true, IsBalloon = true, AutomaticDelay = 2000 };
+                tip.SetToolTip(Text_Altitude, Resources.Strings.FlightPlan_AltitudeTooltip);
                 tip.SetToolTip(Text_SimBriefUsername, Resources.Strings.FlightPlan_SimBriefUsernameTooltip);
                 tip.SetToolTip(Button_ImportSimBrief, Resources.Strings.FlightPlan_ImportSimBriefTooltip);
             }
@@ -75,13 +82,12 @@ namespace JoinFS
                 Combo_Rules.SelectedIndex = plan.rules == "IFR" ? 1 : 0;
                 Text_Route.Text = plan.route;
                 Text_Remarks.Text = plan.remarks;
+                Text_Altitude.Text = plan.altitude;
 
                 // carry through fields with no visible control, unchanged, unless an import replaces them
                 pendingRegistration = plan.registration;
-                pendingIcaoAirline = plan.icaoAirline;
                 pendingFlightNumber = plan.flightNumber;
                 pendingAlternate = plan.alternate;
-                pendingAltitude = plan.altitude;
             }
 
             Text_SimBriefUsername.Text = Settings.Default.SimBriefUsername;
@@ -111,14 +117,15 @@ namespace JoinFS
 
             Button_ImportSimBrief.Enabled = false;
             Label_SimBriefStatus.Text = "";
+            // the main-screen badge reflects the fetch *attempt*, regardless of whether the pilot
+            // goes on to commit it via OK - update it immediately, not just on OK
+            main.sim.simBriefFetchState = Sim.SimBriefFetchState.Fetching;
             try
             {
                 Sim.FlightPlan imported = new();
                 bool ok = await SimBrief.FetchAsync(username, imported, main);
 
-                // the main-screen badge reflects the last fetch *attempt*, regardless of whether
-                // the pilot goes on to commit it via OK - update it immediately, not just on OK
-                main.sim.simBriefLastFetchSucceeded = ok;
+                main.sim.simBriefFetchState = ok ? Sim.SimBriefFetchState.Success : Sim.SimBriefFetchState.Failed;
 
                 if (ok)
                 {
@@ -130,10 +137,10 @@ namespace JoinFS
                     Combo_Rules.SelectedIndex = imported.rules == "IFR" ? 1 : 0;
                     Text_Route.Text = imported.route;
                     Text_Remarks.Text = imported.remarks;
+                    Text_Altitude.Text = imported.altitude;
 
                     pendingRegistration = imported.registration;
                     pendingAlternate = imported.alternate;
-                    pendingAltitude = imported.altitude;
 
                     Label_SimBriefStatus.Text = string.Format(Resources.Strings.FlightPlan_Imported, imported.departure, imported.destination);
                 }
@@ -178,15 +185,30 @@ namespace JoinFS
 
         private void Button_Clear_Click(object sender, EventArgs e)
         {
-            // leaves callsign/type/rules alone (already sourced live from the sim) - only clears
-            // the route-plan fields, same ones a SimBrief import would otherwise fill in
+            // re-fetch callsign/type from the sim instead of leaving whatever's currently shown - both
+            // plan.callsign and plan.icaoType can be permanently stuck on a manually-typed or SimBrief-
+            // imported value once committed via OK (nothing in the sim-update path ever overwrites them
+            // again - see FlightPlan.callsignSetByUser and the "fill icaoType only when blank" pattern
+            // in Sim.cs). originalCallsign/originalIcaoType are the aircraft's own values as first
+            // reported by the sim for this object, kept separate from the editable plan fields for
+            // exactly this purpose.
+            if (aircraft != null)
+            {
+                Text_Callsign.Text = aircraft.originalCallsign;
+                Text_Type.Text = aircraft.originalIcaoType;
+            }
+            // clears the rest of the route-plan fields, same ones a SimBrief import would otherwise fill in
             Text_From.Text = "";
             Text_To.Text = "";
             Text_Route.Text = "";
             Text_Remarks.Text = "";
+            Text_Altitude.Text = "";
             pendingAlternate = "";
-            pendingAltitude = "";
             Label_SimBriefStatus.Text = "";
+            // the main-screen SimBrief button's color reflects the last fetch attempt - clearing the plan
+            // here should revert it back to neutral/default, as if no SimBrief fetch had happened yet,
+            // rather than continuing to show a stale success/failure from before the clear
+            main.sim.simBriefFetchState = Sim.SimBriefFetchState.NotTriggered;
         }
 
         private void Button_OK_Click(object sender, EventArgs e)
@@ -195,17 +217,26 @@ namespace JoinFS
             {
                 // return flight plan
                 plan.callsign = Text_Callsign.Text;
+                // explicitly set here (manual entry, or a SimBrief import pre-filled into this same
+                // textbox and committed via OK either way) - once true, SimConnect-derived defaults must
+                // never overwrite it again, see FlightPlan.callsignSetByUser
+                plan.callsignSetByUser = true;
+                // re-derive the ICAO airline from the (possibly just-changed) callsign - it's the only
+                // airline-relevant signal actually editable in this dialog (SimBrief never supplies
+                // icaoAirline), so a stale sim/livery-derived tag (e.g. from the sim's own aircraft-
+                // customization dialog) must not keep overriding what the user is now flying as. Empty
+                // when the new callsign doesn't look like a commercial flight (GA-style).
+                plan.icaoAirline = Sim.DeriveIcaoAirlineFromCallsign(plan.callsign);
                 plan.icaoType = Text_Type.Text;
                 plan.departure = Text_From.Text.Substring(0, Math.Min(4, Text_From.Text.Length)).ToUpperInvariant();
                 plan.destination = Text_To.Text.Substring(0, Math.Min(4, Text_To.Text.Length)).ToUpperInvariant();
                 plan.rules = Combo_Rules.Text;
                 plan.route = Text_Route.Text.Substring(0, Math.Min(Sim.FlightPlan.MAX_ROUTE, Text_Route.Text.Length));
                 plan.remarks = Text_Remarks.Text.Substring(0, Math.Min(Sim.FlightPlan.MAX_REMARKS, Text_Remarks.Text.Length));
+                plan.altitude = Text_Altitude.Text;
                 plan.registration = pendingRegistration;
-                plan.icaoAirline = pendingIcaoAirline;
                 plan.flightNumber = pendingFlightNumber;
                 plan.alternate = pendingAlternate;
-                plan.altitude = pendingAltitude;
             }
         }
     }

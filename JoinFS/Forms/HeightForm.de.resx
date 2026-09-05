@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -118,7 +118,7 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="Button_Cancel.Text" xml:space="preserve">
-    <value>Stornieren</value>
+    <value>Abbrechen</value>
   </data>
   <assembly alias="System.Drawing" name="System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" />
   <data name="label2.Size" type="System.Drawing.Size, System.Drawing">
@@ -357,5 +357,26 @@
   </data>
   <data name="$this.Text" xml:space="preserve">
     <value>JoinFS: Höhe Einstellen</value>
+  </data>
+  <data name="Button_OK.Text" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="Button_Off.Text" xml:space="preserve">
+    <value>Aus</value>
+  </data>
+  <data name="Button_Plus5.Text" xml:space="preserve">
+    <value>+ 5 cm</value>
+  </data>
+  <data name="Button_Plus50.Text" xml:space="preserve">
+    <value>+ 50 cm</value>
+  </data>
+  <data name="Button_Minus5.Text" xml:space="preserve">
+    <value>- 5 cm</value>
+  </data>
+  <data name="Button_Minus50.Text" xml:space="preserve">
+    <value>- 50 cm</value>
+  </data>
+  <data name="label1.Text" xml:space="preserve">
+    <value>Modell</value>
   </data>
 </root>

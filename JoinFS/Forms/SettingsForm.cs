@@ -148,6 +148,26 @@ namespace JoinFS
             Check_LowBandwidth.Visible = false;
 #endif
 
+            // position the SimBrief auto-import checkbox relative to the username row's actual resolved
+            // position rather than via the Designer .resx - each locale's SettingsForm.*.resx snapshots its
+            // own absolute Y positions for GroupBox_SimBrief and the button row below it, so a fixed Designer
+            // position would only be correct in whichever locale was last saved in the Designer. Grow the
+            // group box and shift the button row/form down by the same amount the checkbox needs, so nothing
+            // overlaps in any locale regardless of how wide the translated checkbox text is (width self-sizes
+            // via AutoSize; only extra height needs to be accounted for here).
+            Check_SimBriefAutoImport.Location = new System.Drawing.Point(
+                Label_SimBriefUsername.Location.X,
+                Text_SimBriefUsername.Location.Y + Text_SimBriefUsername.Height + 6);
+            int simBriefExtraHeight = (Check_SimBriefAutoImport.Location.Y + Check_SimBriefAutoImport.Height + 14) - GroupBox_SimBrief.Height;
+            if (simBriefExtraHeight > 0)
+            {
+                GroupBox_SimBrief.Height += simBriefExtraHeight;
+                Button_Reset.Location = new System.Drawing.Point(Button_Reset.Location.X, Button_Reset.Location.Y + simBriefExtraHeight);
+                Button_OK.Location = new System.Drawing.Point(Button_OK.Location.X, Button_OK.Location.Y + simBriefExtraHeight);
+                Button_Cancel.Location = new System.Drawing.Point(Button_Cancel.Location.X, Button_Cancel.Location.Y + simBriefExtraHeight);
+                ClientSize = new System.Drawing.Size(ClientSize.Width, ClientSize.Height + simBriefExtraHeight);
+            }
+
             if (main.settingsNoSim)
             {
                 GroupBox_Simulator.Visible = false;
@@ -211,6 +231,8 @@ namespace JoinFS
 
             // update simbrief username
             Settings.Default.SimBriefUsername = Text_SimBriefUsername.Text.Trim();
+            // update simbrief auto import
+            Settings.Default.SimBriefAutoImport = Check_SimBriefAutoImport.CheckState == CheckState.Checked;
 
             // update show nicknames enabled
             bool newShowNicknames = (Check_ShowNickname.CheckState == CheckState.Checked);
@@ -500,6 +522,8 @@ namespace JoinFS
             Text_Nickname.Text = Settings.Default.Nickname;
             // get simbrief username
             Text_SimBriefUsername.Text = Settings.Default.SimBriefUsername;
+            // get simbrief auto import
+            Check_SimBriefAutoImport.CheckState = Settings.Default.SimBriefAutoImport ? CheckState.Checked : CheckState.Unchecked;
             // get nickname
             Check_ShowNickname.CheckState = Settings.Default.ShowNicknames ? CheckState.Checked : CheckState.Unchecked;
             // get callsign

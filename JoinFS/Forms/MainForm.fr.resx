@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -504,5 +504,59 @@
         rEEAAKxBAACsQQAArEEAAKxBAACsQQAArEEAAKxBAACsQQAArEEAAKxBAACsQQAArEEAAKxBAACsQQAA
         rEE=
 </value>
+  </data>
+  <data name="Menu_File_AddressBook.Text" xml:space="preserve">
+    <value>Favoris</value>
+  </data>
+  <data name="Menu_File_Exit.Text" xml:space="preserve">
+    <value>Quitter</value>
+  </data>
+  <data name="Menu_File_Options.Text" xml:space="preserve">
+    <value>Options de Ligne de Commande</value>
+  </data>
+  <data name="Menu_File_Recorder.Text" xml:space="preserve">
+    <value>Enregistreur</value>
+  </data>
+  <data name="Menu_File_Settings.Text" xml:space="preserve">
+    <value>Réglages…</value>
+  </data>
+  <data name="Menu_File_Shortcuts.Text" xml:space="preserve">
+    <value>Raccourcis Clavier</value>
+  </data>
+  <data name="Menu_File_SimComX.Text" xml:space="preserve">
+    <value>SimCom X Voice Client…</value>
+  </data>
+  <data name="Menu_File_Variables.Text" xml:space="preserve">
+    <value>Assigner les Variables…</value>
+  </data>
+  <data name="Menu_Help_License.Text" xml:space="preserve">
+    <value>Licence</value>
+  </data>
+  <data name="Menu_Help_Manual.Text" xml:space="preserve">
+    <value>Manuel…</value>
+  </data>
+  <data name="Menu_Help_Radar.Text" xml:space="preserve">
+    <value>Radar ATC…</value>
+  </data>
+  <data name="Menu_Help_Support.Text" xml:space="preserve">
+    <value>Assistance…</value>
+  </data>
+  <data name="Menu_View_Aircraft.Text" xml:space="preserve">
+    <value>Appareil</value>
+  </data>
+  <data name="Menu_View_Atc.Text" xml:space="preserve">
+    <value>ATC Public</value>
+  </data>
+  <data name="Menu_View_Hubs.Text" xml:space="preserve">
+    <value>Concentrateurs</value>
+  </data>
+  <data name="Menu_View_Monitor.Text" xml:space="preserve">
+    <value>Diagnostique</value>
+  </data>
+  <data name="Menu_View_Objects.Text" xml:space="preserve">
+    <value>Objets</value>
+  </data>
+  <data name="Menu_View_Session.Text" xml:space="preserve">
+    <value>Session</value>
   </data>
 </root>

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -556,5 +556,8 @@
   </data>
   <data name="$this.Text" xml:space="preserve">
     <value>JoinFS: Aereo</value>
+  </data>
+  <data name="Context_Aircraft_ExplainMatch.Text" xml:space="preserve">
+    <value>Spiega Corrispondenza…</value>
   </data>
 </root>

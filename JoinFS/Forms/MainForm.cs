@@ -7,7 +7,6 @@ using System.Drawing;
 using System.IO;
 using System.Globalization;
 using JoinFS.Properties;
-using System.Net.Http;
 using System.Threading.Tasks;
 
 
@@ -224,41 +223,15 @@ namespace JoinFS
         /// <summary>
         /// For checking version
         /// </summary>
-        // WebClient versionWebClient = new WebClient(); // obsolete
-        HttpClient versionHttpClient = new();
         string latestVersion = null;
 
         /// <summary>
-        /// Fetch latest version async (replaces WebClient)
+        /// Fetch latest version async (via the jsDelivr CDN, with fork fallback)
         /// </summary>
         private async Task FetchLatestVersionAsync()
         {
-            try
-            {
-                string url;
-                if (Settings.Default.EarlyUpdate)
-                {
-                    url = "https://raw.githubusercontent.com/tuduce/JoinFS/refs/heads/main/JoinFS/util/version.txt";
-                }
-                else
-                {
-                    url = "https://raw.githubusercontent.com/tuduce/JoinFS/refs/heads/main/JoinFS/util/version.txt";
-                }
-                var result = await versionHttpClient.GetStringAsync(url);
-                if (!string.IsNullOrEmpty(result) && result[0] != '<')
-                {
-                    latestVersion = result;
-                }
-                else
-                {
-                    latestVersion = "";
-                }
-            }
-            catch (Exception ex)
-            {
-                main.MonitorEvent(ex.Message);
-                latestVersion = "";
-            }
+            string result = await GitHubData.GetTextAsync("JoinFS/util/version.txt", s => main?.MonitorEvent(s));
+            latestVersion = !string.IsNullOrEmpty(result) && result[0] != '<' ? result : "";
         }
 
 #region Shortcuts
@@ -725,10 +698,11 @@ namespace JoinFS
 
                     // fetch the flight plan right away instead of waiting for the next app
                     // restart's opportunistic check (Program.cs) or a manual button click -
-                    // that check already ran before this username existed, so without this
-                    // the SimBrief button would sit on its default "not fetched yet" (red X)
-                    // state until the user notices and clicks it themselves
-                    if (initialSetupForm.simBriefUsername.Length > 0)
+                    // that check already ran before this username existed. Still gated on
+                    // auto-import: with it off, the button stays in its default (not yet
+                    // triggered) state until the user clicks it themselves, same as any other
+                    // session.
+                    if (Settings.Default.SimBriefAutoImport && initialSetupForm.simBriefUsername.Length > 0)
                     {
                         _ = main.sim.RefreshUserFlightPlanFromSimBriefAsync();
                     }
@@ -752,15 +726,9 @@ namespace JoinFS
                 // reset flag
                 main.scheduleFlightPlan = false;
                 // file flight plan
-                if (new FlightPlanForm(main, main.sim.userFlightPlan).ShowDialog() == DialogResult.OK)
+                if (new FlightPlanForm(main, main.sim.userAircraft, main.sim.userFlightPlan).ShowDialog() == DialogResult.OK)
                 {
-                    // check for user aircraft
-                    if (main.sim.userAircraft != null)
-                    {
-                        // update version
-                        main.sim.userAircraft.flightPlanVersion++;
-                        if (main.sim.userAircraft.flightPlanVersion == 0) main.sim.userAircraft.flightPlanVersion = 1;
-                    }
+                    CommitUserFlightPlanChange();
                 }
             }
 
@@ -1564,7 +1532,7 @@ namespace JoinFS
             Sim.FlightPlan plan = main.sim.userFlightPlan;
             bool hasPlan = plan.departure.Length > 0 || plan.destination.Length > 0;
 
-            Button_FlightPlan.Text = hasPlan ? plan.departure + "   ➜   " + plan.destination : "Flight plan";
+            Button_FlightPlan.Text = hasPlan ? plan.departure + "   ➜   " + plan.destination : Resources.Strings.MainForm_FlightPlanButtonDefaultText;
 
             if (Settings.Default.ToolTips)
             {
@@ -1578,15 +1546,35 @@ namespace JoinFS
                 }
                 else
                 {
-                    tooltip = "Click to create your flight plan, if you'd like to have one assigned.";
+                    tooltip = Resources.Strings.MainForm_FlightPlanButtonTooltipNoPlan;
                 }
                 flightPlanTip.SetToolTip(Button_FlightPlan, tooltip);
             }
 
-            // SimBrief button - green/red (Active/Inactive) coloring, same scheme as Button_Simulator/Button_Network
-            bool ok = main.sim.simBriefLastFetchSucceeded;
-            Color simBriefBackColor = ok ? Settings.Default.ColourActiveBackground : Settings.Default.ColourInactiveBackground;
-            Color simBriefForeColor = ok ? Settings.Default.ColourActiveText : Settings.Default.ColourInactiveText;
+            // SimBrief button coloring: neutral/default (matches Button_FlightPlan's plain look) until a
+            // fetch has actually been triggered (auto-import or a manual click), so an idle button - e.g.
+            // auto-import off and nothing clicked yet - doesn't read as a failure. Once triggered: Waiting/
+            // orange while fetching, Active/green on success, Inactive/red if no plan could be fetched -
+            // same three-state palette as Button_Simulator/Button_Network.
+            bool simBriefNeutral = main.sim.simBriefFetchState == Sim.SimBriefFetchState.NotTriggered;
+            if (Button_SimBrief.UseVisualStyleBackColor != simBriefNeutral)
+            {
+                Button_SimBrief.UseVisualStyleBackColor = simBriefNeutral;
+            }
+            Color simBriefBackColor = main.sim.simBriefFetchState switch
+            {
+                Sim.SimBriefFetchState.Fetching => Settings.Default.ColourWaitingBackground,
+                Sim.SimBriefFetchState.Success => Settings.Default.ColourActiveBackground,
+                Sim.SimBriefFetchState.Failed => Settings.Default.ColourInactiveBackground,
+                _ => SystemColors.Control,
+            };
+            Color simBriefForeColor = main.sim.simBriefFetchState switch
+            {
+                Sim.SimBriefFetchState.Fetching => Settings.Default.ColourWaitingText,
+                Sim.SimBriefFetchState.Success => Settings.Default.ColourActiveText,
+                Sim.SimBriefFetchState.Failed => Settings.Default.ColourInactiveText,
+                _ => SystemColors.ControlText,
+            };
             if (Button_SimBrief.BackColor != simBriefBackColor)
             {
                 Button_SimBrief.BackColor = simBriefBackColor;
@@ -1618,6 +1606,12 @@ namespace JoinFS
                 if (main.sim.userAircraft.flightPlanVersion == 0) main.sim.userAircraft.flightPlanVersion = 1;
             }
             RefreshFlightPlanButtons();
+            // AircraftForm's grid reads flightPlan.callsign live but only redraws when its own refresher
+            // fires - unlike opening FlightPlanForm from AircraftForm's own context menu (which calls
+            // RefreshWindow() directly), this main-screen commit path never notified it, so the grid kept
+            // showing whatever callsign was there before this edit until some unrelated event happened to
+            // trigger a refresh - looking stale/mismatched against a freshly-opened FlightPlanForm.
+            main.aircraftForm.refresher.Schedule();
         }
 
         void BroadcastUserFlightPlanNow()
@@ -1636,7 +1630,7 @@ namespace JoinFS
                 return;
             }
 
-            if (new FlightPlanForm(main, main.sim.userFlightPlan).ShowDialog() == DialogResult.OK)
+            if (new FlightPlanForm(main, main.sim.userAircraft, main.sim.userFlightPlan).ShowDialog() == DialogResult.OK)
             {
                 CommitUserFlightPlanChange();
             }
@@ -1652,7 +1646,7 @@ namespace JoinFS
             if (string.IsNullOrWhiteSpace(Settings.Default.SimBriefUsername))
             {
                 // nothing configured yet - land the pilot on the field where they'd set it
-                if (new FlightPlanForm(main, main.sim.userFlightPlan) { FocusSimBriefUsername = true }.ShowDialog() == DialogResult.OK)
+                if (new FlightPlanForm(main, main.sim.userAircraft, main.sim.userFlightPlan) { FocusSimBriefUsername = true }.ShowDialog() == DialogResult.OK)
                 {
                     CommitUserFlightPlanChange();
                 }
