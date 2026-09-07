@@ -3598,9 +3598,33 @@ namespace JoinFS
 #region Streaming
 
         /// <summary>
-        /// Current data version
+        /// Current data version - the format version of the P2P network stream and the
+        /// recording (.jfs) file. This is INDEPENDENT of XPlane.DATA_VERSION (the JoinFS
+        /// &lt;-&gt; X-Plane-plugin IPC protocol counter); the two just happen to live in the
+        /// same integer range for historical reasons. Never compare them, and never pass
+        /// one where the other is expected - see XPLANE_POSITION_BLOB_VERSION below.
         /// </summary>
-        public const short VERSION = 21008;
+        public const short VERSION = 21009;
+
+        /// <summary>
+        /// From this version on, every AircraftPosition / ObjectPositionVelocity blob written
+        /// to the network or a .jfs file is preceded by a ushort byte-length. A reader that
+        /// doesn't understand a field added later simply skips to the end of the blob instead
+        /// of desyncing the rest of the stream. (Legacy readers &lt; this version read the raw
+        /// body as before.)
+        /// </summary>
+        public const short POSITION_BLOB_LENGTH_PREFIXED = 21009;
+
+        /// <summary>
+        /// The frozen AircraftPosition byte layout that the native X-Plane plugin speaks
+        /// (JoinFS-XP/Link.h, struct AircraftPositionMsg): position + controls + elevation +
+        /// ground flag, and nothing after it. The X-Plane IPC read/write sites in XPlane.cs
+        /// pin Sim.Read / Sim.Write to this value instead of the plugin's DATA_VERSION, so a
+        /// future Sim.VERSION field can never make them over-read a packet the plugin never
+        /// grew. Value is "&gt;= 10023 (elevation + flags) but &lt; 21008 (no staticCgToGround),
+        /// and &lt; POSITION_BLOB_LENGTH_PREFIXED (no length prefix)".
+        /// </summary>
+        public const short XPLANE_POSITION_BLOB_VERSION = 21007;
 
         /// <summary>
         /// Method for reading specific data versions
@@ -3672,11 +3696,89 @@ namespace JoinFS
         }
 
         /// <summary>
+        /// Write a length-prefixed position blob. From POSITION_BLOB_LENGTH_PREFIXED on, the
+        /// body is preceded by a ushort byte-count so a reader can skip a field it doesn't
+        /// know; older versions write the raw body. See Sim.VERSION doc comment.
+        /// </summary>
+        static void WriteLengthPrefixed(BinaryWriter writer, short version, Action<BinaryWriter> writeBody)
+        {
+            if (version < POSITION_BLOB_LENGTH_PREFIXED)
+            {
+                writeBody(writer);
+            }
+            else if (writer.BaseStream.CanSeek)
+            {
+                long lengthPos = writer.BaseStream.Position;
+                writer.Write((ushort)0);
+                long bodyStart = writer.BaseStream.Position;
+                writeBody(writer);
+                long bodyEnd = writer.BaseStream.Position;
+                writer.BaseStream.Position = lengthPos;
+                writer.Write((ushort)(bodyEnd - bodyStart));
+                writer.BaseStream.Position = bodyEnd;
+            }
+            else
+            {
+                // non-seekable target: buffer the body so the ushort length is still correct
+                using MemoryStream buffer = new();
+                using (BinaryWriter bufferWriter = new(buffer, System.Text.Encoding.UTF8, leaveOpen: true))
+                {
+                    writeBody(bufferWriter);
+                }
+                writer.Write((ushort)buffer.Length);
+                buffer.Position = 0;
+                buffer.CopyTo(writer.BaseStream);
+            }
+        }
+
+        /// <summary>
+        /// Read a length-prefixed position blob written by WriteLengthPrefixed. The stored
+        /// length is authoritative: after the body reader runs, the stream is repositioned to
+        /// exactly the end of the blob, so an unknown trailing field (or a short read) can't
+        /// desync whatever follows.
+        /// </summary>
+        static void ReadLengthPrefixed(short version, BinaryReader reader, Action<BinaryReader> readBody)
+        {
+            if (version < POSITION_BLOB_LENGTH_PREFIXED)
+            {
+                readBody(reader);
+            }
+            else if (reader.BaseStream.CanSeek)
+            {
+                ushort length = reader.ReadUInt16();
+                long bodyStart = reader.BaseStream.Position;
+                try { readBody(reader); }
+                catch (EndOfStreamException) { /* length prefix is authoritative - reposition below */ }
+                reader.BaseStream.Position = bodyStart + length;
+            }
+            else
+            {
+                // non-seekable source: pull the exact blob into a buffer and parse from there
+                ushort length = reader.ReadUInt16();
+                byte[] body = reader.ReadBytes(length);
+                using MemoryStream buffer = new(body);
+                using BinaryReader bufferReader = new(buffer);
+                try { readBody(bufferReader); }
+                catch (EndOfStreamException) { /* unknown/short body - ignore, buffer already consumed */ }
+            }
+        }
+
+        /// <summary>
         /// Write position/velocity to a stream
         /// </summary>
         /// <param name="writer">Binary writer</param>
-        /// <param name="simPositionVelocity">Position and Velocity</param>
-        public static void Write(BinaryWriter writer, ref ObjectPositionVelocity positionVelocity)
+        /// <param name="version">Stream/file format version (Sim.VERSION, or a pinned blob version)</param>
+        /// <param name="positionVelocity">Position and Velocity</param>
+        public static void Write(BinaryWriter writer, short version, ref ObjectPositionVelocity positionVelocity)
+        {
+            ObjectPositionVelocity pv = positionVelocity;
+            WriteLengthPrefixed(writer, version, w => WriteObjectPositionVelocityBody(w, ref pv));
+        }
+
+        /// <summary>
+        /// Write position/velocity body (no length prefix)
+        /// </summary>
+        static void WriteObjectPositionVelocityBody(BinaryWriter writer, ref ObjectPositionVelocity positionVelocity)
         {
             // add position
             writer.Write(positionVelocity.latitude);
@@ -3748,15 +3850,27 @@ namespace JoinFS
         /// <param name="reader">Reader</param>
         public static void Read(short version, BinaryReader reader, ref ObjectPositionVelocity positionVelocity)
         {
-            Read<ObjectPositionVelocity>(version, positionVelocityVersions, reader, ref positionVelocity);
+            ObjectPositionVelocity pv = positionVelocity;
+            ReadLengthPrefixed(version, reader, r => Read<ObjectPositionVelocity>(version, positionVelocityVersions, r, ref pv));
+            positionVelocity = pv;
         }
 
         /// <summary>
         /// Write aircraft position/velocity to a stream
         /// </summary>
         /// <param name="writer">Binary writer</param>
-        /// <param name="simPositionVelocity">Position and Velocity</param>
-        public static void Write(BinaryWriter writer, ref AircraftPosition aircraftPosition)
+        /// <param name="version">Stream/file format version (Sim.VERSION, or a pinned blob version)</param>
+        /// <param name="aircraftPosition">Position and Velocity</param>
+        public static void Write(BinaryWriter writer, short version, ref AircraftPosition aircraftPosition)
+        {
+            AircraftPosition ap = aircraftPosition;
+            WriteLengthPrefixed(writer, version, w => WriteAircraftPositionBody(w, version, ref ap));
+        }
+
+        /// <summary>
+        /// Write aircraft position/velocity body (no length prefix)
+        /// </summary>
+        static void WriteAircraftPositionBody(BinaryWriter writer, short version, ref AircraftPosition aircraftPosition)
         {
             // add position
             writer.Write(aircraftPosition.latitude);
@@ -3790,10 +3904,14 @@ namespace JoinFS
             writer.Write(flags);
             // "STATIC CG TO GROUND", feet - the sender's own real ground clearance, used by the receiver to
             // ground a substitute model using its own clearance instead of the sender's (see
-            // helicopters-on-elevated-platforms feature / ground-jitter-on-model-mismatch fix). Always
-            // written; older readers (version < 21008) simply don't read it, matching the elevation/flags
-            // fields' existing pattern above.
-            writer.Write(aircraftPosition.staticCgToGround);
+            // helicopters-on-elevated-platforms feature / ground-jitter-on-model-mismatch fix). Gated on
+            // version >= 21008 to mirror ReadAircraftPosition1: the X-Plane IPC path pins to
+            // XPLANE_POSITION_BLOB_VERSION (21007) and must NOT emit this field, because the native
+            // plugin's AircraftPositionMsg has no slot for it.
+            if (version >= 21008)
+            {
+                writer.Write(aircraftPosition.staticCgToGround);
+            }
         }
 
         /// <summary>
@@ -3851,7 +3969,9 @@ namespace JoinFS
         /// <param name="reader">Reader</param>
         public static void Read(short version, BinaryReader reader, ref AircraftPosition aircraftPosition)
         {
-            Read<AircraftPosition>(version, aircraftPositionVersions, reader, ref aircraftPosition);
+            AircraftPosition ap = aircraftPosition;
+            ReadLengthPrefixed(version, reader, r => Read<AircraftPosition>(version, aircraftPositionVersions, r, ref ap));
+            aircraftPosition = ap;
         }
 
         /// <summary>

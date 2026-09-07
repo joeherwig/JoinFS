@@ -1,17 +1,29 @@
+## ⚠️ Compatibility — read before upgrading
+
+The P2P network protocol and the recording (`.jfs`) file format changed in the 26.5.1 / 26.6 line.
+
+- Every peer in a session, **and the hub / console you connect through**, must run this version or newer. Mixing with 26.5.0 or older can silently corrupt other aircraft's positions instead of failing cleanly - update everything together.
+- `.jfs` recordings saved by this version will **not** load in 26.5.0 or older. Older recordings still load here.
+- Position records are now length-prefixed / self-describing, so future format additions load (unknown fields skipped) instead of throwing "Unable to read beyond the end of the stream".
+
 ## New Features
 
-- **The Flight Plan dialog's Clear button now re-fetches your callsign and aircraft type from the sim**, instead of leaving whatever was last shown (which could be a stale manually-typed or SimBrief-imported value with no relation to what's actually loaded).
-- **Callsign/type now auto-refresh when you change aircraft mid-session, and SimBrief auto-import re-runs if autoimport is enabled** Previously, swapping to a different aircraft after landing a leg left JoinFS still broadcasting the previous aircraft's callsign and type indefinitely - since other pilots' clients key livery matching off your callsign, a stale one caused wrong-livery matches for everyone else on the network, not just a local display issue. JoinFS now detects a real change (a different aircraft type, or a different registration/callsign - even on the same airframe) and automatically re-derives your callsign/type from the sim, resetting to auto-tracking even if you'd manually edited it for the previous leg. If SimBrief auto-import is enabled, a fresh SimBrief fetch is triggered too, the same way it already happens once at JoinFS startup. See the [Flight Plan and SimBrief](https://github.com/tuduce/JoinFS/wiki/Flight-Plan-and-SimBrief) wiki page for a recommended workflow when flying consecutive legs with SimBrief.
+- **Flight Plan "Clear" now re-fetches your callsign and aircraft type from the sim** instead of leaving a stale manual/SimBrief value.
+- **Callsign and type auto-refresh when you change aircraft mid-session**; SimBrief auto-import re-runs if enabled. Prevents JoinFS broadcasting a previous leg's callsign, which caused wrong-livery matches for everyone else. See the [Flight Plan and SimBrief](https://github.com/tuduce/JoinFS/wiki/Flight-Plan-and-SimBrief) wiki page.
+- **New command-line tunables** (no Settings entry): `-groundaltitudedeltalimit <m>` (on-ground snap-back tolerance, default 1.5), `-injectionretryseconds <s>` (retry delay for injections the sim refused, default 10), `-tracediagnostics` (first-chance exception + ground-placement tracing, off by default).
 
 ## Bug Fixes
 
-- **Substitute aircraft are now grounded using their own real clearance, not the sender's.** JoinFS now reads each aircraft's own live `STATIC CG TO GROUND` and, whenever the sender reports on-ground, corrects the local substitute's altitude by the difference between its own clearance and the sender's - so it sits correctly on the ground no matter how differently sized the substitute is from the original aircraft. Strictly gated on the sender's own reported on-ground state, so a flying aircraft is never pulled toward a ground-relative correction, and smoothed rather than snapped so a flickering on-ground flag doesn't itself introduce a visible pop. applied that correction to recorded/played-back injected aircraft as well.
-- **Fixed a SimConnect request-ID collision that could momentarily apply one aircraft's ground-clearance reading to a different aircraft.** Every locally-polled object shared a single request ID for its periodic position/geometry poll, which SimConnect could occasionally cross-match between concurrent requests. Each polled object now gets its own persistent request ID. 
-- **Fixed jitter right after a substitute is spawned.** The sender's raw on-ground flag can flicker for a moment while a newly-injected object's physics is still settling onto the ground; each flicker re-targeted the ground-clearance correction above and produced a short but visible jitter until the flag settled. The flag now has to hold its value for 0.3s before it's trusted.
-- **Fixed persistent jitter on some substitutes (several FSLTL models, among others) that previously needed a large manual height adjustment (50cm+) to work around.** Injected aircraft are normally moved by nudging their velocity, letting the sim's own gear/suspension physics carry them smoothly - but once an object was on the ground, any altitude gap over just 20cm between JoinFS's computed placement and where the object's own physics had already settled it forced a hard position reset, which the sim's gear physics then fought every time, producing jitter. That tolerance is now 1.5m, comfortably absorbing realistic per-model ground-clearance imprecision instead of fighting it.
-- **Fixed `ATC FLIGHT NUMBER`-based callsign synthesis misfiring on an ordinary flight number with a trailing letter suffix** (e.g. a real Eurowings flight reporting `34U`). The "is this field already a complete pre-existing callsign" check treated any non-purely-numeric flight number as already complete and used it bare, instead of combining it with the ICAO airline into a real callsign (`EWG34U`). Now uses the same callsign-shape check already used elsewhere in JoinFS to tell an already-complete callsign apart from a normal flight number.
-- **Fixed aircraft title submatch not taken into account (all words with minimum 3 chars are treated as relevant now)
-- **Fixed raw.githubusercontent.com returning HTTP 404** blocking the public hub list from being populated. Put JSdeliver CDN inbetween and added fork as fallback.
+- **X-Plane: remote aircraft render again.** The shared position record was read with the X-Plane plugin link's protocol version, which crossed the version gate of a new MSFS-only ground field, so every packet failed with "Unable to read beyond the end of the stream". The X-Plane path is now pinned to the exact byte layout the native plugin speaks, and the position record was made length-prefixed so this can't recur.
+- **Substitute aircraft are grounded using their own real `STATIC CG TO GROUND`, not the sender's**, so a substitute of any size sits correctly on the ground. Two on-ground regimes: ordinary ground hands the vertical axis to the sim's gear physics (JoinFS only commands horizontal position + heading); a genuine raised structure (helipad, deck, rig, rooftop) holds the sender's reported altitude and attitude. Retractable gear is forced down whenever the sender is on the ground. Applies to live and recorded/played-back injected aircraft.
+- **FS2020/FS2024: traffic appears without toggling the sim connection.** Injections attempted while MSFS was still loading were marked permanently failed; they now retry on a backoff and re-arm on a fresh connection or SimStart.
+- **Crashes to desktop now leave `crash-<port>.txt`** with a full stack trace. The work thread is guarded so a single error is logged and JoinFS keeps running; a storm escalates to a clean shutdown. Startup prompts once if a crash file from a previous run is waiting.
+- **Fixed a SimConnect request-ID collision** that could apply one aircraft's ground-clearance reading to another; each polled object now has its own persistent request ID.
+- **Fixed jitter right after a substitute spawns** - the sender's on-ground flag must now hold for 0.3 s before it is trusted.
+- **Fixed persistent jitter on some substitutes** (several FSLTL models) that previously needed a 50 cm+ manual height tweak: the on-ground hard-reset tolerance is now 1.5 m instead of 20 cm, so it stops fighting the sim's gear physics.
+- **Fixed `ATC FLIGHT NUMBER` callsign synthesis** misfiring on a numeric flight number with a trailing letter (e.g. `34U` → now `EWG34U` instead of bare `34U`).
+- **Improved title-based model matching** - all words of 3+ characters are now treated as relevant for submatches.
+- **Fixed the public hub list failing to populate** when `raw.githubusercontent.com` returned HTTP 404 - routed through the jsDelivr CDN with a fork fallback.
 
 ## Limitations
 
@@ -19,6 +31,7 @@ The `FSX` and `P3D` variants are built for the x86 (32bit) architecture. Since t
 
 ## Known Issues
 
+- A genuinely crooked platform that exists on neither your nor the sender's scenery cannot be reproduced. A very shallow platform may not be recognised as elevated and would settle slightly low; the manual height override in the Aircraft window remains available.
 - Some XPLANE models appear incomplete (when the model has a space in the filenames of the model data).
 - When moving the timeline of a recording in XPLANE, the recorded aircraft disappears.
 - When in XPLANE an aircraft model is substituted, the new model is displayed in the center of gravity of the original model. If the replacement model is smaller than the original model, it may appear to be floating in the air. If the replacement model is larger than the original model, it may appear to be embedded in the ground.
