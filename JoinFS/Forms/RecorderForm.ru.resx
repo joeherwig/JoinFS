@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -384,5 +384,17 @@
   </data>
   <data name="$this.Text" xml:space="preserve">
     <value>JoinFS: Рекордер</value>
+  </data>
+  <data name="Check_Loop.Text" xml:space="preserve">
+    <value>Цикл</value>
+  </data>
+  <data name="RecorderMenu_File_OpenRecording.Text" xml:space="preserve">
+    <value>Открыть запись…</value>
+  </data>
+  <data name="RecorderMenu_File_AddRecording.Text" xml:space="preserve">
+    <value>Добавить запись…</value>
+  </data>
+  <data name="RecorderMenu_File_SaveRecording.Text" xml:space="preserve">
+    <value>Сохранить запись…</value>
   </data>
 </root>

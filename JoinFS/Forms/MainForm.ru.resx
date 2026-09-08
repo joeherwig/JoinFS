@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -462,5 +462,59 @@
         rEEAAKxBAACsQQAArEEAAKxBAACsQQAArEEAAKxBAACsQQAArEEAAKxBAACsQQAArEEAAKxBAACsQQAA
         rEE=
 </value>
+  </data>
+  <data name="Menu_File_AddressBook.Text" xml:space="preserve">
+    <value>Адресная книга</value>
+  </data>
+  <data name="Menu_File_Exit.Text" xml:space="preserve">
+    <value>Выход</value>
+  </data>
+  <data name="Menu_File_Options.Text" xml:space="preserve">
+    <value>Параметры командной строки</value>
+  </data>
+  <data name="Menu_File_Recorder.Text" xml:space="preserve">
+    <value>Рекордер</value>
+  </data>
+  <data name="Menu_File_Settings.Text" xml:space="preserve">
+    <value>Настройки…</value>
+  </data>
+  <data name="Menu_File_Shortcuts.Text" xml:space="preserve">
+    <value>Горячие клавиши</value>
+  </data>
+  <data name="Menu_File_SimComX.Text" xml:space="preserve">
+    <value>SimCom X Voice Client…</value>
+  </data>
+  <data name="Menu_File_Variables.Text" xml:space="preserve">
+    <value>Назначить переменные…</value>
+  </data>
+  <data name="Menu_Help_License.Text" xml:space="preserve">
+    <value>Лицензия</value>
+  </data>
+  <data name="Menu_Help_Manual.Text" xml:space="preserve">
+    <value>Руководство…</value>
+  </data>
+  <data name="Menu_Help_Radar.Text" xml:space="preserve">
+    <value>ATC Радар…</value>
+  </data>
+  <data name="Menu_Help_Support.Text" xml:space="preserve">
+    <value>Поддержка…</value>
+  </data>
+  <data name="Menu_View_Aircraft.Text" xml:space="preserve">
+    <value>Самолет</value>
+  </data>
+  <data name="Menu_View_Atc.Text" xml:space="preserve">
+    <value>Общественные ATC</value>
+  </data>
+  <data name="Menu_View_Hubs.Text" xml:space="preserve">
+    <value>Публичные хабы</value>
+  </data>
+  <data name="Menu_View_Monitor.Text" xml:space="preserve">
+    <value>Монитор</value>
+  </data>
+  <data name="Menu_View_Objects.Text" xml:space="preserve">
+    <value>Объекты</value>
+  </data>
+  <data name="Menu_View_Session.Text" xml:space="preserve">
+    <value>Сессия</value>
   </data>
 </root>

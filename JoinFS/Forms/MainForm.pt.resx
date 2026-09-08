@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -462,5 +462,59 @@
         rEEAAKxBAACsQQAArEEAAKxBAACsQQAArEEAAKxBAACsQQAArEEAAKxBAACsQQAArEEAAKxBAACsQQAA
         rEE=
 </value>
+  </data>
+  <data name="Menu_File_AddressBook.Text" xml:space="preserve">
+    <value>Livro de Endereços</value>
+  </data>
+  <data name="Menu_File_Exit.Text" xml:space="preserve">
+    <value>Sair</value>
+  </data>
+  <data name="Menu_File_Options.Text" xml:space="preserve">
+    <value>Opções de Linha de Comando</value>
+  </data>
+  <data name="Menu_File_Recorder.Text" xml:space="preserve">
+    <value>Gravador</value>
+  </data>
+  <data name="Menu_File_Settings.Text" xml:space="preserve">
+    <value>Configurações…</value>
+  </data>
+  <data name="Menu_File_Shortcuts.Text" xml:space="preserve">
+    <value>Atalhos de Teclado</value>
+  </data>
+  <data name="Menu_File_SimComX.Text" xml:space="preserve">
+    <value>SimCom X Voice Client…</value>
+  </data>
+  <data name="Menu_File_Variables.Text" xml:space="preserve">
+    <value>Atribuir Variáveis…</value>
+  </data>
+  <data name="Menu_Help_License.Text" xml:space="preserve">
+    <value>Licença</value>
+  </data>
+  <data name="Menu_Help_Manual.Text" xml:space="preserve">
+    <value>Manual…</value>
+  </data>
+  <data name="Menu_Help_Radar.Text" xml:space="preserve">
+    <value>Radar ATC…</value>
+  </data>
+  <data name="Menu_Help_Support.Text" xml:space="preserve">
+    <value>Suporte…</value>
+  </data>
+  <data name="Menu_View_Aircraft.Text" xml:space="preserve">
+    <value>Aeronave</value>
+  </data>
+  <data name="Menu_View_Atc.Text" xml:space="preserve">
+    <value>ATC Público</value>
+  </data>
+  <data name="Menu_View_Hubs.Text" xml:space="preserve">
+    <value>Hubs Públicos</value>
+  </data>
+  <data name="Menu_View_Monitor.Text" xml:space="preserve">
+    <value>Monitor</value>
+  </data>
+  <data name="Menu_View_Objects.Text" xml:space="preserve">
+    <value>Objetos</value>
+  </data>
+  <data name="Menu_View_Session.Text" xml:space="preserve">
+    <value>Sessão</value>
   </data>
 </root>

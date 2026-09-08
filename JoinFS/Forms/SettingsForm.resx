@@ -1462,6 +1462,24 @@
   <data name="&gt;&gt;Text_SimBriefUsername.ZOrder" xml:space="preserve">
     <value>0</value>
   </data>
+  <data name="Check_SimBriefAutoImport.AutoSize" type="System.Boolean, mscorlib">
+    <value>True</value>
+  </data>
+  <data name="Check_SimBriefAutoImport.Text" xml:space="preserve">
+    <value>Auto import</value>
+  </data>
+  <data name="&gt;&gt;Check_SimBriefAutoImport.Name" xml:space="preserve">
+    <value>Check_SimBriefAutoImport</value>
+  </data>
+  <data name="&gt;&gt;Check_SimBriefAutoImport.Type" xml:space="preserve">
+    <value>System.Windows.Forms.CheckBox, System.Windows.Forms, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="&gt;&gt;Check_SimBriefAutoImport.Parent" xml:space="preserve">
+    <value>GroupBox_SimBrief</value>
+  </data>
+  <data name="&gt;&gt;Check_SimBriefAutoImport.ZOrder" xml:space="preserve">
+    <value>0</value>
+  </data>
   <data name="GroupBox_SimBrief.Location" type="System.Drawing.Point, System.Drawing">
     <value>14, 468</value>
   </data>

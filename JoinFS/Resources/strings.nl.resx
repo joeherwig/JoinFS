@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -740,5 +740,23 @@
   </data>
   <data name="MainForm_SimBriefButtonTooltip" xml:space="preserve">
     <value>SimBrief-gegevens gebruiken als bron voor het vluchtplan en nu opnieuw ophalen</value>
+  </data>
+  <data name="Airship" xml:space="preserve">
+    <value>Luchtschip</value>
+  </data>
+  <data name="Balloon" xml:space="preserve">
+    <value>Ballon</value>
+  </data>
+  <data name="Password" xml:space="preserve">
+    <value>Wachtwoord</value>
+  </data>
+  <data name="MainForm_FlightPlanButtonDefaultText" xml:space="preserve">
+    <value>Vluchtplan</value>
+  </data>
+  <data name="MainForm_FlightPlanButtonTooltipNoPlan" xml:space="preserve">
+    <value>Klik om uw vluchtplan aan te maken, als u er een wilt toewijzen.</value>
+  </data>
+  <data name="FlightPlan_AltitudeTooltip" xml:space="preserve">
+    <value>Kruishoogte of vlieghoogte, bijv. 35000 of FL350</value>
   </data>
 </root>

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -740,5 +740,20 @@
   </data>
   <data name="MainForm_SimBriefButtonTooltip" xml:space="preserve">
     <value>SimBrief-Daten als Flugplanquelle verwenden und jetzt neu abrufen</value>
+  </data>
+  <data name="Airship" xml:space="preserve">
+    <value>Luftschiff</value>
+  </data>
+  <data name="Balloon" xml:space="preserve">
+    <value>Ballon</value>
+  </data>
+  <data name="MainForm_FlightPlanButtonDefaultText" xml:space="preserve">
+    <value>Flugplan</value>
+  </data>
+  <data name="MainForm_FlightPlanButtonTooltipNoPlan" xml:space="preserve">
+    <value>Klicken, um Ihren Flugplan zu erstellen, falls Sie einen zugewiesen haben möchten.</value>
+  </data>
+  <data name="FlightPlan_AltitudeTooltip" xml:space="preserve">
+    <value>Reiseflughöhe oder Flugfläche, z. B. 35000 oder FL350</value>
   </data>
 </root>

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -360,5 +360,26 @@
   </data>
   <data name="$this.Text" xml:space="preserve">
     <value>JoinFS: Pas de hoogte aan</value>
+  </data>
+  <data name="Button_OK.Text" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="Button_Off.Text" xml:space="preserve">
+    <value>Uit</value>
+  </data>
+  <data name="Button_Plus5.Text" xml:space="preserve">
+    <value>+ 5 cm</value>
+  </data>
+  <data name="Button_Plus50.Text" xml:space="preserve">
+    <value>+ 50 cm</value>
+  </data>
+  <data name="Button_Minus5.Text" xml:space="preserve">
+    <value>- 5 cm</value>
+  </data>
+  <data name="Button_Minus50.Text" xml:space="preserve">
+    <value>- 50 cm</value>
+  </data>
+  <data name="label1.Text" xml:space="preserve">
+    <value>Model</value>
   </data>
 </root>

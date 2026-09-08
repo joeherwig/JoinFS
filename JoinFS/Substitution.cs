@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 #if !CONSOLE
 using System.Windows.Forms;
 #endif
 using System.IO;
 using System.Globalization;
 using JoinFS.Properties;
-using System.Net.Http;
 using System.Threading.Tasks;
 
 namespace JoinFS
@@ -359,6 +359,13 @@ namespace JoinFS
             /// </summary>
             public bool icaoGuessed = false;
             /// <summary>
+            /// True when icaoAirline came from GuessIcaoAirlineFromText (a free-text airline-name match
+            /// somewhere in livery/title) rather than a config-confirmed icao_airline or a recognized live
+            /// ATC AIRLINE code. Independent of icaoGuessed - a model can have a confirmed icaoType but a
+            /// guessed icaoAirline, or vice versa.
+            /// </summary>
+            public bool icaoAirlineGuessed = false;
+            /// <summary>
             /// True when classCode was derived directly from live SimConnect data (category/engine type/engine
             /// count - see DeriveLiveClassCode), which doesn't depend on icaoType being a recognized Doc8643
             /// designator. Once set, RefreshIcaoDerived leaves classCode/wtc alone instead of re-deriving them
@@ -382,7 +389,8 @@ namespace JoinFS
             public string icaoResolutionNote = "";
 
             public Model(string title, string manufacturer, string type, string variation, int index, string typerole, string smoke, string folder,
-                string icaoType = "", string wtc = "", string icaoAirline = "", string classCode = "", bool classCodeConfirmed = false, string atcId = "")
+                string icaoType = "", string wtc = "", string icaoAirline = "", string classCode = "", bool classCodeConfirmed = false, string atcId = "",
+                bool icaoAirlineGuessed = false)
             {
                 this.title = title;
                 this.manufacturer = manufacturer;
@@ -401,6 +409,7 @@ namespace JoinFS
                 this.classCode = classCode;
                 this.classCodeConfirmed = classCodeConfirmed;
                 this.atcId = atcId;
+                this.icaoAirlineGuessed = icaoAirlineGuessed;
             }
 
             /// <summary>
@@ -696,6 +705,16 @@ namespace JoinFS
             // name (e.g. "Baron", 5 chars) coincidentally matching inside an unrelated title/operator
             // name (e.g. "...BVN_Baron Aviation", a Cessna Caravan livery for an operator named "Baron
             // Aviation", with no "Beechcraft"/"Raytheon" anywhere in the title to justify the match).
+            //
+            // Exception: a needle with distinctive internal casing (a capital letter after position 0,
+            // alongside a lowercase letter - e.g. "XCub", "NXCub") is treated as a coined product name
+            // rather than a plain English word, and is exempt from both the >=6 length floor and the
+            // manufacturer-must-also-appear requirement. "Baron" (Title Case only - one leading capital)
+            // does not qualify, so that case is unaffected. Confirmed real case: Cub Crafters' Doc8643
+            // rows for CC19 are "XCub"/"NXCub" (4-5 chars) - too short for the general rule, and their
+            // installed titles ("XCub Passengers Big Wheels") never contain "Cub Crafters" to satisfy the
+            // manufacturer check either, so without this the type/class code could never be resolved from
+            // title text alone.
             (string icaoType, int matchLength) best = ("", 0);
             foreach (var row in doc8643Rows)
             {
@@ -703,10 +722,11 @@ namespace JoinFS
                     && (corroboratingWtc.Length == 0 || row.wtc == corroboratingWtc);
 
                 string needle = row.modelName.Replace("-", "");
-                int minNeedleLength = classCorroborated ? 3 : 6;
+                bool distinctiveCasing = needle.Skip(1).Any(char.IsUpper) && needle.Any(char.IsLower);
+                int minNeedleLength = classCorroborated || distinctiveCasing ? 3 : 6;
                 if (needle.Length < minNeedleLength || needle.Length <= best.matchLength) continue;
                 if (ContainsToken(haystack, needle) == false) continue;
-                if (classCorroborated == false && needle.Length < 8 && ContainsToken(haystack, row.manufacturer) == false) continue;
+                if (classCorroborated == false && distinctiveCasing == false && needle.Length < 8 && ContainsToken(haystack, row.manufacturer) == false) continue;
 
                 best = (row.icaoType, needle.Length);
             }
@@ -799,12 +819,29 @@ namespace JoinFS
             // A confirmed icao_airline read straight from aircraft.cfg/livery.cfg is trustworthy as-is;
             // a live ATC AIRLINE value is only trustworthy when it's a real, recognized ICAO code - some
             // add-ons report a flight-number/virtual-callsign-style string instead (e.g. "FSC739"). When
-            // that happens, fall back to matching a known airline name against the livery/title text.
-            string resolvedAirline = configConfirmed && icaoAirline.Length > 0 ? icaoAirline
-                : IsKnownIcaoAirline(icaoAirline) ? icaoAirline : GuessIcaoAirlineFromText(variation + " " + title);
-            if (resolvedAirline.Length > 0 && model.icaoAirline != resolvedAirline)
+            // that happens, fall back to matching a known airline name against the livery/title text - a
+            // genuine guess, tagged as such so ScoreCandidate can weight it below a real ICAO-code read.
+            bool airlineIsGuess = false;
+            string resolvedAirline;
+            if (configConfirmed && icaoAirline.Length > 0)
+            {
+                resolvedAirline = icaoAirline;
+            }
+            else if (IsKnownIcaoAirline(icaoAirline))
+            {
+                resolvedAirline = icaoAirline;
+            }
+            else
+            {
+                resolvedAirline = GuessIcaoAirlineFromText(variation + " " + title);
+                airlineIsGuess = resolvedAirline.Length > 0;
+            }
+            // also re-trigger when a previous guess for the same code gets corroborated/upgraded to
+            // confirmed, so the stale "guessed" tag doesn't linger once a better source agrees
+            if (resolvedAirline.Length > 0 && (model.icaoAirline != resolvedAirline || model.icaoAirlineGuessed != airlineIsGuess))
             {
                 model.icaoAirline = resolvedAirline;
+                model.icaoAirlineGuessed = airlineIsGuess;
                 changed = true;
             }
 
@@ -1645,7 +1682,7 @@ namespace JoinFS
                         target.classCodeConfirmed = true;
                         target.configConfirmed = true;
                         if (diskWtc.Length > 0) target.wtc = diskWtc;
-                        if (diskIcaoAirline.Length > 0) target.icaoAirline = diskIcaoAirline;
+                        if (diskIcaoAirline.Length > 0) { target.icaoAirline = diskIcaoAirline; target.icaoAirlineGuessed = false; }
                         if (diskAtcId.Length > 0) target.atcId = diskAtcId;
                     }
                     target.RefreshIcaoDerived(doc8643Lookup);
@@ -1667,7 +1704,15 @@ namespace JoinFS
                     model.typerole = TyperoleFromString(scanTyperole);
 #endif
                     model.folder = scanFolder;
-                    model.icaoAirline = scanIcaoAirline;
+                    // don't let a blank re-scan (e.g. FS2024's SimConnect model-enumeration pass, which has
+                    // no icaoAirline data at all - see SubmitModel's 6-arg overload) clobber an icaoAirline
+                    // already captured by a real config-file read (this scan's own folder-walk, or a
+                    // previous live-learn) - only apply when this scan actually carries a value.
+                    if (scanIcaoAirline.Length > 0)
+                    {
+                        model.icaoAirline = scanIcaoAirline;
+                        model.icaoAirlineGuessed = false;
+                    }
                     model.atcId = scanAtcId;
 #if FS2024
                     if (model.icaoType.Length == 0)
@@ -2150,12 +2195,19 @@ namespace JoinFS
                         // get folder name
                         scanFolder = Path.GetFileName(Path.GetDirectoryName(path));
 
-                        // create reader
-                        StreamReader reader = new(path);
-
                         // track the maximum smoke entry
                         int smokeCount = 0;
                         int startIndex = models.Count;
+                        StreamReader reader = null;
+
+                        // one broken/inaccessible file (permission denied, locked by another
+                        // process, a corrupt/truncated config) must not abort scanning every
+                        // other installed aircraft - catch it here and move on to the next file,
+                        // same convention as the XPLANE branch of this same method above
+                        try
+                        {
+                        // create reader
+                        reader = new(path);
 
                         // [GENERAL] section values - apply once per file to every model found in it
                         string generalIcaoType = "";
@@ -2319,7 +2371,7 @@ namespace JoinFS
                                     models[index].classCodeConfirmed = true;
                                     models[index].configConfirmed = true;
                                     if (fileWtc.Length > 0) models[index].wtc = fileWtc;
-                                    if (fileIcaoAirline.Length > 0) models[index].icaoAirline = fileIcaoAirline;
+                                    if (fileIcaoAirline.Length > 0) { models[index].icaoAirline = fileIcaoAirline; models[index].icaoAirlineGuessed = false; }
                                     if (fileAtcId.Length > 0) models[index].atcId = fileAtcId;
                                     models[index].RefreshIcaoDerived(doc8643Lookup);
                                 }
@@ -2336,6 +2388,32 @@ namespace JoinFS
                                 }
 #endif
                             }
+                        }
+                        }
+                        catch (Exception ex)
+                        {
+                            // one broken/inaccessible file must not abort scanning every other
+                            // installed aircraft - log it and move on to the next file, same
+                            // convention as the XPLANE branch of this same method above
+                            main.MonitorEvent("Failed to read file '" + path + "'. " + ex.Message);
+                            // discard any model(s) already added from this file before the
+                            // failure - a file that misbehaved partway through can't be trusted
+                            // to have parsed correctly up to that point
+                            if (models.Count > startIndex)
+                            {
+                                models.RemoveRange(startIndex, models.Count - startIndex);
+                            }
+                            // a failure mid-read can leave an in-progress [fltsim.N] block's
+                            // fields (scanTitle etc.) sitting in the method-level scan* fields
+                            // without having gone through SubmitScan()'s own reset - clear the
+                            // flag that gates SubmitScan() using them, so the next file's first
+                            // block boundary doesn't fold this broken file's stale/partial data
+                            // into a new model
+                            scanBlock = false;
+                        }
+                        finally
+                        {
+                            if (reader != null) reader.Close();
                         }
                     }
 
@@ -3368,25 +3446,8 @@ namespace JoinFS
                 // download the file if it does not exist
                 if (File.Exists(typeClassifiersFile) == false)
                 {
-                    // download the file from a web server
-                    string url = "https://raw.githubusercontent.com/tuduce/JoinFS/refs/heads/main/JoinFS/util/model2type.txt";
-                    try
-                    {
-                        // download the file
-                        //using (WebClient client = new WebClient())
-                        //{
-                        //    client.DownloadFile(url, typeClassifiersFile);
-                        //}
-                        using HttpClient httpClient = new();
-                        var response = await httpClient.GetAsync(url);
-                        response.EnsureSuccessStatusCode();
-                        using var fs = new FileStream(typeClassifiersFile, FileMode.Create, FileAccess.Write, FileShare.None);
-                        await response.Content.CopyToAsync(fs);
-                    }
-                    catch (Exception ex)
-                    {
-                        main.MonitorEvent("Error downloading type classifiers: " + ex.Message);
-                    }
+                    // download the file from the repository (via CDN, with fork fallback)
+                    await GitHubData.DownloadToFileAsync("JoinFS/util/model2type.txt", typeClassifiersFile, main.MonitorEvent);
                 }
                 // check if file exists
                 if (File.Exists(typeClassifiersFile))
@@ -3425,30 +3486,8 @@ namespace JoinFS
                 // type classifiers file
                 string AddonsFile = Path.Combine(main.storagePath, "Addons_FS2020.txt");
                 string AddonsFile_Web = Path.Combine(main.storagePath, "Addons_FS2020_Web.txt");
-                // Always download the AddOns file from a web server.
-                string url = "https://raw.githubusercontent.com/tuduce/JoinFS/refs/heads/main/JoinFS/util/Addons_FS2020.txt";
-
-                try
-                {
-                    // download the file
-                    //using (WebClient client = new WebClient())
-                    //{
-                    //    client.DownloadFile(url, AddonsFile_Web);
-                    //}
-                    using (HttpClient httpClient = new HttpClient())
-                    {
-                        var response = await httpClient.GetAsync(url);
-                        response.EnsureSuccessStatusCode();
-                        using (var fs = new FileStream(AddonsFile_Web, FileMode.Create, FileAccess.Write, FileShare.None))
-                        {
-                            await response.Content.CopyToAsync(fs);
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    main.MonitorEvent("Error downloading FS2020 AddOns List: " + ex.Message);
-                }
+                // Always refresh the AddOns file from the repository (via CDN, with fork fallback).
+                await GitHubData.DownloadToFileAsync("JoinFS/util/Addons_FS2020.txt", AddonsFile_Web, main.MonitorEvent);
                 // check if file exists
                 if (File.Exists(AddonsFile_Web))
                 {
@@ -3482,21 +3521,8 @@ namespace JoinFS
                 // download the file if it does not exist
                 if (File.Exists(banListFile) == false)
                 {
-                    // download the file from a web server
-                    string url = "https://raw.githubusercontent.com/tuduce/JoinFS/refs/heads/main/JoinFS/util/bannedModels.txt";
-                    try
-                    {
-                        // download the file
-                        using HttpClient httpClient = new();
-                        var response = await httpClient.GetAsync(url);
-                        response.EnsureSuccessStatusCode();
-                        using var fs = new FileStream(banListFile, FileMode.Create, FileAccess.Write, FileShare.None);
-                        await response.Content.CopyToAsync(fs);
-                    }
-                    catch (Exception ex)
-                    {
-                        main.MonitorEvent("Error downloading type classifiers: " + ex.Message);
-                    }
+                    // download the file from the repository (via CDN, with fork fallback)
+                    await GitHubData.DownloadToFileAsync("JoinFS/util/bannedModels.txt", banListFile, main.MonitorEvent);
                 }
                 // check if file exists
                 if (File.Exists(banListFile))
@@ -3989,7 +4015,9 @@ namespace JoinFS
         /// is independent and additive - unlike the old tiered fall-through, a candidate doesn't need an
         /// exact ICAO type match to win; sharing class code + WTC (e.g. a Diamond DA62 against a
         /// Beechcraft Baron remote - both L2P/L) can outscore a same-class-but-wrong-WTC candidate (e.g.
-        /// a Douglas DC-3, L2P/M), which is what actually fixes the reported "wrong substitute" bug.
+        /// a Douglas DC-3, L2P/M), which is what actually fixes the reported "wrong substitute" bug. The
+        /// one exception is a disagreeing typerole without an exact ICAO type match, which is penalized
+        /// heavily rather than just withholding a bonus - see the typerole block below.
         /// Returns the total score, a per-MatchAttribute breakdown (for Explain Match's attribute grid),
         /// and a human-readable contribution list (for the trace/"other candidates considered" panel).
         /// </summary>
@@ -4002,6 +4030,9 @@ namespace JoinFS
             Dictionary<MatchAttribute, int> attrScores = [];
             List<string> details = [];
             double guessFactor = candidate.icaoGuessed ? GuessedSignalMultiplier : 1.0;
+            // independent of guessFactor - icaoType and icaoAirline provenance are unrelated, a candidate
+            // can have a confirmed icaoType but a text-guessed icaoAirline or vice versa
+            double airlineGuessFactor = candidate.icaoAirlineGuessed ? GuessedSignalMultiplier : 1.0;
 
             void Add(MatchAttribute attr, double points, string detail)
             {
@@ -4009,11 +4040,13 @@ namespace JoinFS
                 if (applied == 0) return;
                 total += applied;
                 attrScores[attr] = attrScores.GetValueOrDefault(attr) + applied;
-                details.Add(detail + " (+" + applied + ")");
+                details.Add(detail + " (" + (applied > 0 ? "+" : "") + applied + ")");
             }
 
-            if (remoteIcaoType.Length > 0 && candidate.icaoType.Length > 0 &&
-                candidate.icaoType.Equals(remoteIcaoType, StringComparison.OrdinalIgnoreCase))
+            bool exactIcaoTypeMatch = remoteIcaoType.Length > 0 && candidate.icaoType.Length > 0 &&
+                candidate.icaoType.Equals(remoteIcaoType, StringComparison.OrdinalIgnoreCase);
+
+            if (exactIcaoTypeMatch)
             {
                 Add(MatchAttribute.IcaoType, 200 * guessFactor, "ICAO type '" + remoteIcaoType + "'" + (guessFactor < 1 ? " (guessed)" : ""));
             }
@@ -4021,12 +4054,19 @@ namespace JoinFS
             if (remoteIcaoAirline.Length > 0 && candidate.icaoAirline.Length > 0 &&
                 candidate.icaoAirline.Equals(remoteIcaoAirline, StringComparison.OrdinalIgnoreCase))
             {
-                Add(MatchAttribute.IcaoAirline, 100, "ICAO airline '" + remoteIcaoAirline + "'");
+                Add(MatchAttribute.IcaoAirline, 100 * airlineGuessFactor, "ICAO airline '" + remoteIcaoAirline + "'" + (airlineGuessFactor < 1 ? " (guessed)" : ""));
             }
 
+            // classCode/WTC are not downweighted by guessFactor even when candidate.icaoType came from a
+            // title guess: once a title guess has identified a real, recognized Doc8643 designator, that
+            // designator's classCode/WTC mapping is itself deterministic, not a second independent guess -
+            // the uncertainty is only in "is this the right aircraft," already captured by the IcaoType
+            // match's own downweight above. Downweighting both compounded to the point that a correctly
+            // title-guessed match (e.g. "XCub" -> CC19/L1P) could score below an unrelated candidate that
+            // merely happened to share the same class code by coincidence (e.g. a Cirrus SR22, also L1P).
             if (remoteClassCode.Length == 3 && candidate.classCode.Length == 3 && candidate.classCode == remoteClassCode)
             {
-                Add(MatchAttribute.ClassCode, 60 * guessFactor, "class code '" + remoteClassCode + "'" + (guessFactor < 1 ? " (guessed)" : ""));
+                Add(MatchAttribute.ClassCode, 60, "class code '" + remoteClassCode + "'");
                 if (candidate.classCode[1] == remoteClassCode[1])
                 {
                     Add(MatchAttribute.ClassCode, 20, "engine count");
@@ -4039,12 +4079,16 @@ namespace JoinFS
 
             if (remoteWtc.Length > 0 && candidate.wtc.Length > 0 && candidate.wtc == remoteWtc)
             {
-                Add(MatchAttribute.Wtc, 40 * guessFactor, "WTC '" + remoteWtc + "'" + (guessFactor < 1 ? " (guessed)" : ""));
+                Add(MatchAttribute.Wtc, 40, "WTC '" + remoteWtc + "'");
             }
 
             // registration - prefer an exact match against the candidate's own scanned atc_id when it
             // has one (much more reliable - the actual tail number baked into that specific livery);
-            // only fall back to a substring search in title/variation when it has no scanned atc_id
+            // only fall back to a substring search in title/variation when it has no scanned atc_id.
+            // Deliberately low-weight (well below even a guessed icaoAirline match) - a pilot can change
+            // their tail number mid-session, so registration should only ever act as a tie-breaker among
+            // candidates that already agree on type/airline (e.g. picking the exact-tail livery over a
+            // generic one for the same airline), never an independently decisive signal on its own.
             if (remoteRegistrationAlnum.Length > 0)
             {
                 string candidateAtcIdAlnum = AlnumOnly(candidate.atcId);
@@ -4052,46 +4096,68 @@ namespace JoinFS
                 {
                     if (candidateAtcIdAlnum.Equals(remoteRegistrationAlnum, StringComparison.OrdinalIgnoreCase))
                     {
-                        Add(MatchAttribute.Registration, 50, "registration '" + remoteRegistration + "' (exact atc_id match)");
+                        Add(MatchAttribute.Registration, 15, "registration '" + remoteRegistration + "' (exact atc_id match)");
                     }
                 }
                 else if (AlnumOnly(candidate.variation).Contains(remoteRegistrationAlnum, StringComparison.OrdinalIgnoreCase) ||
                          AlnumOnly(candidate.title).Contains(remoteRegistrationAlnum, StringComparison.OrdinalIgnoreCase))
                 {
-                    Add(MatchAttribute.Registration, 10, "registration '" + remoteRegistration + "' (title/variation match)");
+                    Add(MatchAttribute.Registration, 5, "registration '" + remoteRegistration + "' (title/variation match)");
                 }
             }
 
-            if (remoteTyperole > 0 && candidate.typerole == remoteTyperole)
+            if (remoteTyperole > 0 && candidate.typerole > 0)
             {
-                Add(MatchAttribute.Typerole, 15, "same typerole");
+                if (candidate.typerole == remoteTyperole)
+                {
+                    Add(MatchAttribute.Typerole, 15, "same typerole");
+                }
+                else if (exactIcaoTypeMatch == false)
+                {
+                    // a disagreeing typerole (e.g. a light business jet tagged Fighter/GA-bucket vs. an
+                    // installed Airliner) is real evidence these are different-size aircraft, even when
+                    // classCode+WTC+ICAO airline happen to coincide - WTC buckets are wide enough (Medium
+                    // spans ~7,000-136,000kg) that a Citation CJ4 and a 737 can share L2J/M and even the
+                    // same painted airline, which let a wrong-category match win outright (reported: a CJ4
+                    // remote scored onto an installed 737 substitute purely on classCode+WTC+airline, with
+                    // no CJ4 model installed to compete). The penalty equals the combined max of those three
+                    // coincidental signals (100 airline + 100 classCode/engine + 40 WTC = 240) so it cancels
+                    // them out entirely and drops the candidate below MinMatchScore, falling through to the
+                    // configured typerole Default instead of forcing a wrong-sized guess - unless a real
+                    // identity signal (exact ICAO type, matched above and exempted from this penalty, or
+                    // registration/title-prefix) still carries it.
+                    Add(MatchAttribute.Typerole, -240, "typerole mismatch");
+                }
             }
 
-            // weakest signal - loose word overlap between livery names
-            if (remoteLivery.Length > 0)
+            // weakest signal - multi-word overlap between the remote's title/livery and the candidate's
+            // title/variation. Every distinct significant word (>=3 chars - short enough to still catch
+            // "Cub" for the well-known Piper Cub family) shared by both sides adds points - not just a
+            // leading prefix or the first word found, so e.g. "XCub Kenmore Livery" against an installed
+            // "XCub Passengers Large Wheels (Kenmore)" credits both "XCub" and "Kenmore" instead of only
+            // the shared "XCub " prefix. Word-boundary matched (ContainsToken), case-insensitive. Replaces
+            // the old separate "first livery word only" and "title-prefix only" mechanisms, both too
+            // narrow to catch words that match out of position.
             {
-                foreach (var word in remoteLivery.Split([' ', '-', '_'], StringSplitOptions.RemoveEmptyEntries))
+                HashSet<string> remoteWords = new(StringComparer.OrdinalIgnoreCase);
+                foreach (var word in (remoteTitle + " " + remoteLivery).Split([' ', '-', '_', '(', ')', '.', ','], StringSplitOptions.RemoveEmptyEntries))
                 {
-                    if (word.Length < 4) continue;
-                    if (candidate.variation.Contains(word, StringComparison.OrdinalIgnoreCase))
+                    if (word.Length >= 3) remoteWords.Add(word);
+                }
+                string candidateText = candidate.title + " " + candidate.variation;
+                List<string> matchedWords = [];
+                foreach (var word in remoteWords)
+                {
+                    if (ContainsToken(candidateText, word))
                     {
-                        Add(MatchAttribute.Livery, 1, "livery word '" + word + "'");
-                        break;
+                        matchedWords.Add(word);
                     }
                 }
-            }
-
-            // graded title-prefix match (replaces the old separate all-or-nothing "Auto" tier) - longer
-            // shared prefixes score higher, capped so it can't dominate real identity signals above
-            int maxLen = Math.Min(remoteTitle.Length, candidate.title.Length);
-            int prefixLen = 0;
-            while (prefixLen < maxLen && char.ToLowerInvariant(remoteTitle[prefixLen]) == char.ToLowerInvariant(candidate.title[prefixLen]))
-            {
-                prefixLen++;
-            }
-            if (prefixLen >= 4)
-            {
-                Add(MatchAttribute.Title, Math.Min(prefixLen, 25), "title prefix (" + prefixLen + " chars)");
+                if (matchedWords.Count > 0)
+                {
+                    Add(MatchAttribute.Title, Math.Min(matchedWords.Count * 8, 40),
+                        matchedWords.Count + " title/livery word(s) matched (" + string.Join(", ", matchedWords) + ")");
+                }
             }
 
             score = total;
@@ -4138,6 +4204,7 @@ namespace JoinFS
                 string requestedTyperoleName = typeroleNames.TryGetValue(typerole, out var tn) ? tn : typerole.ToString();
                 string matchedTyperoleName = matched != null && typeroleNames.TryGetValue(matched.typerole, out var mtn) ? mtn : "";
                 bool matchedIsGuessed = matched != null && matched.icaoGuessed;
+                bool matchedAirlineIsGuessed = matched != null && matched.icaoAirlineGuessed;
 
                 void Add(MatchAttribute attr, string requested, string matchedValue)
                 {
@@ -4149,7 +4216,10 @@ namespace JoinFS
                         matched = matchedValue,
                         decisive = attributeScores != null ? contribution > 0 : Array.IndexOf(decisiveAttrs, attr) >= 0,
                         scoreContribution = contribution,
-                        wasDownweighted = contribution > 0 && matchedIsGuessed && attr is MatchAttribute.IcaoType or MatchAttribute.ClassCode or MatchAttribute.Wtc
+                        // ClassCode/Wtc are no longer downweighted for a guessed icaoType - see ScoreCandidate
+                        wasDownweighted = contribution > 0 && (
+                            (matchedIsGuessed && attr == MatchAttribute.IcaoType) ||
+                            (matchedAirlineIsGuessed && attr == MatchAttribute.IcaoAirline))
                     });
                 }
 

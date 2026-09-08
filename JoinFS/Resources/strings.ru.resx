@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -740,5 +740,20 @@
   </data>
   <data name="MainForm_SimBriefButtonTooltip" xml:space="preserve">
     <value>Использовать данные SimBrief как источник плана полёта и получить их заново сейчас</value>
+  </data>
+  <data name="Airship" xml:space="preserve">
+    <value>Дирижабль</value>
+  </data>
+  <data name="Balloon" xml:space="preserve">
+    <value>Воздушный шар</value>
+  </data>
+  <data name="MainForm_FlightPlanButtonDefaultText" xml:space="preserve">
+    <value>План полёта</value>
+  </data>
+  <data name="MainForm_FlightPlanButtonTooltipNoPlan" xml:space="preserve">
+    <value>Нажмите, чтобы создать план полёта, если хотите его назначить.</value>
+  </data>
+  <data name="FlightPlan_AltitudeTooltip" xml:space="preserve">
+    <value>Крейсерская высота или эшелон полёта, напр. 35000 или FL350</value>
   </data>
 </root>

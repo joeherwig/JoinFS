@@ -43,6 +43,8 @@
             this.label6 = new System.Windows.Forms.Label();
             this.Text_Remarks = new System.Windows.Forms.TextBox();
             this.label7 = new System.Windows.Forms.Label();
+            this.Label_Altitude = new System.Windows.Forms.Label();
+            this.Text_Altitude = new System.Windows.Forms.TextBox();
             this.Button_Cancel = new System.Windows.Forms.Button();
             this.Button_OK = new System.Windows.Forms.Button();
             this.label8 = new System.Windows.Forms.Label();
@@ -120,12 +122,24 @@
             // 
             resources.ApplyResources(this.Text_Remarks, "Text_Remarks");
             this.Text_Remarks.Name = "Text_Remarks";
-            // 
+            //
             // label7
-            // 
+            //
             resources.ApplyResources(this.label7, "label7");
             this.label7.Name = "label7";
-            // 
+            //
+            // Label_Altitude
+            //
+            resources.ApplyResources(this.Label_Altitude, "Label_Altitude");
+            this.Label_Altitude.Name = "Label_Altitude";
+            //
+            // Text_Altitude
+            //
+            resources.ApplyResources(this.Text_Altitude, "Text_Altitude");
+            this.Text_Altitude.Name = "Text_Altitude";
+            this.Text_Altitude.CharacterCasing = System.Windows.Forms.CharacterCasing.Upper;
+            this.Text_Altitude.MaxLength = 10;
+            //
             // Button_Cancel
             // 
             resources.ApplyResources(this.Button_Cancel, "Button_Cancel");
@@ -153,18 +167,14 @@
             //
             // label8
             //
-            this.label8.AutoSize = true;
-            this.label8.Location = new System.Drawing.Point(9, 167);
+            resources.ApplyResources(this.label8, "label8");
             this.label8.Name = "label8";
-            this.label8.Size = new System.Drawing.Size(52, 15);
             this.label8.TabIndex = 7;
-            this.label8.Text = "SimBrief";
             //
             // Text_SimBriefUsername
             //
-            this.Text_SimBriefUsername.Location = new System.Drawing.Point(74, 164);
+            resources.ApplyResources(this.Text_SimBriefUsername, "Text_SimBriefUsername");
             this.Text_SimBriefUsername.Name = "Text_SimBriefUsername";
-            this.Text_SimBriefUsername.Size = new System.Drawing.Size(140, 23);
             this.Text_SimBriefUsername.TabIndex = 7;
             // Enter-key handling for this field is done via FlightPlanForm.ProcessDialogKey (see
             // FlightPlanForm.cs) - a single-line TextBox's KeyDown never fires for Enter, since
@@ -172,31 +182,25 @@
             //
             // Button_ImportSimBrief
             //
-            this.Button_ImportSimBrief.Location = new System.Drawing.Point(220, 163);
+            resources.ApplyResources(this.Button_ImportSimBrief, "Button_ImportSimBrief");
             this.Button_ImportSimBrief.Name = "Button_ImportSimBrief";
-            this.Button_ImportSimBrief.Size = new System.Drawing.Size(90, 25);
             this.Button_ImportSimBrief.TabIndex = 8;
-            this.Button_ImportSimBrief.Text = "Import";
             this.Button_ImportSimBrief.UseVisualStyleBackColor = true;
             this.Button_ImportSimBrief.Click += new System.EventHandler(this.Button_ImportSimBrief_Click);
             //
             // Label_SimBriefStatus
             //
-            this.Label_SimBriefStatus.AutoSize = true;
-            this.Label_SimBriefStatus.Location = new System.Drawing.Point(9, 192);
+            resources.ApplyResources(this.Label_SimBriefStatus, "Label_SimBriefStatus");
             this.Label_SimBriefStatus.Name = "Label_SimBriefStatus";
-            this.Label_SimBriefStatus.Size = new System.Drawing.Size(305, 15);
             this.Label_SimBriefStatus.TabIndex = 9;
             //
             // Button_Clear
             // (clears route/remarks/departure/destination only - callsign/type/rules are already
             // sourced live from the sim and untouched by this)
             //
-            this.Button_Clear.Location = new System.Drawing.Point(9, 213);
+            resources.ApplyResources(this.Button_Clear, "Button_Clear");
             this.Button_Clear.Name = "Button_Clear";
-            this.Button_Clear.Size = new System.Drawing.Size(75, 27);
             this.Button_Clear.TabIndex = 9;
-            this.Button_Clear.Text = "Clear";
             this.Button_Clear.UseVisualStyleBackColor = true;
             this.Button_Clear.Click += new System.EventHandler(this.Button_Clear_Click);
             //
@@ -215,6 +219,8 @@
             this.Controls.Add(this.label8);
             this.Controls.Add(this.Button_OK);
             this.Controls.Add(this.Button_Cancel);
+            this.Controls.Add(this.Text_Altitude);
+            this.Controls.Add(this.Label_Altitude);
             this.Controls.Add(this.label7);
             this.Controls.Add(this.Text_Remarks);
             this.Controls.Add(this.label6);
@@ -256,6 +262,8 @@
         private System.Windows.Forms.Label label6;
         private System.Windows.Forms.TextBox Text_Remarks;
         private System.Windows.Forms.Label label7;
+        private System.Windows.Forms.Label Label_Altitude;
+        private System.Windows.Forms.TextBox Text_Altitude;
         private System.Windows.Forms.Button Button_Cancel;
         private System.Windows.Forms.Button Button_OK;
         private System.Windows.Forms.Label label8;

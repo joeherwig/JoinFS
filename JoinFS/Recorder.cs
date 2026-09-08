@@ -167,7 +167,7 @@ namespace JoinFS
                 // write frame
                 base.Write(writer);
                 // write position velocity
-                Sim.Write(writer, ref data);
+                Sim.Write(writer, Sim.VERSION, ref data);
             }
 
             /// <summary>
@@ -225,7 +225,7 @@ namespace JoinFS
                 // write frame
                 base.Write(writer);
                 // write position velocity
-                Sim.Write(writer, ref data);
+                Sim.Write(writer, Sim.VERSION, ref data);
             }
 
             /// <summary>
@@ -1481,7 +1481,16 @@ namespace JoinFS
                 brakeLeft = Lerp(a.brakeLeft, b.brakeLeft, t),
                 brakeRight = Lerp(a.brakeRight, b.brakeRight, t),
                 elevation = Lerp(a.elevation, b.elevation, t),
-                ground = t < 0.5 ? a.ground : b.ground
+                ground = t < 0.5 ? a.ground : b.ground,
+                // carried through so the ground-clearance correction in UpdateAircraft (see
+                // ground-jitter-on-model-mismatch fix) still has the sender's real clearance during
+                // playback - the object initializer above left this at its default (0.0f), which the
+                // correction can't tell apart from a real "sits flush on the ground" reading, so it
+                // silently added the substitute's own full clearance on top of every interpolated
+                // altitude - exactly the "hovers meters above the ground" symptom. NaN propagates
+                // through Lerp when either endpoint frame predates this field, which correctly falls
+                // back to no correction rather than inventing one from partial data.
+                staticCgToGround = Lerp(a.staticCgToGround, b.staticCgToGround, t)
             };
         }
 

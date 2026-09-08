@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -740,5 +740,20 @@
   </data>
   <data name="MainForm_SimBriefButtonTooltip" xml:space="preserve">
     <value>Usa i dati SimBrief come fonte del piano di volo e recuperali di nuovo ora</value>
+  </data>
+  <data name="Airship" xml:space="preserve">
+    <value>Dirigibile</value>
+  </data>
+  <data name="Balloon" xml:space="preserve">
+    <value>Mongolfiera</value>
+  </data>
+  <data name="MainForm_FlightPlanButtonDefaultText" xml:space="preserve">
+    <value>Piano di Volo</value>
+  </data>
+  <data name="MainForm_FlightPlanButtonTooltipNoPlan" xml:space="preserve">
+    <value>Clicca per creare il tuo piano di volo, se desideri averne uno assegnato.</value>
+  </data>
+  <data name="FlightPlan_AltitudeTooltip" xml:space="preserve">
+    <value>Altitudine di crociera o livello di volo, es. 35000 o FL350</value>
   </data>
 </root>

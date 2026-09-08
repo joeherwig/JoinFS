@@ -97,6 +97,18 @@ namespace JoinFS.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool SimBriefAutoImport {
+            get {
+                return ((bool)(this["SimBriefAutoImport"]));
+            }
+            set {
+                this["SimBriefAutoImport"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string AtcAirport {
             get {
