@@ -2,7 +2,7 @@
 
 The P2P network protocol and the recording (`.jfs`) file format changed in the 26.5.1 / 26.6 line.
 
-- Every peer in a session, **and the hub / console you connect through**, must run this version or newer. Mixing with 26.5.0 or older can silently corrupt other aircraft's positions instead of failing cleanly - update everything together.
+- Every peer in a session, **and the hub / console you connect through**, must run this version or newer. A hub still on an older build publishes corrupt positions to every client on it. This version detects and discards a wrong-format position packet (keeping the last good position) rather than showing garbage, but the real fix is to update everything together.
 - `.jfs` recordings saved by this version will **not** load in 26.5.0 or older. Older recordings still load here.
 - Position records are now length-prefixed / self-describing, so future format additions load (unknown fields skipped) instead of throwing "Unable to read beyond the end of the stream".
 
@@ -15,6 +15,7 @@ The P2P network protocol and the recording (`.jfs`) file format changed in the 2
 ## Bug Fixes
 
 - **X-Plane: remote aircraft render again.** The shared position record was read with the X-Plane plugin link's protocol version, which crossed the version gate of a new MSFS-only ground field, so every packet failed with "Unable to read beyond the end of the stream". The X-Plane path is now pinned to the exact byte layout the native plugin speaks, and the position record was made length-prefixed so this can't recur.
+- **Console/hub feeds hardened.** A wrong-format or truncated position packet from a version-mismatched peer is discarded (last good position kept) instead of decoded into garbage and re-broadcast. The WebSocket feed can no longer crash the console process, serialises non-finite values as `0` instead of throwing, drops a slow/half-open client after a 5 s send deadline rather than stalling the others, and stops leaking its change-tracking table.
 - **Substitute aircraft are grounded using their own real `STATIC CG TO GROUND`, not the sender's**, so a substitute of any size sits correctly on the ground. Two on-ground regimes: ordinary ground hands the vertical axis to the sim's gear physics (JoinFS only commands horizontal position + heading); a genuine raised structure (helipad, deck, rig, rooftop) holds the sender's reported altitude and attitude. Retractable gear is forced down whenever the sender is on the ground. Applies to live and recorded/played-back injected aircraft.
 - **FS2020/FS2024: traffic appears without toggling the sim connection.** Injections attempted while MSFS was still loading were marked permanently failed; they now retry on a backoff and re-arm on a fresh connection or SimStart.
 - **Crashes to desktop now leave `crash-<port>.txt`** with a full stack trace. The work thread is guarded so a single error is logged and JoinFS keeps running; a storm escalates to a clean shutdown. Startup prompts once if a crash file from a previous run is waiting.

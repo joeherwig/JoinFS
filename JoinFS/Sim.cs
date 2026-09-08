@@ -3747,8 +3747,18 @@ namespace JoinFS
             {
                 ushort length = reader.ReadUInt16();
                 long bodyStart = reader.BaseStream.Position;
-                try { readBody(reader); }
-                catch (EndOfStreamException) { /* length prefix is authoritative - reposition below */ }
+                // The prefix must fit what's left of the message. A bad length means the sender
+                // isn't actually speaking the length-prefixed format (version mismatch) or the
+                // datagram is truncated - fail loudly so the caller keeps its last good state.
+                if (length > reader.BaseStream.Length - bodyStart)
+                {
+                    throw new ReadException("position blob length " + length + " exceeds "
+                        + (reader.BaseStream.Length - bodyStart) + " bytes remaining");
+                }
+                // A body reader that runs off the end is a real desync - let it propagate.
+                // (A body that reads FEWER bytes than 'length' is fine: a newer peer appended a
+                // field we don't know; the reposition below skips it.)
+                readBody(reader);
                 reader.BaseStream.Position = bodyStart + length;
             }
             else
@@ -3756,10 +3766,13 @@ namespace JoinFS
                 // non-seekable source: pull the exact blob into a buffer and parse from there
                 ushort length = reader.ReadUInt16();
                 byte[] body = reader.ReadBytes(length);
+                if (body.Length != length)
+                {
+                    throw new ReadException("position blob truncated: got " + body.Length + " of " + length + " bytes");
+                }
                 using MemoryStream buffer = new(body);
                 using BinaryReader bufferReader = new(buffer);
-                try { readBody(bufferReader); }
-                catch (EndOfStreamException) { /* unknown/short body - ignore, buffer already consumed */ }
+                readBody(bufferReader);
             }
         }
 
@@ -3972,6 +3985,28 @@ namespace JoinFS
             AircraftPosition ap = aircraftPosition;
             ReadLengthPrefixed(version, reader, r => Read<AircraftPosition>(version, aircraftPositionVersions, r, ref ap));
             aircraftPosition = ap;
+        }
+
+        // Latitude/longitude/pitch/bank/heading are radians at this layer; altitude is metres.
+        // A decode that landed on the wrong byte boundary (e.g. a peer/hub on a different wire
+        // format) produces non-finite or absurd values - callers use these to drop the packet
+        // and keep the last good state instead of publishing/relaying garbage.
+        public static bool PlausibleAircraftPosition(in AircraftPosition p)
+        {
+            return double.IsFinite(p.latitude) && double.IsFinite(p.longitude) && double.IsFinite(p.altitude)
+                && float.IsFinite(p.pitch) && float.IsFinite(p.bank) && float.IsFinite(p.heading)
+                && float.IsFinite(p.velocityX) && float.IsFinite(p.velocityY) && float.IsFinite(p.velocityZ)
+                && Math.Abs(p.latitude) <= 3.2 && Math.Abs(p.longitude) <= 6.4
+                && p.altitude >= -2000.0 && p.altitude <= 200000.0;
+        }
+
+        public static bool PlausibleObjectPositionVelocity(in ObjectPositionVelocity p)
+        {
+            return double.IsFinite(p.latitude) && double.IsFinite(p.longitude) && double.IsFinite(p.altitude)
+                && float.IsFinite(p.pitch) && float.IsFinite(p.bank) && float.IsFinite(p.heading)
+                && float.IsFinite(p.velocityX) && float.IsFinite(p.velocityY) && float.IsFinite(p.velocityZ)
+                && Math.Abs(p.latitude) <= 3.2 && Math.Abs(p.longitude) <= 6.4
+                && p.altitude >= -2000.0 && p.altitude <= 200000.0;
         }
 
         /// <summary>
