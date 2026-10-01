@@ -1,7 +1,7 @@
 ## About this release
 
 A rebuild of the `26.6-beta` fixes against tuduce/JoinFS's new JFP2 network-protocol and
-simulator-thread reorganization (merged upstream in `main` as #181). Four fixes originally opened
+simulator-thread reorganization (merged upstream in `main` as #181). Seven fixes originally opened
 against the pre-reorg `main` were re-verified and, where the underlying code had moved or changed
 shape, re-implemented against the new architecture rather than just reapplied as-is.
 
@@ -20,6 +20,17 @@ shape, re-implemented against the new architecture rather than just reapplied as
 - **Duplicate ("ghost") aircraft on reconnect**: a network identity/position packet racing ahead of
   (or arriving just after) a peer's own join/leave handshake no longer creates a short-lived
   duplicate aircraft with an unresolvable identity.
+- **Retry injections the simulator refused while loading**: traffic that failed to inject because
+  the simulator was still on the main menu or loading a flight now retries automatically every 10
+  seconds (up to 30 attempts) instead of being skipped forever until a manual `[Sim]` toggle.
+- **Keep the pilot's callsign and aircraft type in sync with the simulator**: changing aircraft
+  mid-session (a real swap, or a different registration/livery on the same airframe) now updates the
+  broadcast callsign/type, so other clients' livery matching keys off the current value instead of a
+  stale one.
+- **Reconnect after losing every peer**: a client that loses every peer - including the hub, if
+  joined directly - while still reporting "Connected" now reconnects automatically every 10 seconds,
+  for both a direct join and an email/hub-account login. The Network button shows a third (Waiting)
+  color while this is happening, instead of reading as a healthy Connected the whole time.
 
 ## Installation
 
