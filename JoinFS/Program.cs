@@ -125,8 +125,8 @@ namespace JoinFS
         public bool settingsXplane = false;
         public bool settingsTcas = false;
         public bool settingsScan = false;
-        /// <summary>Which model-matching engine resolves remote aircraft (Settings: ModelMatchingEngine, 0 = Classic, 1 = New)</summary>
-        public MatchingEngine settingsMatchingEngine = MatchingEngine.Classic;
+        /// <summary>Which model-matching engine resolves remote aircraft (Settings: ModelMatchingEngine, 0 = Classic, 1 = New, default New)</summary>
+        public MatchingEngine settingsMatchingEngine = MatchingEngine.New;
 
         // elevated platform (helipad/ship deck/rooftop) ground-trust feature - command-line only, not persisted
         public bool settingsElevatedPlatformRecognition = true;
@@ -265,7 +265,7 @@ namespace JoinFS
                 settingsXplane = Settings.Default.XPlane;
                 settingsTcas = Settings.Default.TCAS;
                 settingsScan = Settings.Default.ModelScanOnConnection;
-                settingsMatchingEngine = Enum.IsDefined((MatchingEngine)Settings.Default.ModelMatchingEngine) ? (MatchingEngine)Settings.Default.ModelMatchingEngine : MatchingEngine.Classic;
+                settingsMatchingEngine = Enum.IsDefined((MatchingEngine)Settings.Default.ModelMatchingEngine) ? (MatchingEngine)Settings.Default.ModelMatchingEngine : MatchingEngine.New;
 #if XPLANE || CONSOLE
                 settingsGenerateCsl = Settings.Default.GenerateCsl;
                 settingsSkipCsl = Settings.Default.SkipCsl;
