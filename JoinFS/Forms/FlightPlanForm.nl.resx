@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -441,5 +441,32 @@
   </data>
   <data name="$this.Text" xml:space="preserve">
     <value>JoinFS: Bestand Vluchtplan</value>
+  </data>
+  <data name="Button_OK.Text" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="label2.Text" xml:space="preserve">
+    <value>Type</value>
+  </data>
+  <data name="label6.Text" xml:space="preserve">
+    <value>Route</value>
+  </data>
+  <data name="Label_Altitude.Location" type="System.Drawing.Point, System.Drawing">
+    <value>192, 73</value>
+  </data>
+  <data name="Label_Altitude.Text" xml:space="preserve">
+    <value>Hoogte</value>
+  </data>
+  <data name="Text_Altitude.Location" type="System.Drawing.Point, System.Drawing">
+    <value>245, 70</value>
+  </data>
+  <data name="label8.Text" xml:space="preserve">
+    <value>SimBrief</value>
+  </data>
+  <data name="Button_ImportSimBrief.Text" xml:space="preserve">
+    <value>Importeren</value>
+  </data>
+  <data name="Button_Clear.Text" xml:space="preserve">
+    <value>Wissen</value>
   </data>
 </root>

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -291,8 +291,20 @@
   <data name="Shortcuts_Network" xml:space="preserve">
     <value>Включить / выключить состояние сети</value>
   </data>
+  <data name="Shortcuts_Overdub" xml:space="preserve">
+    <value>Начать запись с наложением</value>
+  </data>
+  <data name="Shortcuts_Record" xml:space="preserve">
+    <value>Начать запись выбранного самолета</value>
+  </data>
+  <data name="Shortcuts_Replay" xml:space="preserve">
+    <value>Воспроизведение / пауза самолета, сохраненного в рекордере</value>
+  </data>
   <data name="Shortcuts_Simulator" xml:space="preserve">
     <value>Включение / выключение состояния симулятора</value>
+  </data>
+  <data name="Shortcuts_Stop" xml:space="preserve">
+    <value>Остановить запись / воспроизведение</value>
   </data>
   <data name="SingleProp" xml:space="preserve">
     <value>SingleProp</value>
@@ -740,5 +752,47 @@
   </data>
   <data name="MainForm_SimBriefButtonTooltip" xml:space="preserve">
     <value>Использовать данные SimBrief как источник плана полёта и получить их заново сейчас</value>
+  </data>
+  <data name="Airship" xml:space="preserve">
+    <value>Дирижабль</value>
+  </data>
+  <data name="Balloon" xml:space="preserve">
+    <value>Воздушный шар</value>
+  </data>
+  <data name="MainForm_FlightPlanButtonDefaultText" xml:space="preserve">
+    <value>План полёта</value>
+  </data>
+  <data name="MainForm_FlightPlanButtonTooltipNoPlan" xml:space="preserve">
+    <value>Нажмите, чтобы создать план полёта, если хотите его назначить.</value>
+  </data>
+  <data name="FlightPlan_AltitudeTooltip" xml:space="preserve">
+    <value>Крейсерская высота или эшелон полёта, напр. 35000 или FL350</value>
+  </data>
+  <data name="Recorder_ActiveLoad" xml:space="preserve">
+    <value>Загрузка записи останавливает текущее воспроизведение, а внедрённый трафик исчезает у пользователей, которые разрешают тебе несколько объектов. Сначала останови рекордер (Recorder|Stop), затем загрузи запись.</value>
+  </data>
+  <data name="Recorder_ActiveSave" xml:space="preserve">
+    <value>Останови рекордер (Recorder|Stop), прежде чем сохранять.</value>
+  </data>
+  <data name="Recorder_AutoSaved" xml:space="preserve">
+    <value>Запись сохранена: {0}</value>
+  </data>
+  <data name="ReconnectCredentialsRejected" xml:space="preserve">
+    <value>Соединение потеряно, и хаб отклонил сохранённые учётные данные (возможно, они изменились). Введите их снова, чтобы подключиться.</value>
+  </data>
+  <data name="Tip_NetworkReconnecting" xml:space="preserve">
+    <value>Соединение потеряно: выполняется автоматическое переподключение.</value>
+  </data>
+  <data name="ReconnectGaveUp" xml:space="preserve">
+    <value>Соединение потеряно. Автоматическое переподключение не удалось восстановить за последние {0} мин. Подключитесь вручную, когда будете готовы.</value>
+  </data>
+  <data name="Tip_ClassicMatching" xml:space="preserve">
+    <value>Использовать классическое соответствие моделей (только тип, авиакомпания и класс) вместо умного</value>
+  </data>
+  <data name="MatchExplain_EngineNew" xml:space="preserve">
+    <value>Способ подбора: умный (помимо типа, авиакомпании и класса сравнивает размер, массу, скорость, двигатели и производителя). Запустите JoinFS с параметром --classicmatching для классического способа.</value>
+  </data>
+  <data name="MatchExplain_EngineClassic" xml:space="preserve">
+    <value>Способ подбора: классический (сравнивает только тип, авиакомпанию, код класса и категорию турбулентности следа), выбран параметром --classicmatching.</value>
   </data>
 </root>

@@ -9,6 +9,7 @@ using System.Globalization;
 using JoinFS.Properties;
 using System.Net.Http;
 using System.Threading.Tasks;
+using JoinFS.Net;
 
 
 namespace JoinFS
@@ -134,13 +135,13 @@ namespace JoinFS
                 Combo_Join.Text = Settings.Default.JoinAddress;
 
 #if NO_HUBS
-                Combo_Join.Text = Network.EncodeIP(Settings.Default.JoinAddress);
+                Combo_Join.Text = AddressCodec.EncodeIP(Settings.Default.JoinAddress);
                 Menu_View_Hubs.Visible = false;
                 Menu_View_Atc.Visible = false;
                 Settings.Default.AtcFormOpen = false;
                 Settings.Default.HubsFormOpen = false;
 #else
-                Text_MyIP.Text = Network.UuidToString(main.uuid);
+                Text_MyIP.Text = UserDirectory.UuidToString(main.uuid);
 #endif
 
                 Tool_Version.Text = Main.Version;
@@ -296,6 +297,10 @@ namespace JoinFS
         public Shortcut handOverShortcut = new();
         public Shortcut enterShortcut = new();
         public Shortcut followShortcut = new();
+        public Shortcut recordShortcut = new();
+        public Shortcut overdubShortcut = new();
+        public Shortcut stopShortcut = new();
+        public Shortcut replayShortcut = new();
 
         /// <summary>
         /// Check if a particular key is pressed
@@ -385,6 +390,10 @@ namespace JoinFS
             LoadShortcut(Settings.Default.ShortcutHandOverKey, handOverShortcut);
             LoadShortcut(Settings.Default.ShortcutEnterKey, enterShortcut);
             LoadShortcut(Settings.Default.ShortcutFollowKey, followShortcut);
+            LoadShortcut(Settings.Default.ShortcutRecordKey, recordShortcut);
+            LoadShortcut(Settings.Default.ShortcutOverdubKey, overdubShortcut);
+            LoadShortcut(Settings.Default.ShortcutStopKey, stopShortcut);
+            LoadShortcut(Settings.Default.ShortcutReplayKey, replayShortcut);
         }
 
         /// <summary>
@@ -429,7 +438,7 @@ namespace JoinFS
                     if (main.sessionForm != null)
                     {
                         // get selected user
-                        LocalNode.Nuid nuid = main.sessionForm.GetSelectedNuid();
+                        NodeId nuid = main.sessionForm.GetSelectedNuid();
                         // check for valid user
                         if (nuid.Valid())
                         {
@@ -459,22 +468,22 @@ namespace JoinFS
                     if (main.sessionForm != null)
                     {
                         // get selected user
-                        LocalNode.Nuid nuid = main.sessionForm.GetSelectedNuid();
+                        NodeId nuid = main.sessionForm.GetSelectedNuid();
                         // check for valid user
                         if (nuid.Valid())
                         {
                             // get current hand over state
-                            bool handOver = main.network.shareFlightControls == nuid;
+                            bool handOver = main.network.Peers.shareFlightControls == nuid;
                             // check state
                             if (handOver)
                             {
                                 // disable
-                                main.network.shareFlightControls = new LocalNode.Nuid();
+                                main.network.Peers.shareFlightControls = new NodeId();
                             }
                             else
                             {
                                 // enable
-                                main.network.shareFlightControls = nuid;
+                                main.network.Peers.shareFlightControls = nuid;
                             }
                             // refresh
                             main.sessionForm ?. usersRefresher.Schedule();
@@ -499,6 +508,34 @@ namespace JoinFS
                     main.aircraftForm?.Context_Aircraft_Follow_Click(null, EventArgs.Empty);
                 }
 #endif
+
+                // check if record key pressed
+                if (Settings.Default.ShortcutRecord && CombinationPressed(control, shift, alt, recordShortcut))
+                {
+                    // start recording
+                    main.recorderForm?.Hotkey_Record();
+                }
+
+                // check if overdub key pressed
+                if (Settings.Default.ShortcutOverdub && CombinationPressed(control, shift, alt, overdubShortcut))
+                {
+                    // start overdub
+                    main.recorderForm?.Hotkey_Overdub();
+                }
+
+                // check if stop key pressed
+                if (Settings.Default.ShortcutStop && CombinationPressed(control, shift, alt, stopShortcut))
+                {
+                    // stop recording/playing
+                    main.recorderForm?.Button_Stop_Click(null, EventArgs.Empty);
+                }
+
+                // check if replay key pressed
+                if (Settings.Default.ShortcutReplay && CombinationPressed(control, shift, alt, replayShortcut))
+                {
+                    // toggle replay/pause
+                    main.recorderForm?.Button_Play_Click(null, EventArgs.Empty);
+                }
             }
         }
 
@@ -512,6 +549,8 @@ namespace JoinFS
 
         private void RefreshWindows(object sender, System.EventArgs e)
         {
+            HideExpiredRecordingSaved();
+
             // check if refresh is already active
             if (refreshActive)
             {
@@ -522,7 +561,7 @@ namespace JoinFS
             refreshActive = true;
 
             // check for first iterations
-            if (main.ElapsedTime < 6.0)
+            if (main.ElapsedTime - main.StartTime < 6.0)
             {
                 // force a refresh
                 refreshForce = true;
@@ -715,7 +754,7 @@ namespace JoinFS
                     if (main.settingsNickname.Length < 2)
                     {
                         // create hash nickname
-                        main.settingsNickname = LocalNode.GenerateName(main.storagePath);
+                        main.settingsNickname = NetHash.GenerateName(main.storagePath);
                     }
                     // get nickname
                     Settings.Default.Nickname = main.settingsNickname;
@@ -725,10 +764,11 @@ namespace JoinFS
 
                     // fetch the flight plan right away instead of waiting for the next app
                     // restart's opportunistic check (Program.cs) or a manual button click -
-                    // that check already ran before this username existed, so without this
-                    // the SimBrief button would sit on its default "not fetched yet" (red X)
-                    // state until the user notices and clicks it themselves
-                    if (initialSetupForm.simBriefUsername.Length > 0)
+                    // that check already ran before this username existed. Still gated on
+                    // auto-import: with it off, the button stays in its default (not yet
+                    // triggered) state until the user clicks it themselves, same as any other
+                    // session.
+                    if (Settings.Default.SimBriefAutoImport && initialSetupForm.simBriefUsername.Length > 0)
                     {
                         _ = main.sim.RefreshUserFlightPlanFromSimBriefAsync();
                     }
@@ -752,15 +792,9 @@ namespace JoinFS
                 // reset flag
                 main.scheduleFlightPlan = false;
                 // file flight plan
-                if (new FlightPlanForm(main, main.sim.userFlightPlan).ShowDialog() == DialogResult.OK)
+                if (new FlightPlanForm(main, main.sim.View.UserAircraft, main.sim.View.UserFlightPlan).ShowDialog() == DialogResult.OK)
                 {
-                    // check for user aircraft
-                    if (main.sim.userAircraft != null)
-                    {
-                        // update version
-                        main.sim.userAircraft.flightPlanVersion++;
-                        if (main.sim.userAircraft.flightPlanVersion == 0) main.sim.userAircraft.flightPlanVersion = 1;
-                    }
+                    CommitUserFlightPlanChange();
                 }
             }
 
@@ -791,7 +825,7 @@ namespace JoinFS
             {
 #if NO_HUBS
                 // get myip
-                string myip = Network.EncodeIP(Settings.Default.MyIp);
+                string myip = AddressCodec.EncodeIP(Settings.Default.MyIp);
 
                 // get port
                 if (main.settingsPortEnabled)
@@ -818,10 +852,10 @@ namespace JoinFS
                     lock (main.conch)
                     {
                         // check if connected
-                        if (main.network.localNode.CurrentState != LocalNode.State.Unconnected)
+                        if (main.network.Snapshot.State != SessionState.Unconnected)
                         {
                             // check if connected to global session
-                            if (main.network.localNode.GlobalSession)
+                            if (main.network.Snapshot.GlobalSession)
                             {
                                 // global session
                                 joinText = Resources.Strings.Global;
@@ -836,7 +870,7 @@ namespace JoinFS
                                 else
                                 {
                                     // find entry
-                                    Network.Hub hub = main.network.hubList.Find(h => h.endPoint.Equals(main.network.joinEndPoint));
+                                    HubDirectory.Hub hub = main.network.Hubs.List.Find(h => h.endPoint.Equals(main.network.joinEndPoint));
                                     if (hub != null)
                                     {
                                         joinText = hub.name;
@@ -870,20 +904,20 @@ namespace JoinFS
                     if (main.settingsHub)
                     {
                         // check for global session
-                        if (main.network.localNode.GlobalSession)
+                        if (main.network.Snapshot.GlobalSession)
                         {
                             // update maximum
-                            maxGlobal = main.network.localNode.NodeCount + 1;
+                            maxGlobal = main.network.Snapshot.PeerCount + 1;
                         }
                         else
                         {
                             // add to total
-                            publicCount += main.network.localNode.NodeCount + 1;
+                            publicCount += main.network.Snapshot.PeerCount + 1;
                         }
                     }
 
                     // for each hub
-                    foreach (var hub in main.network.hubList)
+                    foreach (var hub in main.network.Hubs.List)
                     {
                         // check for global hub
                         if (hub.globalSession)
@@ -905,7 +939,7 @@ namespace JoinFS
                     // add global users
                     publicCount += maxGlobal;
 
-                    int sessionCount = main.network.nodeList.Count + (main.network.localNode.Connected ? 1 : 0);
+                    int sessionCount = main.network.Peers.Nodes.Count + (main.network.Connected ? 1 : 0);
 
                     // get user count as string
 #if NO_HUBS
@@ -1027,12 +1061,22 @@ namespace JoinFS
             };
             if (dialog.ShowDialog() == DialogResult.OK)
             {
+                // copy on the sim thread (which owns the recording) before opening the file, which
+                // truncates it - a failed copy must not leave an empty file marked as saved
+                List<Recorder.Obj> objects = main.InvokeOnSim(sim => main.recorder.CopyForSave());
+                if (objects == null)
+                {
+                    string message = "ERROR - Recording not saved: the simulator thread did not respond. Please try again.";
+                    MessageBox.Show(message, Main.Name + ": " + Resources.Strings.RecorderStr);
+                    main.MonitorEvent(message);
+                    return;
+                }
                 if ((stream = dialog.OpenFile()) != null)
                 {
-                    lock (main.conch)
+                    // write here
+                    using (stream)
                     {
-                        main.recorder.Write(new BinaryWriter(stream));
-                        stream.Close();
+                        main.recorder.Write(new BinaryWriter(stream), objects);
                     }
                     // save folder
                     Settings.Default.RecordingFolder = Path.GetDirectoryName(dialog.FileName);
@@ -1043,9 +1087,83 @@ namespace JoinFS
         }
 
         /// <summary>
-        /// Check if there is an unsaved recording
+        /// Write an unsaved recording to the documents folder without asking, so starting a new
+        /// recording (also by hotkey, e.g. in VR) never needs a dialog. Returns false if the
+        /// recording couldn't be saved and must be kept
         /// </summary>
-        public void CheckRecording()
+        public bool AutoSaveRecording()
+        {
+            if (unsaved == false || main.recorder.Empty)
+            {
+                return true;
+            }
+
+            // copy on the sim thread, which owns the recording
+            List<Recorder.Obj> objects = main.InvokeOnSim(sim => main.recorder.CopyForSave());
+            if (objects == null)
+            {
+                return ReportAutoSaveFailure("the simulator thread did not respond");
+            }
+
+            try
+            {
+                string path = main.recorder.AutoSave(main.documentsPath, objects, DateTime.Now);
+                main.MonitorEvent("Recorder: auto-saved the previous recording to '" + path + "'.");
+                ShowRecordingSaved(path);
+                unsaved = false;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                return ReportAutoSaveFailure(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Status-bar hint (visible without the Recorder window, e.g. for VR users) for a few seconds
+        /// </summary>
+        const double RECORDING_SAVED_SECONDS = 10.0;
+        ToolStripStatusLabel recordingSavedLabel;
+        DateTime recordingSavedUntil;
+
+        void ShowRecordingSaved(string path)
+        {
+            if (recordingSavedLabel == null)
+            {
+                recordingSavedLabel = new ToolStripStatusLabel
+                {
+                    BorderSides = ToolStripStatusLabelBorderSides.Left,
+                    ForeColor = Color.Gray
+                };
+                StatusStrip_Main.Items.Add(recordingSavedLabel);
+                StatusStrip_Main.ShowItemToolTips = true;
+            }
+            recordingSavedLabel.Text = string.Format(Resources.Strings.Recorder_AutoSaved, Path.GetFileName(path));
+            recordingSavedLabel.ToolTipText = path;
+            recordingSavedLabel.Visible = true;
+            recordingSavedUntil = DateTime.UtcNow.AddSeconds(RECORDING_SAVED_SECONDS);
+        }
+
+        void HideExpiredRecordingSaved()
+        {
+            if (recordingSavedLabel != null && recordingSavedLabel.Visible && DateTime.UtcNow > recordingSavedUntil)
+            {
+                recordingSavedLabel.Visible = false;
+            }
+        }
+
+        bool ReportAutoSaveFailure(string reason)
+        {
+            string message = "ERROR - Previous recording not saved (" + reason + "), so no new recording was started.";
+            main.MonitorEvent(message);
+            MessageBox.Show(message, Main.Name + ": " + Resources.Strings.RecorderStr);
+            return false;
+        }
+
+        /// <summary>
+        /// Ask whether to save an unsaved recording (when closing)
+        /// </summary>
+        public void PromptSaveRecording()
         {
             // check if recording is unsaved
             if (unsaved)
@@ -1054,13 +1172,14 @@ namespace JoinFS
                 DialogResult result = MessageBox.Show(Resources.Strings.SaveCurrentRecording, Main.Name + ": " + Resources.Strings.UnsavedRecording, MessageBoxButtons.YesNo);
                 if (result == DialogResult.Yes)
                 {
-                    lock (main.conch)
-                    {
-                        SaveRecording();
-                    }
+                    // not under conch: SaveRecording shows a dialog and waits for the sim thread
+                    SaveRecording();
                 }
             }
         }
+
+        /// <summary>The tool tips of the main window's buttons; null when tool tips are off.</summary>
+        private ToolTip mainTips;
 
         private void MainForm_Load(object sender, EventArgs e)
         {
@@ -1122,6 +1241,7 @@ namespace JoinFS
                 tip.SetToolTip(Button_Simulator, Resources.Strings.Tip_SimulatorButton);
                 tip.SetToolTip(StatusStrip_Main, Resources.Strings.Tip_Status);
                 tip.SetToolTip(Button_SimBrief, Resources.Strings.MainForm_SimBriefButtonTooltip);
+                mainTips = tip;
             }
 
             // initial flight-plan button state
@@ -1134,9 +1254,25 @@ namespace JoinFS
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
             // leave network
-            CheckRecording();
+            PromptSaveRecording();
 
             base.OnFormClosed(e);
+        }
+
+        /// <summary>
+        /// The automatic reconnect replays the remembered credentials silently. When the hub turns them
+        /// down (they changed), say why the user is asked again before the usual password/login dialog,
+        /// and don't retry the stored password - it is the one just rejected.
+        /// </summary>
+        private void ExplainRejectedCredentialsOnReconnect()
+        {
+            NetworkSnapshot snapshot = main.network.Snapshot;
+            bool rejected = snapshot.JoinResult != JoinResult.Accepted || snapshot.LoginResult != LoginResult.Accepted;
+            if (main.network.Reconnecting && rejected)
+            {
+                main.attempedUsedPassword = true;
+                MessageBox.Show(Resources.Strings.ReconnectCredentialsRejected, Main.Name);
+            }
         }
 
         /// <summary>
@@ -1149,10 +1285,12 @@ namespace JoinFS
             {
 #if !SERVER
                 // check if password failed
-                if (main.network.localNode.CurrentState == LocalNode.State.Connecting)
+                if (main.network.Snapshot.State == SessionState.Connecting)
                 {
+                    ExplainRejectedCredentialsOnReconnect();
+
                     // check for password fail
-                    if (main.network.localNode.ActiveJoinResult == LocalNode.JoinResult.PasswordRequired)
+                    if (main.network.Snapshot.JoinResult == JoinResult.PasswordRequired)
                     {
                         // leave existing network
                         main.network.ScheduleLeave();
@@ -1187,7 +1325,7 @@ namespace JoinFS
                             if (passwordForm.ShowDialog() == DialogResult.OK)
                             {
                                 // get hashed password
-                                passwordHash = LocalNode.HashPassword(passwordForm.password.TrimStart(' ').TrimEnd(' '));
+                                passwordHash = NetHash.HashPassword(passwordForm.password.TrimStart(' ').TrimEnd(' '));
 
                                 lock (main.conch)
                                 {
@@ -1204,7 +1342,7 @@ namespace JoinFS
                         }
                     }
                     // check for login required
-                    else if (main.network.localNode.ActiveJoinResult == LocalNode.JoinResult.LoginRequired)
+                    else if (main.network.Snapshot.JoinResult == JoinResult.LoginRequired)
                     {
                         // leave existing network
                         main.network.ScheduleLeave();
@@ -1296,12 +1434,12 @@ namespace JoinFS
                             lock (main.conch)
                             {
                                 // join session
-                                main.network.ScheduleLogin(main.network.joinEndPoint, loginForm.email, LocalNode.HashString(loginForm.password), false);
+                                main.network.ScheduleLogin(main.network.joinEndPoint, loginForm.email, NetHash.HashString(loginForm.password), false);
                             }
                         }
                     }
                     // check for verify required
-                    else if (main.network.localNode.ActiveLoginResult == LocalNode.LoginResult.VerifyPassword)
+                    else if (main.network.Snapshot.LoginResult == LoginResult.VerifyPassword)
                     {
                         // leave existing network
                         main.network.ScheduleLeave();
@@ -1312,7 +1450,7 @@ namespace JoinFS
                         if (loginForm.ShowDialog() == DialogResult.OK)
                         {
                             // get password hash
-                            uint hash = LocalNode.HashString(loginForm.password);
+                            uint hash = NetHash.HashString(loginForm.password);
                             if (hash == 0) hash = 1;
                             // verify password
                             if (hash == main.network.ScheduleLoginHash)
@@ -1331,7 +1469,7 @@ namespace JoinFS
                         }
                     }
                     // check for invalid email
-                    else if (main.network.localNode.ActiveLoginResult == LocalNode.LoginResult.InvalidAddress)
+                    else if (main.network.Snapshot.LoginResult == LoginResult.InvalidAddress)
                     {
                         // leave existing network
                         main.network.ScheduleLeave();
@@ -1339,7 +1477,7 @@ namespace JoinFS
                         main.ShowMessage(Resources.Strings.InvalidEmail);
                     }
                     // check for invalid password
-                    else if (main.network.localNode.ActiveLoginResult == LocalNode.LoginResult.InvalidPassword)
+                    else if (main.network.Snapshot.LoginResult == LoginResult.InvalidPassword)
                     {
                         // leave existing network
                         main.network.ScheduleLeave();
@@ -1365,7 +1503,7 @@ namespace JoinFS
                         // update button text
                         createText = "Hub";
                     }
-                    else if (main.network.localNode.CurrentState != LocalNode.State.Unconnected)
+                    else if (main.network.Snapshot.State != SessionState.Unconnected)
                     {
                         // update create button
                         createEnabled = false;
@@ -1407,33 +1545,43 @@ namespace JoinFS
                 Color backColor = Settings.Default.ColourWaitingBackground;
                 Color foreColor = Settings.Default.ColourWaitingText;
                 string buttonText = Resources.Strings.Network;
+                string buttonTip = Resources.Strings.Tip_NetworkButton;
 
                 lock (main.conch)
                 {
-                    // check connection state
-                    switch (main.network.localNode.CurrentState)
+                    // "Connected" can also mean "lost every peer and retrying" (see
+                    // Network.CheckForOrphanedSession): orange, like Button_Simulator's Connecting state
+                    bool reconnecting = main.network.Reconnecting;
+                    NetworkButtonLook look = NetworkButtonStyle.For(
+                        main.network.Snapshot.State, reconnecting, main.network.scheduleJoinUser);
+
+                    switch (look)
                     {
-                        case LocalNode.State.Connected:
-                            // update label
+                        case NetworkButtonLook.Active:
                             backColor = Settings.Default.ColourActiveBackground;
                             foreColor = Settings.Default.ColourActiveText;
                             // check for password
-                            if (main.network.localNode.Password)
+                            if (main.network.Snapshot.PasswordProtected)
                             {
                                 buttonText = Resources.Strings.Password;
                             }
                             break;
 
-                        case LocalNode.State.Unconnected:
-                            // check not auto joining
-                            if (main.network.scheduleJoinUser == false)
-                            {
-                                // update label
-                                backColor = Settings.Default.ColourInactiveBackground;
-                                foreColor = Settings.Default.ColourInactiveText;
-                            }
+                        case NetworkButtonLook.Inactive:
+                            backColor = Settings.Default.ColourInactiveBackground;
+                            foreColor = Settings.Default.ColourInactiveText;
                             break;
                     }
+
+                    if (reconnecting)
+                    {
+                        buttonTip = Resources.Strings.Tip_NetworkReconnecting;
+                    }
+                }
+
+                if (mainTips != null && mainTips.GetToolTip(Button_Network) != buttonTip)
+                {
+                    mainTips.SetToolTip(Button_Network, buttonTip);
                 }
 
                 // update back color
@@ -1472,16 +1620,16 @@ namespace JoinFS
                 Color backColor = Settings.Default.ColourInactiveBackground;
                 Color foreColor = Settings.Default.ColourInactiveText;
 
-                lock (main.conch)
+                SimSnapshot view = main.sim.View;
                 {
                     // check if FS connected
-                    if (main.sim.Connected)
+                    if (view.Connected)
                     {
                         // update label
                         backColor = Settings.Default.ColourActiveBackground;
                         foreColor = Settings.Default.ColourActiveText;
                     }
-                    else if (main.sim.Connecting)
+                    else if (view.Connecting)
                     {
                         // update label
                         backColor = Settings.Default.ColourWaitingBackground;
@@ -1539,7 +1687,7 @@ namespace JoinFS
         {
             // join
 #if NO_HUBS
-            main.Join(Network.DecodeIP(Combo_Join.Text.TrimStart(' ').TrimEnd(' ')));
+            main.Join(AddressCodec.DecodeIP(Combo_Join.Text.TrimStart(' ').TrimEnd(' ')));
 #else
             main.Join(Combo_Join.Text.TrimStart(' ').TrimEnd(' '));
 #endif
@@ -1561,10 +1709,10 @@ namespace JoinFS
                 return;
             }
 
-            Sim.FlightPlan plan = main.sim.userFlightPlan;
+            Sim.FlightPlan plan = main.sim.View.UserFlightPlan;
             bool hasPlan = plan.departure.Length > 0 || plan.destination.Length > 0;
 
-            Button_FlightPlan.Text = hasPlan ? plan.departure + "   ➜   " + plan.destination : "Flight plan";
+            Button_FlightPlan.Text = hasPlan ? plan.departure + "   ➜   " + plan.destination : Resources.Strings.MainForm_FlightPlanButtonDefaultText;
 
             if (Settings.Default.ToolTips)
             {
@@ -1578,15 +1726,35 @@ namespace JoinFS
                 }
                 else
                 {
-                    tooltip = "Click to create your flight plan, if you'd like to have one assigned.";
+                    tooltip = Resources.Strings.MainForm_FlightPlanButtonTooltipNoPlan;
                 }
                 flightPlanTip.SetToolTip(Button_FlightPlan, tooltip);
             }
 
-            // SimBrief button - green/red (Active/Inactive) coloring, same scheme as Button_Simulator/Button_Network
-            bool ok = main.sim.simBriefLastFetchSucceeded;
-            Color simBriefBackColor = ok ? Settings.Default.ColourActiveBackground : Settings.Default.ColourInactiveBackground;
-            Color simBriefForeColor = ok ? Settings.Default.ColourActiveText : Settings.Default.ColourInactiveText;
+            // SimBrief button coloring: neutral/default (matches Button_FlightPlan's plain look) until a
+            // fetch has actually been triggered (auto-import or a manual click), so an idle button - e.g.
+            // auto-import off and nothing clicked yet - doesn't read as a failure. Once triggered: Waiting/
+            // orange while fetching, Active/green on success, Inactive/red if no plan could be fetched -
+            // same three-state palette as Button_Simulator/Button_Network.
+            bool simBriefNeutral = main.sim.simBriefFetchState == Sim.SimBriefFetchState.NotTriggered;
+            if (Button_SimBrief.UseVisualStyleBackColor != simBriefNeutral)
+            {
+                Button_SimBrief.UseVisualStyleBackColor = simBriefNeutral;
+            }
+            Color simBriefBackColor = main.sim.simBriefFetchState switch
+            {
+                Sim.SimBriefFetchState.Fetching => Settings.Default.ColourWaitingBackground,
+                Sim.SimBriefFetchState.Success => Settings.Default.ColourActiveBackground,
+                Sim.SimBriefFetchState.Failed => Settings.Default.ColourInactiveBackground,
+                _ => SystemColors.Control,
+            };
+            Color simBriefForeColor = main.sim.simBriefFetchState switch
+            {
+                Sim.SimBriefFetchState.Fetching => Settings.Default.ColourWaitingText,
+                Sim.SimBriefFetchState.Success => Settings.Default.ColourActiveText,
+                Sim.SimBriefFetchState.Failed => Settings.Default.ColourInactiveText,
+                _ => SystemColors.ControlText,
+            };
             if (Button_SimBrief.BackColor != simBriefBackColor)
             {
                 Button_SimBrief.BackColor = simBriefBackColor;
@@ -1611,22 +1779,26 @@ namespace JoinFS
 
         void CommitUserFlightPlanChange()
         {
-            // bump flight plan version, same as the scheduled flight-plan-form flow
-            if (main.sim.userAircraft != null)
-            {
-                main.sim.userAircraft.flightPlanVersion++;
-                if (main.sim.userAircraft.flightPlanVersion == 0) main.sim.userAircraft.flightPlanVersion = 1;
-            }
             RefreshFlightPlanButtons();
+            // AircraftForm's grid reads flightPlan.callsign live but only redraws when its own refresher
+            // fires - unlike opening FlightPlanForm from AircraftForm's own context menu (which calls
+            // RefreshWindow() directly), this main-screen commit path never notified it, so the grid kept
+            // showing whatever callsign was there before this edit until some unrelated event happened to
+            // trigger a refresh - looking stale/mismatched against a freshly-opened FlightPlanForm.
+            main.aircraftForm.refresher.Schedule();
         }
 
         void BroadcastUserFlightPlanNow()
         {
-            // main-screen source buttons commit and broadcast immediately - no dialog/Save step
-            if (main.sim.userAircraft != null)
+            // main-screen source buttons commit and broadcast immediately - no dialog/Save step.
+            // On the sim thread, which owns the plan (after any edit posted before it).
+            main.SimCommand(sim =>
             {
-                main.network.SendFlightPlanMessage(main.network.localNode.GetLocalNuid(), main.sim.userAircraft.netId, main.sim.userFlightPlan);
-            }
+                if (sim.userAircraft != null)
+                {
+                    main.network.SimSender.BroadcastFlightPlanUpdate(sim.userAircraft.netId, sim.userFlightPlan);
+                }
+            });
         }
 
         private void Button_FlightPlan_Click(object sender, EventArgs e)
@@ -1636,7 +1808,7 @@ namespace JoinFS
                 return;
             }
 
-            if (new FlightPlanForm(main, main.sim.userFlightPlan).ShowDialog() == DialogResult.OK)
+            if (new FlightPlanForm(main, main.sim.View.UserAircraft, main.sim.View.UserFlightPlan).ShowDialog() == DialogResult.OK)
             {
                 CommitUserFlightPlanChange();
             }
@@ -1652,7 +1824,7 @@ namespace JoinFS
             if (string.IsNullOrWhiteSpace(Settings.Default.SimBriefUsername))
             {
                 // nothing configured yet - land the pilot on the field where they'd set it
-                if (new FlightPlanForm(main, main.sim.userFlightPlan) { FocusSimBriefUsername = true }.ShowDialog() == DialogResult.OK)
+                if (new FlightPlanForm(main, main.sim.View.UserAircraft, main.sim.View.UserFlightPlan) { FocusSimBriefUsername = true }.ShowDialog() == DialogResult.OK)
                 {
                     CommitUserFlightPlanChange();
                 }
@@ -1678,7 +1850,7 @@ namespace JoinFS
         public void ToggleNetwork()
         {
             // get connected state
-            bool connected = main.network.localNode.CurrentState != LocalNode.State.Unconnected;
+            bool connected = main.network.Snapshot.State != SessionState.Unconnected;
 
             // check if user join scheduled
             if (main.network.scheduleJoinUser)
@@ -1702,7 +1874,7 @@ namespace JoinFS
             {
                 // join
 #if NO_HUBS
-                main.Join(Network.DecodeIP(Combo_Join.Text.TrimStart(' ').TrimEnd(' ')));
+                main.Join(AddressCodec.DecodeIP(Combo_Join.Text.TrimStart(' ').TrimEnd(' ')));
 #else
                 main.Join(Combo_Join.Text.TrimStart(' ').TrimEnd(' '));
 #endif
@@ -1750,7 +1922,7 @@ namespace JoinFS
             lock (main.conch)
             {
                 // low bandwidth
-                main.network.localNode.lowBandwidth = Settings.Default.LowBandwidth;
+                main.network.LowBandwidth = Settings.Default.LowBandwidth;
             }
         }
 
@@ -1964,7 +2136,7 @@ namespace JoinFS
         {
             // check if no simulator connected
 #if !XPLANE
-            if (main.sim != null && main.sim.Connected == false)
+            if (main.sim != null && main.sim.View.Connected == false)
             {
                 MessageBox.Show(Resources.Strings.EditMatchingWarning, Main.Name + ": " + Resources.Strings.EditModelMatching);
             }
@@ -2049,14 +2221,14 @@ namespace JoinFS
         {
 #if !SERVER
             // check if no simulator connected
-            if (main.sim != null && main.sim.Connected == false)
+            if (main.sim != null && main.sim.View.Connected == false)
             {
                 MessageBox.Show(Resources.Strings.AssignVariablesWarning, Main.Name);
             }
             else
             {
                 // show dialog for assigning variables
-                new VariablesForm(main, main.sim ?. userAircraft ?. ownerModel).ShowDialog();
+                new VariablesForm(main, main.sim ?. View.UserAircraft ?. ownerModel).ShowDialog();
             }
 #endif
         }

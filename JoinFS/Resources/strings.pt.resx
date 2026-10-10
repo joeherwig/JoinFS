@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -330,8 +330,20 @@
   <data name="Shortcuts_Network" xml:space="preserve">
     <value>Liga / desliga o estado da rede</value>
   </data>
+  <data name="Shortcuts_Overdub" xml:space="preserve">
+    <value>Comece a gravação em overdub</value>
+  </data>
+  <data name="Shortcuts_Record" xml:space="preserve">
+    <value>Comece a registrar a aeronave selecionada</value>
+  </data>
+  <data name="Shortcuts_Replay" xml:space="preserve">
+    <value>Reproduzir / pausar a aeronave armazenada no gravador</value>
+  </data>
   <data name="Shortcuts_Simulator" xml:space="preserve">
     <value>Liga / desliga o estado do simulador</value>
+  </data>
+  <data name="Shortcuts_Stop" xml:space="preserve">
+    <value>Pare de gravar / reproduzir</value>
   </data>
   <data name="SingleProp" xml:space="preserve">
     <value>SingleProp</value>
@@ -740,5 +752,47 @@
   </data>
   <data name="MainForm_SimBriefButtonTooltip" xml:space="preserve">
     <value>Usar dados do SimBrief como fonte do plano de voo e buscá-los novamente agora</value>
+  </data>
+  <data name="Airship" xml:space="preserve">
+    <value>Dirigível</value>
+  </data>
+  <data name="Balloon" xml:space="preserve">
+    <value>Balão</value>
+  </data>
+  <data name="MainForm_FlightPlanButtonDefaultText" xml:space="preserve">
+    <value>Plano de Voo</value>
+  </data>
+  <data name="MainForm_FlightPlanButtonTooltipNoPlan" xml:space="preserve">
+    <value>Clique para criar seu plano de voo, caso deseje ter um atribuído.</value>
+  </data>
+  <data name="FlightPlan_AltitudeTooltip" xml:space="preserve">
+    <value>Altitude de cruzeiro ou nível de voo, ex. 35000 ou FL350</value>
+  </data>
+  <data name="Recorder_ActiveLoad" xml:space="preserve">
+    <value>Carregar uma gravação interrompe a reprodução atual e o tráfego injetado desaparece para os utilizadores que te permitem vários objetos. Para primeiro o gravador (Recorder|Stop) e depois carrega a gravação.</value>
+  </data>
+  <data name="Recorder_ActiveSave" xml:space="preserve">
+    <value>Para o gravador (Recorder|Stop) antes de guardar.</value>
+  </data>
+  <data name="Recorder_AutoSaved" xml:space="preserve">
+    <value>Gravação salva: {0}</value>
+  </data>
+  <data name="ReconnectCredentialsRejected" xml:space="preserve">
+    <value>A conexão foi perdida e o hub rejeitou as credenciais salvas (elas podem ter mudado). Digite-as novamente para reconectar.</value>
+  </data>
+  <data name="Tip_NetworkReconnecting" xml:space="preserve">
+    <value>Conexão perdida - reconectando automaticamente.</value>
+  </data>
+  <data name="ReconnectGaveUp" xml:space="preserve">
+    <value>Conexão perdida. A reconexão automática não conseguiu restabelecê-la nos últimos {0} minutos. Tente reconectar manualmente quando estiver pronto.</value>
+  </data>
+  <data name="Tip_ClassicMatching" xml:space="preserve">
+    <value>Usar a correspondência de modelos clássica (apenas tipo, companhia e classe) em vez da inteligente</value>
+  </data>
+  <data name="MatchExplain_EngineNew" xml:space="preserve">
+    <value>Método de correspondência: inteligente (compara também tamanho, peso, velocidade, motores e fabricante, além de tipo, companhia e classe). Inicie o JoinFS com --classicmatching para usar o método clássico.</value>
+  </data>
+  <data name="MatchExplain_EngineClassic" xml:space="preserve">
+    <value>Método de correspondência: clássico (compara apenas tipo, companhia, código de classe e categoria de esteira), escolhido com --classicmatching.</value>
   </data>
 </root>

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -504,5 +504,65 @@
         rEEAAKxBAACsQQAArEEAAKxBAACsQQAArEEAAKxBAACsQQAArEEAAKxBAACsQQAArEEAAKxBAACsQQAA
         rEE=
 </value>
+  </data>
+  <data name="Menu_File_AddressBook.Text" xml:space="preserve">
+    <value>Favorieten</value>
+  </data>
+  <data name="Menu_File_Exit.Text" xml:space="preserve">
+    <value>Afsluiten</value>
+  </data>
+  <data name="Menu_File_Options.Text" xml:space="preserve">
+    <value>Command Line Opties</value>
+  </data>
+  <data name="Menu_File_Recorder.Text" xml:space="preserve">
+    <value>Opname</value>
+  </data>
+  <data name="Menu_File_Settings.Text" xml:space="preserve">
+    <value>Instellingen…</value>
+  </data>
+  <data name="Menu_File_Shortcuts.Text" xml:space="preserve">
+    <value>Sneltoetsen</value>
+  </data>
+  <data name="Menu_File_SimComX.Text" xml:space="preserve">
+    <value>SimCom X Voice Client…</value>
+  </data>
+  <data name="Menu_File_Variables.Text" xml:space="preserve">
+    <value>Variabelen toewijzen…</value>
+  </data>
+  <data name="Menu_Help_License.Text" xml:space="preserve">
+    <value>Licentie</value>
+  </data>
+  <data name="Menu_Help_Manual.Text" xml:space="preserve">
+    <value>Handleiding…</value>
+  </data>
+  <data name="Menu_Help_Radar.Text" xml:space="preserve">
+    <value>ATC Radar…</value>
+  </data>
+  <data name="Menu_Help_Support.Text" xml:space="preserve">
+    <value>Ondersteuning…</value>
+  </data>
+  <data name="Menu_View_Aircraft.Text" xml:space="preserve">
+    <value>Vliegtuigen</value>
+  </data>
+  <data name="Menu_View_Atc.Text" xml:space="preserve">
+    <value>Openbare ATC</value>
+  </data>
+  <data name="Menu_View_Hubs.Text" xml:space="preserve">
+    <value>Servers</value>
+  </data>
+  <data name="Menu_View_Monitor.Text" xml:space="preserve">
+    <value>Monitor</value>
+  </data>
+  <data name="Menu_View_Objects.Text" xml:space="preserve">
+    <value>Objecten</value>
+  </data>
+  <data name="Menu_View_Session.Text" xml:space="preserve">
+    <value>Gebruikers</value>
+  </data>
+  <data name="Button_Simulator.Text" xml:space="preserve">
+    <value>Simulator</value>
+  </data>
+  <data name="helpToolStripMenuItem.Text" xml:space="preserve">
+    <value>Help</value>
   </data>
 </root>

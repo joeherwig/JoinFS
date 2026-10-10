@@ -6,6 +6,7 @@ using System.IO;
 using System.Windows.Forms;
 #endif
 using JoinFS.Properties;
+using JoinFS.Net;
 
 
 namespace JoinFS
@@ -15,6 +16,14 @@ namespace JoinFS
     /// </summary>
     public class Recorder
     {
+        /// <summary>
+        /// Version written into .jfs recordings, and the newest this build reads. It used to be the
+        /// network data version (Sim.VERSION), so any wire change bumped recordings too; the legacy
+        /// wire now has its own (JoinFS.Net.Legacy.LegacyWire.DataVersion) and this changes only when
+        /// the recording format does. Same value as before, so files are unchanged.
+        /// </summary>
+        public const short FileVersion = 21008;
+
         /// <summary>
         /// Reference to the main form
         /// </summary>
@@ -29,7 +38,7 @@ namespace JoinFS
             this.main = main;
 
             // read versions
-            readVersions = new Dictionary<short, Sim.ReadVersion>()
+            readVersions = new Dictionary<short, JfsFrames.ReadVersion>()
             {
                 { 10022, Read1 },
             };
@@ -76,7 +85,7 @@ namespace JoinFS
             public Frame()
             {
                 // versions
-                readVersions = new Dictionary<short,Sim.ReadVersion>()
+                readVersions = new Dictionary<short,JfsFrames.ReadVersion>()
                 {
                     { 10022, Read1 },
                 };
@@ -109,7 +118,7 @@ namespace JoinFS
             /// <summary>
             /// Version table for reading data
             /// </summary>
-            protected Dictionary<short, Sim.ReadVersion> readVersions;
+            protected Dictionary<short, JfsFrames.ReadVersion> readVersions;
 
             /// <summary>
             /// Read data
@@ -119,7 +128,7 @@ namespace JoinFS
             public void Read(short version, BinaryReader reader)
             {
                 // read correct version
-                Sim.Read(version, readVersions, reader);
+                JfsFrames.Read(version, readVersions, reader);
             }
         }
 
@@ -153,7 +162,7 @@ namespace JoinFS
             public ObjectPositionFrame()
             {
                 // versions
-                readVersions = new Dictionary<short, Sim.ReadVersion>()
+                readVersions = new Dictionary<short, JfsFrames.ReadVersion>()
                 {
                     { 10022, Read1 },
                 };
@@ -167,7 +176,7 @@ namespace JoinFS
                 // write frame
                 base.Write(writer);
                 // write position velocity
-                Sim.Write(writer, ref data);
+                JfsFrames.Write(writer, ref data);
             }
 
             /// <summary>
@@ -177,7 +186,7 @@ namespace JoinFS
             public override void Read1(short version, BinaryReader reader)
             {
                 // read position velocity
-                Sim.Read(version, reader, ref data);
+                JfsFrames.Read(version, reader, ref data);
             }
         }
 
@@ -211,7 +220,7 @@ namespace JoinFS
             public AircraftPositionFrame()
             {
                 // versions
-                readVersions = new Dictionary<short, Sim.ReadVersion>()
+                readVersions = new Dictionary<short, JfsFrames.ReadVersion>()
                 {
                     { 10022, Read1 },
                 };
@@ -225,7 +234,7 @@ namespace JoinFS
                 // write frame
                 base.Write(writer);
                 // write position velocity
-                Sim.Write(writer, ref data);
+                JfsFrames.Write(writer, ref data);
             }
 
             /// <summary>
@@ -235,7 +244,7 @@ namespace JoinFS
             public override void Read1(short version, BinaryReader reader)
             {
                 // read position velocity
-                Sim.Read(version, reader, ref data);
+                JfsFrames.Read(version, reader, ref data);
             }
         }
 
@@ -271,7 +280,7 @@ namespace JoinFS
             public SimEventFrame()
             {
                 // versions
-                readVersions = new Dictionary<short, Sim.ReadVersion>()
+                readVersions = new Dictionary<short, JfsFrames.ReadVersion>()
                 {
                     { 10022, Read1 },
                 };
@@ -338,7 +347,7 @@ namespace JoinFS
             public IntegerVariablesFrame()
             {
                 // versions
-                readVersions = new Dictionary<short, Sim.ReadVersion>()
+                readVersions = new Dictionary<short, JfsFrames.ReadVersion>()
                 {
                     { 10022, Read1 },
                 };
@@ -355,7 +364,7 @@ namespace JoinFS
                 // write frame
                 base.Write(writer);
                 // write variables
-                Sim.Write(writer, variables);
+                JfsFrames.Write(writer, variables);
             }
 
             /// <summary>
@@ -367,7 +376,7 @@ namespace JoinFS
                 // clear variables
                 variables.Clear();
                 // read variables
-                Sim.Read(version, reader, variables);
+                JfsFrames.Read(version, reader, variables);
             }
         }
 
@@ -405,7 +414,7 @@ namespace JoinFS
             public FloatVariablesFrame()
             {
                 // versions
-                readVersions = new Dictionary<short, Sim.ReadVersion>()
+                readVersions = new Dictionary<short, JfsFrames.ReadVersion>()
                 {
                     { 10022, Read1 },
                 };
@@ -422,7 +431,7 @@ namespace JoinFS
                 // write frame
                 base.Write(writer);
                 // write variables
-                Sim.Write(writer, variables);
+                JfsFrames.Write(writer, variables);
             }
 
             /// <summary>
@@ -434,7 +443,7 @@ namespace JoinFS
                 // clear variables
                 variables.Clear();
                 // read variables
-                Sim.Read(version, reader, variables);
+                JfsFrames.Read(version, reader, variables);
             }
         }
 
@@ -472,7 +481,7 @@ namespace JoinFS
             public String8VariablesFrame()
             {
                 // versions
-                readVersions = new Dictionary<short, Sim.ReadVersion>()
+                readVersions = new Dictionary<short, JfsFrames.ReadVersion>()
                 {
                     { 10022, Read1 },
                 };
@@ -489,7 +498,7 @@ namespace JoinFS
                 // write frame
                 base.Write(writer);
                 // write variables
-                Sim.Write(writer, variables);
+                JfsFrames.Write(writer, variables);
             }
 
             /// <summary>
@@ -501,7 +510,7 @@ namespace JoinFS
                 // clear variables
                 variables.Clear();
                 // read variables
-                Sim.Read(version, reader, variables);
+                JfsFrames.Read(version, reader, variables);
             }
         }
 
@@ -538,6 +547,14 @@ namespace JoinFS
             /// List of frames
             /// </summary>
             public List<Frame> frames = [];
+
+            /// <summary>Copy with its own frame list (the frames themselves are shared)</summary>
+            public Obj CopyForSave()
+            {
+                Obj copy = (Obj)MemberwiseClone();
+                copy.frames = new(frames);
+                return copy;
+            }
             public int frameIndex = 0;
             /// <summary>
             /// Object owner
@@ -579,7 +596,7 @@ namespace JoinFS
                 this.livery = livery;
 
                 // versions
-                readVersions = new Dictionary<short, Sim.ReadVersion>()
+                readVersions = new Dictionary<short, JfsFrames.ReadVersion>()
                 {
                     { 10022, Read1 },
                 };
@@ -595,7 +612,7 @@ namespace JoinFS
                 this.owner = Sim.Obj.Owner.Recorder;
 
                 // versions
-                readVersions = new Dictionary<short, Sim.ReadVersion>()
+                readVersions = new Dictionary<short, JfsFrames.ReadVersion>()
                 {
                     { 10022, Read1 },
                 };
@@ -703,7 +720,7 @@ namespace JoinFS
             /// <summary>
             /// Version table for reading data
             /// </summary>
-            protected Dictionary<short, Sim.ReadVersion> readVersions;
+            protected Dictionary<short, JfsFrames.ReadVersion> readVersions;
 
             /// <summary>
             /// Read data
@@ -713,7 +730,7 @@ namespace JoinFS
             public void Read(short version, BinaryReader reader)
             {
                 // read correct version
-                Sim.Read(version, readVersions, reader);
+                JfsFrames.Read(version, readVersions, reader);
             }
         }
 
@@ -749,7 +766,7 @@ namespace JoinFS
                 this.livery = livery;
 
                 // versions
-                readVersions = new Dictionary<short, Sim.ReadVersion>()
+                readVersions = new Dictionary<short, JfsFrames.ReadVersion>()
                 {
                     { 10022, Read1 },
                 };
@@ -761,7 +778,7 @@ namespace JoinFS
             public Aircraft()
             {
                 // versions
-                readVersions = new Dictionary<short, Sim.ReadVersion>()
+                readVersions = new Dictionary<short, JfsFrames.ReadVersion>()
                 {
                     { 10022, Read1 },
                 };
@@ -858,14 +875,36 @@ namespace JoinFS
         List<Obj> objList = [];
 
         /// <summary>
-        /// Is the recorder currently recording
+        /// Is the recorder currently recording. The recorder runs on the sim thread; other threads
+        /// may read the flags and <see cref="EndTimeView"/>/<see cref="Exists"/>, and send
+        /// commands through Main.InvokeOnSim / Main.SimCommand.
         /// </summary>
-        public bool recording;
+        public volatile bool recording;
 
         /// <summary>
         /// Is the recorder currently playing
         /// </summary>
-        public bool playing;
+        public volatile bool playing;
+
+        /// <summary>
+        /// End time and object ids as of the last pass, for other threads
+        /// </summary>
+        double endTimeView;
+        volatile uint[] idsView = [];
+
+        /// <summary>
+        /// <see cref="EndTime"/> as of the sim thread's last pass (any thread)
+        /// </summary>
+        public double EndTimeView => System.Threading.Volatile.Read(ref endTimeView);
+
+        /// <summary>
+        /// Publish what other threads read (sim thread)
+        /// </summary>
+        public void PublishStatus()
+        {
+            System.Threading.Volatile.Write(ref endTimeView, EndTime);
+            idsView = objList.ConvertAll(o => o.id).ToArray();
+        }
 
         /// <summary>
         /// Is the recorder recording or playing
@@ -876,6 +915,116 @@ namespace JoinFS
         /// Is the recorder empty
         /// </summary>
         public bool Empty { get { return (objList.Count == 0); } }
+
+        /// <summary>
+        /// What each recorder action is allowed to do in a given state. The Recorder buttons and the
+        /// global hotkeys both ask these, so a hotkey can't fire what the button would have disabled
+        /// (Button.Enabled goes stale while the Recorder window is hidden).
+        /// </summary>
+        public static bool CanRecord(bool recording, bool playing) => !(recording || playing);
+        public static bool CanOverdub(bool recording, bool empty) => !recording && !empty;
+        public static bool CanPlay(bool recording, bool empty) => !recording && !empty;
+        public static bool CanStop(bool recording, bool playing) => recording || playing;
+
+        public bool CanRecord() => CanRecord(recording, playing);
+        public bool CanOverdub() => CanOverdub(recording, Empty);
+        public bool CanPlay() => CanPlay(recording, Empty);
+        public bool CanStop() => CanStop(recording, playing);
+
+        /// <summary>
+        /// The Record and Overdub hotkeys pressed during a recording stop it first (Record then
+        /// auto-saves it) and start a new one, since a hotkey user (VR) can't reach Stop. The buttons
+        /// stay disabled meanwhile.
+        /// </summary>
+        public static bool HotkeyRestartsRecording(bool recording) => recording;
+
+        /// <summary>
+        /// An overdub needs a track to overdub: on an empty recorder it is a plain record, which also
+        /// sets the start time that frames are stamped against
+        /// </summary>
+        public static bool ResolveOverdub(bool requested, bool empty) => requested && !empty;
+
+        /// <summary>
+        /// File name for an auto-saved recording: date, time and the first aircraft's callsign
+        /// </summary>
+        public static string BuildAutoSaveFileName(DateTime now, string firstCallsign)
+        {
+            string callsign = string.IsNullOrWhiteSpace(firstCallsign) ? "recording" : firstCallsign.Trim();
+            foreach (char invalid in Path.GetInvalidFileNameChars())
+            {
+                callsign = callsign.Replace(invalid, '_');
+            }
+            return now.ToString("yyyy-MM-dd_HHmmss", System.Globalization.CultureInfo.InvariantCulture) + "_" + callsign + ".jfs";
+        }
+
+        /// <summary>
+        /// Callsign of the first aircraft in a recording, empty if there is none
+        /// </summary>
+        public static string FirstCallsign(List<Obj> objects)
+        {
+            foreach (var obj in objects)
+            {
+                if (obj is Aircraft aircraft)
+                {
+                    return aircraft.callsign ?? "";
+                }
+            }
+            return "";
+        }
+
+        /// <summary>
+        /// A path in the folder for the file name that doesn't exist yet (-2, -3, ... appended)
+        /// </summary>
+        public static string UniquePath(string folder, string fileName)
+        {
+            string path = Path.Combine(folder, fileName);
+            string stem = Path.GetFileNameWithoutExtension(fileName);
+            string extension = Path.GetExtension(fileName);
+            for (int counter = 2; File.Exists(path); counter++)
+            {
+                path = Path.Combine(folder, stem + "-" + counter + extension);
+            }
+            return path;
+        }
+
+        /// <summary>
+        /// Write a copy of a recording (from <see cref="CopyForSave"/>) into the folder under an
+        /// automatic name, never overwriting a file. Returns the path; throws if it can't be written
+        /// (a partially written file is deleted first) - any thread
+        /// </summary>
+        public string AutoSave(string folder, List<Obj> objects, DateTime now)
+        {
+            string path = UniquePath(folder, BuildAutoSaveFileName(now, FirstCallsign(objects)));
+            using (var stream = new FileStream(path, FileMode.CreateNew))
+            {
+                try
+                {
+                    using var writer = new BinaryWriter(stream);
+                    Write(writer, objects);
+                }
+                catch
+                {
+                    stream.Dispose();
+                    TryDeleteQuietly(path);
+                    throw;
+                }
+            }
+            return path;
+        }
+
+        /// <summary>
+        /// Delete a file, ignoring failures (nothing sensible left to do about them) - any thread
+        /// </summary>
+        static void TryDeleteQuietly(string path)
+        {
+            try
+            {
+                File.Delete(path);
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+            }
+        }
 
         /// <summary>
         /// Time that playing or recording started
@@ -1083,6 +1232,9 @@ namespace JoinFS
         /// </summary>
         public void StartRecord(bool overdub)
         {
+            // overdubbing nothing is recording
+            overdub = ResolveOverdub(overdub, Empty);
+
             // should not be recording
             if (main.sim != null && recording == false && (playing == false || overdub))
             {
@@ -1108,7 +1260,7 @@ namespace JoinFS
                             // plane
                             Sim.Aircraft simAircraft = simObject as Sim.Aircraft;
                             // create recorded aircraft
-                            simObject.recorderObj = new Aircraft(simAircraft is Sim.Plane, simAircraft.flightPlan.callsign, main.network.GetNodeName(simAircraft.ownerNuid), simAircraft.ownerModel, simAircraft.ownerLivery, simAircraft.ownerIcaoType, simAircraft.ownerIcaoAirline, simAircraft.typerole, simAircraft.owner);
+                            simObject.recorderObj = new Aircraft(simAircraft is Sim.Plane, simAircraft.flightPlan.callsign, main.network.Peers.GetNodeName(simAircraft.ownerNuid), simAircraft.ownerModel, simAircraft.ownerLivery, simAircraft.ownerIcaoType, simAircraft.ownerIcaoAirline, simAircraft.typerole, simAircraft.owner);
                         }
                         else
                         {
@@ -1136,7 +1288,7 @@ namespace JoinFS
                         aircraftCount++;
                     }
                 }
-                main.MonitorEvent("Recorder: start recording " + objList.Count + " objects (" + aircraftCount + " aircraft). SimConnected=" + main.sim.Connected + ", NetworkConnected=" + main.network.localNode.Connected + ".");
+                main.MonitorEvent("Recorder: start recording " + objList.Count + " objects (" + aircraftCount + " aircraft). SimConnected=" + main.sim.Connected + ", NetworkConnected=" + main.network.Connected + ".");
 
                 // now recording
                 recording = true;
@@ -1176,7 +1328,7 @@ namespace JoinFS
                 obj.StopPlaying();
 
                 // remove recorded object from sim
-                main.sim ?. RemoveObject(new LocalNode.Nuid(), obj.id);
+                main.sim ?. RemoveObject(new NodeId(), obj.id);
             }
 
             // check state
@@ -1188,7 +1340,7 @@ namespace JoinFS
                 int variableCount = recordFrameCounts.GetValueOrDefault(FrameType.IntegerVariables) + recordFrameCounts.GetValueOrDefault(FrameType.FloatVariables) + recordFrameCounts.GetValueOrDefault(FrameType.String8Variables);
                 if (positionCount == 0 && variableCount > 0)
                 {
-                    main.MonitorEvent("Recorder: warning - captured variable frames but no position frames. SimConnected=" + main.sim.Connected + ", NetworkConnected=" + main.network.localNode.Connected + ".");
+                    main.MonitorEvent("Recorder: warning - captured variable frames but no position frames. SimConnected=" + main.sim.Connected + ", NetworkConnected=" + main.network.Connected + ".");
                 }
 
                 if (recordSimErrorCount > 0)
@@ -1218,7 +1370,8 @@ namespace JoinFS
         /// <returns></returns>
         public bool Exists(uint id)
         {
-            return objList.Exists(o => o.id == id);
+            // any thread: the ids as of the sim thread's last pass
+            return Array.IndexOf(idsView, id) >= 0;
         }
 
         /// <summary>
@@ -1240,7 +1393,7 @@ namespace JoinFS
                 if (main.sim != null)
                 {
                     // remove recorded object from sim
-                    main.sim.RemoveObject(new LocalNode.Nuid(), obj.id);
+                    main.sim.RemoveObject(new NodeId(), obj.id);
 
                     // for each object in the sim
                     foreach (var simObject in main.sim.objectList)
@@ -1262,7 +1415,7 @@ namespace JoinFS
         /// <summary>
         /// Is the recorder currently paused
         /// </summary>
-        public bool paused;
+        public volatile bool paused;
 
         /// <summary>
         /// Time at which paused occurred
@@ -1284,7 +1437,7 @@ namespace JoinFS
                     if (obj.playing)
                     {
                         // update pause state
-                        main.sim ?. PauseObject(new LocalNode.Nuid(), obj.id, false);
+                        main.sim ?. PauseObject(new NodeId(), obj.id, false);
                     }
                 }
 
@@ -1307,7 +1460,7 @@ namespace JoinFS
                     if (obj.playing)
                     {
                         // update pause state
-                        main.sim ?. PauseObject(new LocalNode.Nuid(), obj.id, true);
+                        main.sim ?. PauseObject(new NodeId(), obj.id, true);
                     }
                 }
             }
@@ -1366,15 +1519,15 @@ namespace JoinFS
                             // recordings don't currently capture classCode/wtc (a Phase 3 network-only
                             // addition) - pass empty/unconfirmed so replay falls back to local re-derivation
                             // from icaoType, same as before this feature existed
-                            main.sim ?. UpdateAircraft(new LocalNode.Nuid(), obj.id, false, aircraft.plane, aircraft.callsign, "", aircraft.nickname, aircraft.model, aircraft.livery, aircraft.icaoType, aircraft.icaoAirline, "", "", "", false, aircraft.typerole, recentFrame.time, ref (recentFrame as AircraftPositionFrame).data);
+                            main.sim ?. UpdateAircraft(new NodeId(), obj.id, false, aircraft.plane, aircraft.callsign, "", aircraft.nickname, aircraft.model, aircraft.livery, aircraft.icaoType, aircraft.icaoAirline, "", "", "", false, aircraft.typerole, recentFrame.time, ref (recentFrame as AircraftPositionFrame).data);
                         }
                         else
                         {
                             // update position
-                            main.sim?.UpdateObject(new LocalNode.Nuid(), obj.id, obj.model, obj.livery, obj.icaoType, obj.icaoAirline, "", "", false, obj.typerole, recentFrame.time, ref (recentFrame as ObjectPositionFrame).data);
+                            main.sim?.UpdateObject(new NodeId(), obj.id, obj.model, obj.livery, obj.icaoType, obj.icaoAirline, "", "", false, obj.typerole, recentFrame.time, ref (recentFrame as ObjectPositionFrame).data);
                         }
                         // reset object
-                        main.sim ?. ResetObject(new LocalNode.Nuid(), obj.id);
+                        main.sim ?. ResetObject(new NodeId(), obj.id);
                     }
                 }
             }
@@ -1481,7 +1634,16 @@ namespace JoinFS
                 brakeLeft = Lerp(a.brakeLeft, b.brakeLeft, t),
                 brakeRight = Lerp(a.brakeRight, b.brakeRight, t),
                 elevation = Lerp(a.elevation, b.elevation, t),
-                ground = t < 0.5 ? a.ground : b.ground
+                ground = t < 0.5 ? a.ground : b.ground,
+                // carried through so the ground-clearance correction in UpdateAircraft (see
+                // ground-jitter-on-model-mismatch fix) still has the sender's real clearance during
+                // playback - the object initializer above left this at its default (0.0f), which the
+                // correction can't tell apart from a real "sits flush on the ground" reading, so it
+                // silently added the substitute's own full clearance on top of every interpolated
+                // altitude - exactly the "hovers meters above the ground" symptom. NaN propagates
+                // through Lerp when either endpoint frame predates this field, which correctly falls
+                // back to no correction rather than inventing one from partial data.
+                staticCgToGround = Lerp(a.staticCgToGround, b.staticCgToGround, t)
             };
         }
 
@@ -1525,7 +1687,7 @@ namespace JoinFS
                     double t = Blend(from, to, time);
                     Vector angles = InterpolateAngles(obj, from.data.pitch, from.data.heading, from.data.bank, to.data.pitch, to.data.heading, to.data.bank, t);
                     Sim.AircraftPosition data = Interpolate(from, to, t, angles);
-                    main.sim?.UpdateAircraft(new LocalNode.Nuid(), obj.id, false, aircraft.plane, aircraft.callsign, "", aircraft.nickname, aircraft.model, aircraft.livery, aircraft.icaoType, aircraft.icaoAirline, "", "", "", false, aircraft.typerole, time, ref data);
+                    main.sim?.UpdateAircraft(new NodeId(), obj.id, false, aircraft.plane, aircraft.callsign, "", aircraft.nickname, aircraft.model, aircraft.livery, aircraft.icaoType, aircraft.icaoAirline, "", "", "", false, aircraft.typerole, time, ref data);
                 }
             }
             else
@@ -1537,7 +1699,7 @@ namespace JoinFS
                     double t = Blend(from, to, time);
                     Vector angles = InterpolateAngles(obj, from.data.pitch, from.data.heading, from.data.bank, to.data.pitch, to.data.heading, to.data.bank, t);
                     Sim.ObjectPositionVelocity data = Interpolate(from, to, t, angles);
-                    main.sim?.UpdateObject(new LocalNode.Nuid(), obj.id, obj.model, obj.livery, obj.icaoType, obj.icaoAirline, "", "", false, obj.typerole, time, ref data);
+                    main.sim?.UpdateObject(new NodeId(), obj.id, obj.model, obj.livery, obj.icaoType, obj.icaoAirline, "", "", false, obj.typerole, time, ref data);
                 }
             }
         }
@@ -1545,6 +1707,19 @@ namespace JoinFS
         /// <summary>
         /// Do work
         /// </summary>
+        /// <summary>
+        /// How often playback advances while playing (seconds)
+        /// </summary>
+        const double PlaybackInterval = 0.005;
+
+        /// <summary>
+        /// When DoWork next has timed work (playback); the sim thread sleeps until then
+        /// </summary>
+        public double NextDue(double now)
+        {
+            return playing ? now + PlaybackInterval : double.MaxValue;
+        }
+
         public void DoWork()
         {
             // check if playing
@@ -1560,7 +1735,7 @@ namespace JoinFS
                         if (paused)
                         {
                             // touch object
-                            main.sim ?. TouchObject(new LocalNode.Nuid(), obj.id);
+                            main.sim ?. TouchObject(new NodeId(), obj.id);
                         }
                         else
                         {
@@ -1582,16 +1757,16 @@ namespace JoinFS
                                     case FrameType.AircraftPosition:
                                         break;
                                     case FrameType.SimEvent:
-                                        main.sim ?. UpdateAircraft(new LocalNode.Nuid(), obj.id, (frame as SimEventFrame).eventId, (frame as SimEventFrame).data, true);
+                                        main.sim ?. UpdateAircraft(new NodeId(), obj.id, (frame as SimEventFrame).eventId, (frame as SimEventFrame).data, true);
                                         break;
                                     case FrameType.IntegerVariables:
-                                        main.sim ?. UpdateAircraft(new LocalNode.Nuid(), obj.id, (frame as IntegerVariablesFrame).variables);
+                                        main.sim ?. UpdateAircraft(new NodeId(), obj.id, (frame as IntegerVariablesFrame).variables);
                                         break;
                                     case FrameType.FloatVariables:
-                                        main.sim ?. UpdateAircraft(new LocalNode.Nuid(), obj.id, (frame as FloatVariablesFrame).variables);
+                                        main.sim ?. UpdateAircraft(new NodeId(), obj.id, (frame as FloatVariablesFrame).variables);
                                         break;
                                     case FrameType.String8Variables:
-                                        main.sim ?. UpdateAircraft(new LocalNode.Nuid(), obj.id, (frame as String8VariablesFrame).variables);
+                                        main.sim ?. UpdateAircraft(new NodeId(), obj.id, (frame as String8VariablesFrame).variables);
                                         break;
                                 }
                                 // next frame
@@ -1607,7 +1782,7 @@ namespace JoinFS
                                 // stop aircraft
                                 obj.StopPlaying();
                                 // remove recorded object from sim
-                                main.sim ?. RemoveObject(new LocalNode.Nuid(), obj.id);
+                                main.sim ?. RemoveObject(new NodeId(), obj.id);
                             }
                         }
                     }
@@ -1629,7 +1804,7 @@ namespace JoinFS
                             // plane
                             Sim.Aircraft simAircraft = simObject as Sim.Aircraft;
                             // create recorded aircraft
-                            simObject.recorderObj = new Aircraft(simAircraft is Sim.Plane, simAircraft.flightPlan.callsign, main.network.GetNodeName(simAircraft.ownerNuid), simAircraft.ownerModel, simAircraft.ownerLivery, simAircraft.ownerIcaoType, simAircraft.ownerIcaoAirline, simAircraft.typerole, simAircraft.owner);
+                            simObject.recorderObj = new Aircraft(simAircraft is Sim.Plane, simAircraft.flightPlan.callsign, main.network.Peers.GetNodeName(simAircraft.ownerNuid), simAircraft.ownerModel, simAircraft.ownerLivery, simAircraft.ownerIcaoType, simAircraft.ownerIcaoAirline, simAircraft.typerole, simAircraft.owner);
                         }
                         else
                         {
@@ -1656,6 +1831,9 @@ namespace JoinFS
                     }
                 }
             }
+
+            // publish what other threads read
+            PublishStatus();
         }
 
         /// <summary>
@@ -1664,8 +1842,26 @@ namespace JoinFS
         /// <param name="writer"></param>
         public void Write(BinaryWriter writer)
         {
+            // sim thread (or before it starts)
+            Write(writer, objList);
+        }
+
+        /// <summary>
+        /// Copies of the objects with their own frame lists, so a recording can be written on
+        /// another thread while this one goes on (sim thread)
+        /// </summary>
+        public List<Obj> CopyForSave()
+        {
+            return objList.ConvertAll(o => o.CopyForSave());
+        }
+
+        /// <summary>
+        /// Write <paramref name="objList"/> (from <see cref="CopyForSave"/>) - any thread
+        /// </summary>
+        public void Write(BinaryWriter writer, List<Obj> objList)
+        {
             // write header
-            writer.Write(Sim.VERSION);
+            writer.Write(FileVersion);
             // count aircraft
             int aircraftCount = 0;
             // for each object
@@ -1707,10 +1903,14 @@ namespace JoinFS
 #region Reader
 
         /// <summary>
-        /// Append existing recording
+        /// Where Read1 puts what it parses (only while <see cref="Parse"/> runs)
         /// </summary>
-        bool append = false;
-        double appendTime = 0.0;
+        List<Obj> readTarget;
+
+        /// <summary>
+        /// One parse at a time
+        /// </summary>
+        readonly object parseLock = new();
 
         /// <summary>
         /// Read recording from a stream VERSION 1
@@ -1723,12 +1923,6 @@ namespace JoinFS
             int loadedObjects = 0;
             int loadedFrames = 0;
 
-            // check for append
-            if (append == false)
-            {
-                // clear all aircraft
-                objList.Clear();
-            }
 
             // read aircraft count
             int count = reader.ReadInt32();
@@ -1776,19 +1970,8 @@ namespace JoinFS
                     main.MonitorEvent("Recorder: warning - aircraft '" + aircraft.callsign + "' has no ObjectPosition/AircraftPosition frames.");
                 }
 
-                // check for append
-                if (append)
-                {
-                    // for each frame
-                    foreach (var frame in aircraft.frames)
-                    {
-                        // adjust time
-                        frame.time += appendTime;
-                    }
-                }
-
                 // add to list
-                objList.Add(aircraft);
+                readTarget.Add(aircraft);
                 loadedAircraft++;
                 loadedFrames += aircraft.frames.Count;
             }
@@ -1806,32 +1989,21 @@ namespace JoinFS
                     obj.Read(version, reader);
 
 
-                    // check for append
-                    if (append)
-                    {
-                        // for each frame
-                        foreach (var frame in obj.frames)
-                        {
-                            // adjust time
-                            frame.time += appendTime;
-                        }
-                    }
-
                     // add to list
-                    objList.Add(obj);
+                    readTarget.Add(obj);
                     loadedObjects++;
                     loadedFrames += obj.frames.Count;
                 }
             }
 
             // log load summary
-            main.MonitorEvent("Recorder: loaded " + loadedAircraft + " aircraft, " + loadedObjects + " objects, " + loadedFrames + " frames" + (append ? " (append)" : "") + ".");
+            main.MonitorEvent("Recorder: loaded " + loadedAircraft + " aircraft, " + loadedObjects + " objects, " + loadedFrames + " frames.");
         }
 
         /// <summary>
         /// Version table for reading data
         /// </summary>
-        readonly Dictionary<short, Sim.ReadVersion> readVersions;
+        readonly Dictionary<short, JfsFrames.ReadVersion> readVersions;
 
         /// <summary>
         /// Read data
@@ -1839,35 +2011,83 @@ namespace JoinFS
         /// <param name="reader">Reader</param>
         public void Read(BinaryReader reader)
         {
-            // get version
-            short version = reader.ReadInt16();
-            // log version
-            main.MonitorEvent("Recorder: reading recording stream (version " + version + (append ? ", append mode" : "") + ").");
-            // check version
-            if (version < 10022)
-            {
-                // warning
-                main.ShowMessage(Resources.Strings.OldRecording);
-                return;
-            }
-            // read correct version
-            Sim.Read(version, readVersions, reader);
+            // sim thread (or before it starts)
+            Load(Parse(reader), false);
         }
 
         /// <summary>
-        /// Append data
+        /// Append data (sim thread)
         /// </summary>
         /// <param name="reader">Reader</param>
         public void Append(BinaryReader reader)
         {
-            // enable append
-            append = true;
-            appendTime = EndTime;
-            main.MonitorEvent("Recorder: appending recording from " + appendTime.ToString("0.00") + "s.");
-            // read data
-            Read(reader);
-            // finish append
-            append = false;
+            Load(Parse(reader), true);
+        }
+
+        /// <summary>
+        /// Parse a recording into objects without touching the recorder, so a file can be read on
+        /// any thread and then applied on the sim thread with <see cref="Load"/>. Null when the
+        /// recording can't be used.
+        /// </summary>
+        public List<Obj> Parse(BinaryReader reader)
+        {
+            lock (parseLock)
+            {
+                readTarget = [];
+                try
+                {
+                    // get version
+                    short version = reader.ReadInt16();
+                    // log version
+                    main.MonitorEvent("Recorder: reading recording stream (version " + version + ").");
+                    // check version
+                    if (version < 10022)
+                    {
+                        // warning
+                        main.ShowMessage(Resources.Strings.OldRecording);
+                        return null;
+                    }
+                    // read correct version
+                    JfsFrames.Read(version, readVersions, reader);
+                    return readTarget;
+                }
+                finally
+                {
+                    readTarget = null;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Replace the recording with parsed objects, or append them after its end (sim thread)
+        /// </summary>
+        public void Load(List<Obj> objects, bool append)
+        {
+            if (objects == null)
+            {
+                return;
+            }
+            if (append)
+            {
+                double appendTime = EndTime;
+                main.MonitorEvent("Recorder: appending recording from " + appendTime.ToString("0.00") + "s.");
+                // for each frame
+                foreach (var obj in objects)
+                {
+                    foreach (var frame in obj.frames)
+                    {
+                        // adjust time
+                        frame.time += appendTime;
+                    }
+                }
+            }
+            else
+            {
+                // clear all aircraft
+                objList.Clear();
+            }
+            objList.AddRange(objects);
+            PublishStatus();
         }
 
 #endregion

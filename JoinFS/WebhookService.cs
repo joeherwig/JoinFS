@@ -30,17 +30,31 @@ namespace JoinFS
 
         public void DoWork()
         {
+            try
+            {
+                DoWorkInner();
+            }
+            catch (Exception ex)
+            {
+                // never let the webhook feed the work-thread failure streak (Program.cs
+                // escalates 5 throws in 5 s to a full shutdown) - but never swallow it silently
+                // either: logs regardless of the websocketlog setting (no silent errors).
+                main.monitor.Write($"Webhook DoWork error: {ex.Message}");
+            }
+        }
+
+        void DoWorkInner()
+        {
             // collect changed aircraft inside the conch lock
             List<object> changed = null;
 
             if (main.sim != null)
             {
-                foreach (var obj in main.sim.objectList)
+                foreach (var obj in main.sim.View.Objects)
                 {
                     if (obj is not Sim.Aircraft aircraft) continue;
 
-                    Guid guid = main.network.GetNodeGuid(aircraft.ownerNuid);
-                    if (guid == Guid.Empty) guid = new Guid(aircraft.simId, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+                    Guid guid = main.network.Peers.GetAircraftIdentityGuid(aircraft.ownerNuid, aircraft.netId, aircraft.simId);
 
                     string com1 = "", com2 = "";
                     if (aircraft.variableSet != null)
@@ -63,7 +77,7 @@ namespace JoinFS
                         changed.Add(new
                         {
                             callsign = aircraft.flightPlan.callsign,
-                            nickname = main.network.GetNodeName(aircraft.ownerNuid),
+                            nickname = main.network.Peers.GetNodeName(aircraft.ownerNuid),
                             com1,
                             com2
                         });
@@ -99,8 +113,8 @@ namespace JoinFS
                 }
                 catch (Exception ex)
                 {
-                    if (log)
-                        main.monitor.Write($"Webhook error: {ex.Message}");
+                    // a real delivery failure, not routine chatter - no silent errors
+                    main.monitor.Write($"Webhook error: {ex.Message}");
                 }
             });
         }

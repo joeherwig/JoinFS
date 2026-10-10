@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -454,5 +454,8 @@
   </data>
   <data name="$this.Text" xml:space="preserve">
     <value>JoinFS: Hubs Públicos</value>
+  </data>
+  <data name="label4.Text" xml:space="preserve">
+    <value>Haga doble clic en un hub para unirse</value>
   </data>
 </root>

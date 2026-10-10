@@ -16,11 +16,32 @@ namespace JoinFS
     {
         readonly Main main;
         readonly Sim.Aircraft aircraft;
+        readonly Substitution.Model matchedModel;
+        readonly Substitution.Type matchType;
+        readonly Substitution.MatchTrace matchTrace;
 
+        /// <summary>
+        /// Show the live match result already recorded for this aircraft (aircraft.subModel/subType/
+        /// subTrace) - the usual case, for any aircraft that actually went through Substitution.Match().
+        /// </summary>
         public MatchExplainForm(Main main, Sim.Aircraft aircraft)
+            : this(main, aircraft, aircraft.subModel, aircraft.subType, aircraft.subTrace)
+        {
+        }
+
+        /// <summary>
+        /// Show an already-computed match result without reading or writing aircraft.subModel/subType/
+        /// subTrace at all - used for a diagnostic-only preview (e.g. running Match() against the user's
+        /// own flight plan values, which never goes through Match()/subTrace for real; its actual rendered
+        /// model is driven by Masquerade() instead, and must not be overwritten by a preview).
+        /// </summary>
+        public MatchExplainForm(Main main, Sim.Aircraft aircraft, Substitution.Model matchedModel, Substitution.Type matchType, Substitution.MatchTrace matchTrace)
         {
             this.main = main;
             this.aircraft = aircraft;
+            this.matchedModel = matchedModel;
+            this.matchType = matchType;
+            this.matchTrace = matchTrace;
 
             InitializeComponent();
 
@@ -46,6 +67,17 @@ namespace JoinFS
                 Substitution.MatchAttribute.Typerole => Resources.Strings.MatchAttr_Typerole,
                 Substitution.MatchAttribute.Folder => Resources.Strings.MatchAttr_Folder,
                 _ => attribute.ToString()
+            };
+        }
+
+        /// <summary>Which matching engine produced the trace, in the user's language; empty when none was involved.</summary>
+        static string EngineDescription(Substitution.MatchTrace trace)
+        {
+            return trace?.engine switch
+            {
+                MatchingEngine.New => Resources.Strings.MatchExplain_EngineNew,
+                MatchingEngine.Classic => Resources.Strings.MatchExplain_EngineClassic,
+                _ => ""
             };
         }
 
@@ -76,13 +108,13 @@ namespace JoinFS
         /// </summary>
         string IcaoResolutionExplanation()
         {
-            string note = aircraft.subModel?.icaoResolutionNote ?? "";
+            string note = matchedModel?.icaoResolutionNote ?? "";
             if (note.Length == 0) return "";
 
             int colon = note.IndexOf(':');
             string reason = colon >= 0 ? note[..colon] : note;
             string declaredValue = colon >= 0 ? note[(colon + 1)..] : "";
-            string resolvedValue = aircraft.subModel.icaoType;
+            string resolvedValue = matchedModel.icaoType;
 
             // "Blank" variants mean icao_type_designator wasn't merely wrong but entirely absent - those
             // messages take only the resolved value, since there's no invalid declared value to reference
@@ -101,7 +133,7 @@ namespace JoinFS
 
         void RefreshWindow()
         {
-            Substitution.MatchTrace trace = aircraft.subTrace;
+            Substitution.MatchTrace trace = matchTrace;
             if (trace == null)
             {
                 Label_Outcome.Text = Resources.Strings.MatchExplain_NoMatchYet;
@@ -109,13 +141,13 @@ namespace JoinFS
             }
 
             // outcome headline
-            string outcomeText = string.Format(Resources.Strings.MatchExplain_ResultPrefix, aircraft.subType);
-            if (aircraft.subModel != null)
+            string outcomeText = string.Format(Resources.Strings.MatchExplain_ResultPrefix, matchType);
+            if (matchedModel != null)
             {
-                outcomeText += string.Format(Resources.Strings.MatchExplain_ResultMatchSuffix, aircraft.subModel.title);
-                if (aircraft.subModel.variation.Length > 0)
+                outcomeText += string.Format(Resources.Strings.MatchExplain_ResultMatchSuffix, matchedModel.title);
+                if (matchedModel.variation.Length > 0)
                 {
-                    outcomeText += " / '" + aircraft.subModel.variation + "'";
+                    outcomeText += " / '" + matchedModel.variation + "'";
                 }
             }
             else
@@ -133,7 +165,7 @@ namespace JoinFS
                 Label_IcaoGuessed.Text = resolutionText;
                 Label_IcaoGuessed.Visible = true;
             }
-            else if (aircraft.subModel != null && aircraft.subModel.icaoGuessed)
+            else if (matchedModel != null && matchedModel.icaoGuessed)
             {
                 Label_IcaoGuessed.Text = Resources.Strings.MatchExplain_IcaoGuessedWarning;
                 Label_IcaoGuessed.Visible = true;
@@ -165,7 +197,13 @@ namespace JoinFS
 
             // tier-by-tier trace
             List<string> steps = new(trace.steps);
-            if (aircraft.subModel != null && aircraft.subModel.classCodeConfirmed)
+            string engineText = EngineDescription(trace);
+            if (engineText.Length > 0)
+            {
+                steps.Insert(0, "");
+                steps.Insert(0, engineText);
+            }
+            if (matchedModel != null && matchedModel.classCodeConfirmed)
             {
                 steps.Add(Resources.Strings.MatchExplain_ClassCodeConfirmedNote);
             }
@@ -188,7 +226,7 @@ namespace JoinFS
 
         string BuildMarkdownReport()
         {
-            Substitution.MatchTrace trace = aircraft.subTrace;
+            Substitution.MatchTrace trace = matchTrace;
             StringBuilder sb = new();
 
             sb.AppendLine("# Match Report - " + aircraft.flightPlan.callsign);
@@ -224,6 +262,12 @@ namespace JoinFS
 
             sb.AppendLine("## " + Resources.Strings.MatchExplain_ReportStepsHeader);
             sb.AppendLine();
+            string engineSentence = EngineDescription(trace);
+            if (engineSentence.Length > 0)
+            {
+                sb.AppendLine(engineSentence);
+                sb.AppendLine();
+            }
             if (trace != null)
             {
                 int step = 1;
@@ -232,7 +276,7 @@ namespace JoinFS
                     sb.AppendLine($"{step}. {line}");
                     step++;
                 }
-                if (aircraft.subModel != null && aircraft.subModel.classCodeConfirmed)
+                if (matchedModel != null && matchedModel.classCodeConfirmed)
                 {
                     sb.AppendLine($"{step}. {Resources.Strings.MatchExplain_ClassCodeConfirmedNote}");
                 }

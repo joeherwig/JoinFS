@@ -2,7 +2,11 @@
 using Microsoft.FlightSimulator.SimConnect;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
+using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Threading;
 using static JoinFS.Sim;
 #endif
 
@@ -12,7 +16,7 @@ namespace JoinFS
     /// <summary>
     /// Simconnect interface
     /// </summary>
-    class SimConnectInterface
+    class SimConnectInterface : IDisposable
     {    /// <summary>
          /// SimConnect interface
          /// </summary>
@@ -32,6 +36,75 @@ namespace JoinFS
         readonly Main main;
 
         /// <summary>
+        /// The thread that created the SimConnect object. SimConnect is not thread-safe, so every
+        /// call must be made on this thread.
+        /// </summary>
+        readonly int ownerThreadId = Environment.CurrentManagedThreadId;
+
+        /// <summary>
+        /// Callers already reported for calling from the wrong thread (each is logged once)
+        /// </summary>
+        readonly HashSet<string> wrongThreadCallers = [];
+
+        /// <summary>
+        /// Signalled by SimConnect whenever messages are waiting; the sim thread waits on it
+        /// </summary>
+        readonly EventWaitHandle messageEvent = new(false, EventResetMode.AutoReset);
+
+        /// <summary>
+        /// Signalled whenever SimConnect has messages for <see cref="ReceiveMsg"/>
+        /// </summary>
+        public WaitHandle MessageEvent => messageEvent;
+
+        /// <summary>
+        /// True when called on the owner thread. Otherwise the call is re-posted to the owner
+        /// (sim) thread through <paramref name="retry"/> and false is returned, so a caller on
+        /// another thread never touches SimConnect itself. The first deferred call of each method
+        /// is logged, to show which paths still call from other threads.
+        /// </summary>
+        bool OnOwnerThread(Action retry, [CallerMemberName] string caller = "")
+        {
+            if (Environment.CurrentManagedThreadId == ownerThreadId)
+            {
+                return true;
+            }
+            SimService service = main.simService;
+            if (service == null)
+            {
+                // no sim thread (never expected) - run here rather than lose the call
+                return true;
+            }
+            bool first;
+            lock (wrongThreadCallers)
+            {
+                first = wrongThreadCallers.Add(caller);
+            }
+            if (first)
+            {
+                main.MonitorNetwork("THREAD - SimConnect '" + caller + "' called from thread " + Environment.CurrentManagedThreadId + " (" + Thread.CurrentThread.Name + "), deferred to the sim thread");
+            }
+            service.Post(retry);
+            return false;
+        }
+
+        /// <summary>
+        /// Close the SimConnect connection
+        /// </summary>
+        public void Dispose()
+        {
+            if (!OnOwnerThread(Dispose)) return;
+            try
+            {
+                sc?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                main.MonitorError(ex, "Closing SimConnect");
+            }
+            messageEvent.Dispose();
+        }
+
+        /// <summary>
         /// Handle simconnect errors
         /// </summary>
         /// <param name="ex">Exception</param>
@@ -44,11 +117,8 @@ namespace JoinFS
                 case 0xC00000B0:
                     main.MonitorEvent("Lost connection to simulator");
                     main.recorder?.NotifySimulatorError("Lost connection to simulator");
-                    lock (main.conch)
-                    {
-                        // close simconnect
-                        main.sim?.Close();
-                    }
+                    // close once the current dispatch has finished, never inside it
+                    sim.ScheduleClose();
                     break;
                 default:
                     main.MonitorEvent("SIMCONNECT ERROR - " + ex.Message);
@@ -71,7 +141,8 @@ namespace JoinFS
                 // set main
                 this.main = main;
                 // try simconnect
-                this.sc = new SimConnect(name, (IntPtr)0, 0x0402, null, 0);
+                // no window: SimConnect signals messageEvent when messages are waiting
+                this.sc = new SimConnect(name, IntPtr.Zero, 0, messageEvent, 0);
 
                 // define an object structure
                 sc.AddToDataDefinition(Sim.Definitions.OBJECT_GET_INFO, "CATEGORY", null, SIMCONNECT_DATATYPE.STRING32, 0.0f, SimConnect.SIMCONNECT_UNUSED);
@@ -167,6 +238,13 @@ namespace JoinFS
                 // diagnostic only (see helicopters-on-elevated-platforms feature) - not yet used in any trust/correction decision, logged to verify reliability for injected aircraft first
                 sc.AddToDataDefinition(Sim.Definitions.AIRCRAFT_POSITION, "PLANE ALT ABOVE GROUND", "feet", SIMCONNECT_DATATYPE.FLOAT32, 0.0f, SimConnect.SIMCONNECT_UNUSED);
                 sc.AddToDataDefinition(Sim.Definitions.AIRCRAFT_POSITION, "SIM ON GROUND", "bool", SIMCONNECT_DATATYPE.INT32, 0.0f, SimConnect.SIMCONNECT_UNUSED);
+                // used to ground a substitute model using its own real clearance instead of the sender's -
+                // see AircraftPosition.staticCgToGround / the ground-jitter-on-model-mismatch fix
+                sc.AddToDataDefinition(Sim.Definitions.AIRCRAFT_POSITION, "STATIC CG TO GROUND", "feet", SIMCONNECT_DATATYPE.FLOAT32, 0.0f, SimConnect.SIMCONNECT_UNUSED);
+#if FS2020 || FS2024
+                // when the sample was taken, on the simulator's clock - see Sim.AircraftPositionTimed
+                sc.AddToDataDefinition(Sim.Definitions.AIRCRAFT_POSITION, "SIMULATION TIME", "seconds", SIMCONNECT_DATATYPE.FLOAT64, 0.0f, SimConnect.SIMCONNECT_UNUSED);
+#endif
 
                 // define an ID structure
                 sc.AddToDataDefinition(Sim.Definitions.AIRCRAFT_SET_ID, "ATC ID", null, SIMCONNECT_DATATYPE.STRING32, 0.0f, SimConnect.SIMCONNECT_UNUSED);
@@ -184,7 +262,11 @@ namespace JoinFS
                 sc.RegisterDataDefineStruct<Sim.ObjectPositionUpdate>(Sim.Definitions.OBJECT_POSITION_UPDATE);
                 sc.RegisterDataDefineStruct<Sim.ObjectVelocity>(Sim.Definitions.OBJECT_VELOCITY);
                 sc.RegisterDataDefineStruct<Sim.ObjectEuler>(Sim.Definitions.OBJECT_EULER);
+#if FS2020 || FS2024
+                sc.RegisterDataDefineStruct<Sim.AircraftPositionTimed>(Sim.Definitions.AIRCRAFT_POSITION);
+#else
                 sc.RegisterDataDefineStruct<Sim.AircraftPosition>(Sim.Definitions.AIRCRAFT_POSITION);
+#endif
                 sc.RegisterDataDefineStruct<Sim.AircraftSetId>(Sim.Definitions.AIRCRAFT_SET_ID);
                 sc.RegisterDataDefineStruct<Object[]>(Sim.Definitions.AIRCRAFT_WAYPOINTS);
 
@@ -245,6 +327,12 @@ namespace JoinFS
                 sc.SubscribeToSystemEvent(Sim.Event.OBJECT_REMOVED, "ObjectRemoved");
                 sc.SubscribeToSystemEvent(Sim.Event.FRAME, "Frame");
                 sc.SubscribeToSystemEvent(Sim.Event.PAUSE, "Pause");
+                // SimStart/SimStop - used only to re-arm failed injections (see Sim.RearmFailedInjections),
+                // never to gate the injection branch itself: SimStart semantics vary between MSFS builds
+                // and a missed event would suppress all traffic, which the injection-finder backoff
+                // already guards against independently.
+                sc.SubscribeToSystemEvent(Sim.Event.SIM_START, "SimStart");
+                sc.SubscribeToSystemEvent(Sim.Event.SIM_STOP, "SimStop");
             }
             catch (COMException ex)
             {
@@ -252,12 +340,13 @@ namespace JoinFS
             }
             catch (Exception ex)
             {
-                main.MonitorEvent("ERROR - " + ex.Message);
+                main.MonitorError(ex);
             }
         }
 
         public void RequestSimulatorModels()
         {
+            if (!OnOwnerThread(() => RequestSimulatorModels())) return;
             Action request = () =>
             {
 #if FS2024
@@ -350,6 +439,7 @@ namespace JoinFS
         /// <param name="units"></param>
         public void RegisterIntegerVariable(VariableMgr.Definition definition)
         {
+            if (!OnOwnerThread(() => RegisterIntegerVariable(definition))) return;
             // check for valid name
             if (definition.scName.Length > 0)
             {
@@ -366,7 +456,7 @@ namespace JoinFS
                 }
                 catch (Exception ex)
                 {
-                    main.MonitorEvent("ERROR - " + ex.Message);
+                    main.MonitorError(ex);
                 }
             }
         }
@@ -379,6 +469,7 @@ namespace JoinFS
         /// <param name="units"></param>
         public void RegisterFloatVariable(VariableMgr.Definition definition)
         {
+            if (!OnOwnerThread(() => RegisterFloatVariable(definition))) return;
             // check for valid name
             if (definition.scName.Length > 0)
             {
@@ -395,7 +486,7 @@ namespace JoinFS
                 }
                 catch (Exception ex)
                 {
-                    main.MonitorEvent("ERROR - " + ex.Message);
+                    main.MonitorError(ex);
                 }
             }
         }
@@ -408,6 +499,7 @@ namespace JoinFS
         /// <param name="units"></param>
         public void RegisterString8Variable(VariableMgr.Definition definition)
         {
+            if (!OnOwnerThread(() => RegisterString8Variable(definition))) return;
             // check for valid name
             if (definition.scName.Length > 0)
             {
@@ -424,7 +516,7 @@ namespace JoinFS
                 }
                 catch (Exception ex)
                 {
-                    main.MonitorEvent("ERROR - " + ex.Message);
+                    main.MonitorError(ex);
                 }
             }
         }
@@ -434,6 +526,7 @@ namespace JoinFS
         /// </summary>
         public void RegisterVariableEvent(VariableMgr.Definition definition)
         {
+            if (!OnOwnerThread(() => RegisterVariableEvent(definition))) return;
             try
             {
                 // check for valid event name
@@ -450,12 +543,143 @@ namespace JoinFS
             }
             catch (Exception ex)
             {
-                main.MonitorEvent("ERROR - " + ex.Message);
+                main.MonitorError(ex);
+            }
+        }
+
+        /// <summary>
+        /// Module used to hold the structures generated at runtime for bundled variable reads.
+        /// One field is emitted per bundled variable (in order), typed to match the variable's
+        /// SimConnect datatype, so a single RequestDataOnSimObject can return many variables in
+        /// one SIMCONNECT_RECV_SIMOBJECT_DATA message instead of one message per variable.
+        /// </summary>
+        static readonly ModuleBuilder bundleModuleBuilder = AssemblyBuilder
+            .DefineDynamicAssembly(new AssemblyName("JoinFS.VariableBundles"), AssemblyBuilderAccess.Run)
+            .DefineDynamicModule("VariableBundles");
+
+        /// <summary>
+        /// Unique name suffix for generated bundle structures
+        /// </summary>
+        static int bundleTypeCounter;
+
+        /// <summary>
+        /// Build a value type with one field per entry in <paramref name="fields"/>, in order,
+        /// laid out and marshalled exactly like the existing single-variable structs
+        /// (<see cref="Sim.IntegerStruct"/>, <see cref="Sim.FloatStruct"/>, <see cref="Sim.String8Struct"/>)
+        /// so SimConnect's managed wrapper can marshal a whole bundle's worth of variables at once.
+        /// </summary>
+        static Type BuildBundleStructType(List<VariableMgr.Definition> fields)
+        {
+            TypeBuilder typeBuilder = bundleModuleBuilder.DefineType(
+                "Bundle" + System.Threading.Interlocked.Increment(ref bundleTypeCounter),
+                TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.Sealed |
+                TypeAttributes.AnsiClass | TypeAttributes.BeforeFieldInit,
+                typeof(ValueType),
+                PackingSize.Size1);
+
+            ConstructorInfo marshalAsCtor = typeof(MarshalAsAttribute).GetConstructor([typeof(UnmanagedType)]);
+            FieldInfo sizeConstField = typeof(MarshalAsAttribute).GetField(nameof(MarshalAsAttribute.SizeConst));
+
+            for (int index = 0; index < fields.Count; index++)
+            {
+                // field name encodes its position - this is how DetectSimconnect maps values
+                // back onto vuids, since reflection does not guarantee GetFields() order
+                string fieldName = "F" + index;
+
+                switch (fields[index].type)
+                {
+                    case VariableMgr.Definition.Type.INTEGER:
+                        typeBuilder.DefineField(fieldName, typeof(int), FieldAttributes.Public);
+                        break;
+                    case VariableMgr.Definition.Type.FLOAT:
+                        typeBuilder.DefineField(fieldName, typeof(float), FieldAttributes.Public);
+                        break;
+                    case VariableMgr.Definition.Type.STRING8:
+                        {
+                            FieldBuilder stringField = typeBuilder.DefineField(fieldName, typeof(string), FieldAttributes.Public);
+                            // [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 8)] - matches Sim.String8Struct
+                            CustomAttributeBuilder marshalAsAttr = new(
+                                marshalAsCtor,
+                                [UnmanagedType.ByValTStr],
+                                [sizeConstField],
+                                [8]);
+                            stringField.SetCustomAttribute(marshalAsAttr);
+                        }
+                        break;
+                }
+            }
+
+            return typeBuilder.CreateType();
+        }
+
+        /// <summary>
+        /// Register the combined read structure for a variable file: build a struct matching
+        /// its fields, add each field to the SimConnect data definition (same name/units as the
+        /// per-variable registration would have used), and register the struct with SimConnect's
+        /// marshaller so OnRecvSimobjectData hands back one populated instance per request instead
+        /// of requiring one request (and one COM round trip) per variable.
+        /// </summary>
+        public void RegisterVariableBundle(VariableMgr.Bundle bundle, List<VariableMgr.Definition> fields)
+        {
+            if (!OnOwnerThread(() => RegisterVariableBundle(bundle, fields))) return;
+            try
+            {
+                // build the structure type for this bundle
+                Type structType = BuildBundleStructType(fields);
+
+                // add every field to the data definition, in the same order they were built into the struct
+                foreach (var field in fields)
+                {
+                    switch (field.type)
+                    {
+                        case VariableMgr.Definition.Type.INTEGER:
+                            sc.AddToDataDefinition(bundle.scDefinition, field.scName, field.scUnits, SIMCONNECT_DATATYPE.INT32, 0.0f, SimConnect.SIMCONNECT_UNUSED);
+                            break;
+                        case VariableMgr.Definition.Type.FLOAT:
+                            sc.AddToDataDefinition(bundle.scDefinition, field.scName, field.scUnits, SIMCONNECT_DATATYPE.FLOAT32, 0.0f, SimConnect.SIMCONNECT_UNUSED);
+                            break;
+                        case VariableMgr.Definition.Type.STRING8:
+                            sc.AddToDataDefinition(bundle.scDefinition, field.scName, field.scUnits, SIMCONNECT_DATATYPE.STRING8, 0.0f, SimConnect.SIMCONNECT_UNUSED);
+                            break;
+                    }
+                }
+
+                // register the structure with the managed wrapper's marshaller - the generic
+                // method is only known at runtime, so invoke it via reflection
+                typeof(SimConnect)
+                    .GetMethod(nameof(SimConnect.RegisterDataDefineStruct))
+                    .MakeGenericMethod(structType)
+                    .Invoke(sc, [bundle.scDefinition]);
+
+                // cache the field accessors, in field order, for fast unpacking on receipt
+                FieldInfo[] fieldInfos = new FieldInfo[fields.Count];
+                for (int index = 0; index < fields.Count; index++)
+                {
+                    fieldInfos[index] = structType.GetField("F" + index);
+                }
+
+                bundle.structType = structType;
+                bundle.fields = fieldInfos;
+            }
+            catch (COMException ex)
+            {
+                HandleException(ex);
+            }
+            catch (TargetInvocationException ex) when (ex.InnerException is COMException comEx)
+            {
+                // RegisterDataDefineStruct is invoked via reflection - unwrap so COM errors
+                // are handled the same way as everywhere else
+                HandleException(comEx);
+            }
+            catch (Exception ex)
+            {
+                main.MonitorError(ex);
             }
         }
 
         public void RemoveObject(uint simId, Sim.Requests request)
         {
+            if (!OnOwnerThread(() => RemoveObject(simId, request))) return;
             try
             {
                 sc.AIRemoveObject(simId, request);
@@ -466,12 +690,13 @@ namespace JoinFS
             }
             catch (Exception ex)
             {
-                main.MonitorEvent("ERROR - " + ex.Message);
+                main.MonitorError(ex);
             }
         }
 
         public void SetData(Enum def, uint simId, object data)
         {
+            if (!OnOwnerThread(() => SetData(def, simId, data))) return;
             if ((Sim.Definitions)def != Sim.Definitions.OBJECT_VELOCITY)
             {
                 main.MonitorNetwork("SetData ID '" + simId + "' - Data '" + Sim.DefinitionToString((Sim.Definitions)def) + "'");
@@ -488,12 +713,13 @@ namespace JoinFS
             }
             catch (Exception ex)
             {
-                main.MonitorEvent("ERROR - " + ex.Message);
+                main.MonitorError(ex);
             }
         }
 
         public void SetWaypoint(uint simId)
         {
+            if (!OnOwnerThread(() => SetWaypoint(simId))) return;
             // initialise single waypoiny
             SIMCONNECT_DATA_WAYPOINT[] wp = new SIMCONNECT_DATA_WAYPOINT[1];
             wp[0].Flags = (uint)SIMCONNECT_WAYPOINT_FLAGS.SPEED_REQUESTED;
@@ -511,6 +737,7 @@ namespace JoinFS
 
         public void DoEvent(uint simId, Enum simEvent, uint data)
         {
+            if (!OnOwnerThread(() => DoEvent(simId, simEvent, data))) return;
             try
             {
                 // simconnect event
@@ -522,12 +749,13 @@ namespace JoinFS
             }
             catch (Exception ex)
             {
-                main.MonitorEvent("ERROR - " + ex.Message);
+                main.MonitorError(ex);
             }
         }
 
         public void SetWeather(string metar)
         {
+            if (!OnOwnerThread(() => SetWeather(metar))) return;
             main.MonitorNetwork("SimEvent - Metar '" + metar + "'");
 
             try
@@ -542,12 +770,13 @@ namespace JoinFS
             }
             catch (Exception ex)
             {
-                main.MonitorEvent("ERROR - " + ex.Message);
+                main.MonitorError(ex);
             }
         }
 
         public void RequestDataByType(Sim.Requests request, Sim.Definitions def, uint radius)
         {
+            if (!OnOwnerThread(() => RequestDataByType(request, def, radius))) return;
             Action lambdaCall = () =>
             {
                 try
@@ -573,7 +802,7 @@ namespace JoinFS
                 }
                 catch (Exception ex)
                 {
-                    main.MonitorEvent("ERROR - " + ex.Message);
+                    main.MonitorError(ex);
                 }
             };
             if (_isSimOpen)
@@ -589,6 +818,7 @@ namespace JoinFS
 
         public void RequestData(Sim.Requests request, Sim.Definitions def, uint simId)
         {
+            if (!OnOwnerThread(() => RequestData(request, def, simId))) return;
             Action lambdaCall = () =>
             {
                 try
@@ -602,7 +832,7 @@ namespace JoinFS
                 }
                 catch (Exception ex)
                 {
-                    main.MonitorEvent("ERROR - " + ex.Message);
+                    main.MonitorError(ex);
                 }
             };
             if (_isSimOpen)
@@ -619,6 +849,7 @@ namespace JoinFS
 
         public void RequestVariable(Enum scRequest, Enum scDefinition, uint simId)
         {
+            if (!OnOwnerThread(() => RequestVariable(scRequest, scDefinition, simId))) return;
             Action request = () =>
             {
                 try
@@ -632,7 +863,7 @@ namespace JoinFS
                 }
                 catch (Exception ex)
                 {
-                    main.MonitorEvent("ERROR - " + ex.Message);
+                    main.MonitorError(ex);
                 }
             };
             if (_isSimOpen)
@@ -646,8 +877,62 @@ namespace JoinFS
             }
         }
 
+        /// <summary>
+        /// Have the simulator send an object's data every visual frame, or every second, until
+        /// <see cref="UnsubscribeData"/>. Visual rather than simulation frames: they keep coming
+        /// while the simulation is paused.
+        /// </summary>
+        public void SubscribeData(Sim.Requests request, Sim.Definitions def, uint simId, bool everyFrame)
+        {
+            if (!OnOwnerThread(() => SubscribeData(request, def, simId, everyFrame))) return;
+            Action subscribe = () =>
+            {
+                try
+                {
+                    sc.RequestDataOnSimObject(request, def, simId, everyFrame ? SIMCONNECT_PERIOD.VISUAL_FRAME : SIMCONNECT_PERIOD.SECOND, SIMCONNECT_DATA_REQUEST_FLAG.DEFAULT, 0, 0, 0);
+                }
+                catch (COMException ex)
+                {
+                    HandleException(ex);
+                }
+                catch (Exception ex)
+                {
+                    main.MonitorError(ex);
+                }
+            };
+            if (_isSimOpen)
+            {
+                subscribe();
+            }
+            else
+            {
+                _pendingRequests.Add(subscribe);
+            }
+        }
+
+        /// <summary>
+        /// Stop a feed started with <see cref="SubscribeData"/>
+        /// </summary>
+        public void UnsubscribeData(Sim.Requests request, Sim.Definitions def, uint simId)
+        {
+            if (!OnOwnerThread(() => UnsubscribeData(request, def, simId))) return;
+            try
+            {
+                sc.RequestDataOnSimObject(request, def, simId, SIMCONNECT_PERIOD.NEVER, SIMCONNECT_DATA_REQUEST_FLAG.DEFAULT, 0, 0, 0);
+            }
+            catch (COMException ex)
+            {
+                HandleException(ex);
+            }
+            catch (Exception ex)
+            {
+                main.MonitorError(ex);
+            }
+        }
+
         public void StopRequest(Enum scRequest, Enum scDefinition, uint simId)
         {
+            if (!OnOwnerThread(() => StopRequest(scRequest, scDefinition, simId))) return;
             try
             {
                 // stop request updates
@@ -659,12 +944,13 @@ namespace JoinFS
             }
             catch (Exception ex)
             {
-                main.MonitorEvent("ERROR - " + ex.Message);
+                main.MonitorError(ex);
             }
         }
 
         public void WeatherRequest(Sim.Requests request, double lat, double lon, double alt)
         {
+            if (!OnOwnerThread(() => WeatherRequest(request, lat, lon, alt))) return;
             try
             {
                 // request weather
@@ -676,18 +962,33 @@ namespace JoinFS
             }
             catch (Exception ex)
             {
-                main.MonitorEvent("ERROR - " + ex.Message);
+                main.MonitorError(ex);
             }
         }
 
         public void ReleaseControl(uint simId, Sim.Requests request)
         {
+            if (!OnOwnerThread(() => ReleaseControl(simId, request))) return;
             // take control of the object
             sc.AIReleaseControl(simId, request);
         }
 
         public void CreateObject(Sim.Obj obj)
         {
+            if (!OnOwnerThread(() => CreateObject(obj))) return;
+
+            // Defer until SimConnect has actually sent OPEN. There's a window between simconnect !=
+            // null (Sim.Connected flips true) and RecvOpen where this would otherwise be
+            // refused with exception 22 (reported asynchronously through RecvException, not thrown
+            // as a COMException) - same _pendingRequests pattern already used elsewhere
+            // (e.g. RequestSimulatorModels) for exactly this readiness gap.
+            if (!_isSimOpen)
+            {
+                _pendingRequests.Add(() => CreateObject(obj));
+                main.MonitorEvent("SimConnect not ready. Injection of '" + obj.ModelTitle + "' queued.");
+                return;
+            }
+
             // create sim position
             SIMCONNECT_DATA_INITPOSITION initPosition = new()
             {
@@ -752,20 +1053,21 @@ namespace JoinFS
             }
             catch (Exception ex)
             {
-                main.MonitorEvent("ERROR - " + ex.Message);
+                main.MonitorError(ex);
             }
         }
 
         // [HandleProcessCorruptedStateExceptions]
         public void ReceiveMsg()
         {
+            if (!OnOwnerThread(() => ReceiveMsg())) return;
             try
             {
                 sc.ReceiveMessage();
             }
             catch (AccessViolationException ex)
             {
-                main.MonitorEvent("ERROR - Access violation " + ex.Message);
+                main.MonitorError(ex, "Access violation");
             }
             catch (COMException ex)
             {
@@ -773,7 +1075,7 @@ namespace JoinFS
             }
             catch (Exception ex)
             {
-                main.MonitorEvent("ERROR - " + ex.Message);
+                main.MonitorError(ex);
             }
         }
     }

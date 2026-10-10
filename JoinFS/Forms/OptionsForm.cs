@@ -1,4 +1,4 @@
-﻿using System;
+﻿﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
 using JoinFS.Properties;
@@ -96,6 +96,7 @@ namespace JoinFS
             DataGrid_Options.Rows.Add(@"--hubabout ""<text>"" ", Resources.Strings.Tip_HubAbout);
             DataGrid_Options.Rows.Add(@"--hubvoip ""<text>"" ", Resources.Strings.Tip_HubVoice);
             DataGrid_Options.Rows.Add(@"--hubevent ""<text>"" ", Resources.Strings.Tip_HubEvent);
+            DataGrid_Options.Rows.Add(@"--hubrelays <number>", Resources.Strings.Tip_HubRelays);
 #endif
             DataGrid_Options.Rows.Add(@"--password", Resources.Strings.Tip_Password);
             DataGrid_Options.Rows.Add(@"--play ""<file.jfs>"" ", Resources.Strings.Options_Play);
@@ -113,6 +114,7 @@ namespace JoinFS
             DataGrid_Options.Rows.Add(@"--nogui", Resources.Strings.Options_NoGui);
             DataGrid_Options.Rows.Add(@"--multiobjects", Resources.Strings.Tip_MultiObjects);
             DataGrid_Options.Rows.Add(@"--simfolder", Resources.Strings.Options_SimFolder);
+            DataGrid_Options.Rows.Add(@"--classicmatching", Resources.Strings.Tip_ClassicMatching);
             DataGrid_Options.Rows.Add(@"--xplane", Resources.Strings.Tip_Xplane);
             DataGrid_Options.Rows.Add(@"--installplugin", Resources.Strings.Options_InstallPlugin);
             DataGrid_Options.Rows.Add(@"--tcas", Resources.Strings.Tip_TCAS);

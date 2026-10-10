@@ -2,6 +2,7 @@
 using System.Windows.Forms;
 using System.Globalization;
 using JoinFS.Properties;
+using JoinFS.Net;
 
 namespace JoinFS
 {
@@ -148,6 +149,26 @@ namespace JoinFS
             Check_LowBandwidth.Visible = false;
 #endif
 
+            // position the SimBrief auto-import checkbox relative to the username row's actual resolved
+            // position rather than via the Designer .resx - each locale's SettingsForm.*.resx snapshots its
+            // own absolute Y positions for GroupBox_SimBrief and the button row below it, so a fixed Designer
+            // position would only be correct in whichever locale was last saved in the Designer. Grow the
+            // group box and shift the button row/form down by the same amount the checkbox needs, so nothing
+            // overlaps in any locale regardless of how wide the translated checkbox text is (width self-sizes
+            // via AutoSize; only extra height needs to be accounted for here).
+            Check_SimBriefAutoImport.Location = new System.Drawing.Point(
+                Label_SimBriefUsername.Location.X,
+                Text_SimBriefUsername.Location.Y + Text_SimBriefUsername.Height + 6);
+            int simBriefExtraHeight = (Check_SimBriefAutoImport.Location.Y + Check_SimBriefAutoImport.Height + 14) - GroupBox_SimBrief.Height;
+            if (simBriefExtraHeight > 0)
+            {
+                GroupBox_SimBrief.Height += simBriefExtraHeight;
+                Button_Reset.Location = new System.Drawing.Point(Button_Reset.Location.X, Button_Reset.Location.Y + simBriefExtraHeight);
+                Button_OK.Location = new System.Drawing.Point(Button_OK.Location.X, Button_OK.Location.Y + simBriefExtraHeight);
+                Button_Cancel.Location = new System.Drawing.Point(Button_Cancel.Location.X, Button_Cancel.Location.Y + simBriefExtraHeight);
+                ClientSize = new System.Drawing.Size(ClientSize.Width, ClientSize.Height + simBriefExtraHeight);
+            }
+
             if (main.settingsNoSim)
             {
                 GroupBox_Simulator.Visible = false;
@@ -204,13 +225,15 @@ namespace JoinFS
             if (nickname.Length < 2)
             {
                 // create random nickname, 2 letters
-                nickname = LocalNode.GenerateName(main.storagePath);
+                nickname = NetHash.GenerateName(main.storagePath);
             }
             main.settingsNickname = nickname;
             Settings.Default.Nickname = nickname;
 
             // update simbrief username
             Settings.Default.SimBriefUsername = Text_SimBriefUsername.Text.Trim();
+            // update simbrief auto import
+            Settings.Default.SimBriefAutoImport = Check_SimBriefAutoImport.CheckState == CheckState.Checked;
 
             // update show nicknames enabled
             bool newShowNicknames = (Check_ShowNickname.CheckState == CheckState.Checked);
@@ -220,7 +243,7 @@ namespace JoinFS
                 lock (main.conch)
                 {
                     // remove all controlled aircraft
-                    main.sim.RemoveInjectedObjects();
+                    main.SimCommand(sim => sim.RemoveInjectedObjects());
                 }
             }
             // update nickname
@@ -247,9 +270,6 @@ namespace JoinFS
             // update model scan
             main.settingsScan = Check_Scan.CheckState == CheckState.Checked;
             Settings.Default.ModelScanOnConnection = main.settingsScan;
-            // update use AI features
-            main.settingsUseAIFeatures = Check_UseAIFeatures.CheckState == CheckState.Checked;
-            Settings.Default.UseAIFeatures = main.settingsUseAIFeatures;
             // update elevation correction
             Settings.Default.ElevationCorrection = Check_Elevation.CheckState == CheckState.Checked;
 
@@ -289,7 +309,7 @@ namespace JoinFS
                 lock (main.conch)
                 {
                     // remove all controlled aircraft
-                    main.sim.RemoveInjectedObjects();
+                    main.SimCommand(sim => sim.RemoveInjectedObjects());
                 }
                 // update settings
                 main.settingsAtc = atcMode;
@@ -303,7 +323,7 @@ namespace JoinFS
             // write level
             Settings.Default.AtcLevel = Combo_Level.SelectedIndex;
             // write frequency
-            Settings.Default.AtcFrequency = Sim.FrequencyStringToInt(Text_Frequency.Text);
+            Settings.Default.AtcFrequency = Atc.FrequencyStringToInt(Text_Frequency.Text);
             // update Euroscope
             Settings.Default.Euroscope = Check_Euroscope.CheckState == CheckState.Checked;
 
@@ -390,7 +410,7 @@ namespace JoinFS
                 lock (main.conch)
                 {
                     // open the new port
-                    if (main.network.localNode.Open(newPort))
+                    if (main.network.Open(newPort))
                     {
                         // monitor
                         main.MonitorEvent("Closed UDP port " + oldPort);
@@ -500,6 +520,8 @@ namespace JoinFS
             Text_Nickname.Text = Settings.Default.Nickname;
             // get simbrief username
             Text_SimBriefUsername.Text = Settings.Default.SimBriefUsername;
+            // get simbrief auto import
+            Check_SimBriefAutoImport.CheckState = Settings.Default.SimBriefAutoImport ? CheckState.Checked : CheckState.Unchecked;
             // get nickname
             Check_ShowNickname.CheckState = Settings.Default.ShowNicknames ? CheckState.Checked : CheckState.Unchecked;
             // get callsign
@@ -514,8 +536,6 @@ namespace JoinFS
             Check_Connect.CheckState = Settings.Default.ConnectOnLaunch ? CheckState.Checked : CheckState.Unchecked;
             // get model scan
             Check_Scan.CheckState = Settings.Default.ModelScanOnConnection ? CheckState.Checked : CheckState.Unchecked;
-            // get AI state
-            Check_UseAIFeatures.CheckState = Settings.Default.UseAIFeatures ? CheckState.Checked : CheckState.Unchecked;
             // get elevation
             Check_Elevation.CheckState = Settings.Default.ElevationCorrection ? CheckState.Checked : CheckState.Unchecked;
             // get local port number
@@ -545,7 +565,7 @@ namespace JoinFS
             // get ATC level
             Combo_Level.SelectedIndex = Math.Min(4, Math.Max(0, Settings.Default.AtcLevel));
             // get ATC frequency
-            Text_Frequency.Text = Sim.FrequencyIntToString(Settings.Default.AtcFrequency);
+            Text_Frequency.Text = Atc.FrequencyIntToString(Settings.Default.AtcFrequency);
             // get Euroscope
             Check_Euroscope.CheckState = Settings.Default.Euroscope ? CheckState.Checked : CheckState.Unchecked;
             // get hub mode

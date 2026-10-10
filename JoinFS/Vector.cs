@@ -145,12 +145,60 @@ namespace JoinFS
         {
             // difference
             double delta = b - a;
+            // Reduce to (-2*PI, 2*PI) before applying the single wrap-around correction below, so the
+            // correction is always sufficient even when a and b have drifted more than one full revolution
+            // apart - e.g. one side is a continuously-unwrapped/accumulated angle (see Recorder's playback
+            // angle unwrapping, which deliberately keeps adding whole revolutions so recorded headings don't
+            // jump at the 0/360 boundary) while the other is a freshly wrapped reading, such as a live
+            // SimConnect heading readback for userAircraft. Without this reduction, a multi-revolution
+            // difference (e.g. ~720 degrees, two aircraft facing the same real heading but represented ~720
+            // degrees apart) left a residual of a whole extra revolution after only one +/-2*PI correction.
+            // That bogus ~360 degree "delta" was being fed into UpdateSimObjectVelocity's angular velocity and
+            // sent straight to a live flight-dynamics object (see the share-cockpit yaw-shake investigation),
+            // commanding a physically nonsensical yaw rate (~9.5 rad/s observed) every time the two
+            // representations happened to be sampled that far apart - producing violent, repeated shaking. The
+            // modulo is a no-op for the normal case (adjacent recorded frames, or two angles already within one
+            // revolution of each other), so this doesn't change behaviour anywhere else AngleDelta is used.
+            delta %= Math.PI * 2.0;
             // move into range
             if (delta < -Math.PI) delta += Math.PI * 2.0f;
             else if (delta > Math.PI) delta -= Math.PI * 2.0f;
             // return result
             return delta;
         }
+
+        /// <summary>
+        /// A heading in radians as a compass heading in whole degrees, 0-359 (360 reads as 0, -90 as 270).
+        /// Rounded to the nearest degree, not truncated: 359 degrees is 358.99999999999994 after the radian round trip,
+        /// which truncation reports as 358.
+        /// For REPORTING only (websocket, Whazzup/hub lists, dialogs). Playback keeps an unwrapped running
+        /// heading on purpose (see Recorder.InterpolateAngles) that grows past 360 with every turn, and
+        /// reporting that raw made the websocket's plausibility check drop the aircraft after the first
+        /// clockwise crossing of north. Never feed this back into playback or the simulator.
+        /// </summary>
+        public static int HeadingDegrees(double radians)
+        {
+            if (!double.IsFinite(radians))
+            {
+                return 0;
+            }
+            double degrees = radians * (180.0 / Math.PI) % 360.0;
+            if (degrees < 0.0)
+            {
+                degrees += 360.0;
+            }
+            // 359.6 rounds to 360, and a tiny negative value (-1e-14) became 359.99999999999997: neither may report 360
+            int heading = (int)Math.Round(degrees, MidpointRounding.AwayFromZero);
+            return heading >= 360 ? 0 : heading;
+        }
+
+        /// <summary>
+        /// Guard against garbage in a reported heading (e.g. a hub user sending nonsense); the websocket skips an
+        /// aircraft that fails it. Playback cannot trip it any more because reporting goes through
+        /// <see cref="HeadingDegrees"/>; before that, the first clockwise crossing of north (361) silenced a
+        /// replayed aircraft until the recording was jumped.
+        /// </summary>
+        public static bool IsPlausibleHeading(int heading) => heading >= -360 && heading <= 360;
 
         /// <summary>
         /// Difference between two sets of angles

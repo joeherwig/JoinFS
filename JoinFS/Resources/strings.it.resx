@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -243,8 +243,20 @@
   <data name="Shortcuts_Network" xml:space="preserve">
     <value>Attiva / disattiva lo stato della rete</value>
   </data>
+  <data name="Shortcuts_Overdub" xml:space="preserve">
+    <value>Inizia la registrazione in sovraincisione</value>
+  </data>
+  <data name="Shortcuts_Record" xml:space="preserve">
+    <value>Inizia a registrare l'aereo selezionato</value>
+  </data>
+  <data name="Shortcuts_Replay" xml:space="preserve">
+    <value>Riprodurre / mettere in pausa l'aereo memorizzato nel registratore</value>
+  </data>
   <data name="Shortcuts_Simulator" xml:space="preserve">
     <value>Attiva / disattiva lo stato del simulatore</value>
+  </data>
+  <data name="Shortcuts_Stop" xml:space="preserve">
+    <value>Interrompere la registrazione / riproduzione</value>
   </data>
   <data name="SingleProp" xml:space="preserve">
     <value>Monomotore ad elica</value>
@@ -740,5 +752,47 @@
   </data>
   <data name="MainForm_SimBriefButtonTooltip" xml:space="preserve">
     <value>Usa i dati SimBrief come fonte del piano di volo e recuperali di nuovo ora</value>
+  </data>
+  <data name="Airship" xml:space="preserve">
+    <value>Dirigibile</value>
+  </data>
+  <data name="Balloon" xml:space="preserve">
+    <value>Mongolfiera</value>
+  </data>
+  <data name="MainForm_FlightPlanButtonDefaultText" xml:space="preserve">
+    <value>Piano di Volo</value>
+  </data>
+  <data name="MainForm_FlightPlanButtonTooltipNoPlan" xml:space="preserve">
+    <value>Clicca per creare il tuo piano di volo, se desideri averne uno assegnato.</value>
+  </data>
+  <data name="FlightPlan_AltitudeTooltip" xml:space="preserve">
+    <value>Altitudine di crociera o livello di volo, es. 35000 o FL350</value>
+  </data>
+  <data name="Recorder_ActiveLoad" xml:space="preserve">
+    <value>Il caricamento di una registrazione interrompe la riproduzione in corso e il traffico iniettato scompare per gli utenti che ti consentono più oggetti. Ferma prima il registratore (Recorder|Stop), poi carica la registrazione.</value>
+  </data>
+  <data name="Recorder_ActiveSave" xml:space="preserve">
+    <value>Ferma il registratore (Recorder|Stop) prima di salvare.</value>
+  </data>
+  <data name="Recorder_AutoSaved" xml:space="preserve">
+    <value>Registrazione salvata: {0}</value>
+  </data>
+  <data name="ReconnectCredentialsRejected" xml:space="preserve">
+    <value>La connessione è stata persa e l&apos;hub ha rifiutato le credenziali salvate (potrebbero essere cambiate). Inseriscile di nuovo per riconnetterti.</value>
+  </data>
+  <data name="Tip_NetworkReconnecting" xml:space="preserve">
+    <value>Connessione persa: riconnessione automatica in corso.</value>
+  </data>
+  <data name="ReconnectGaveUp" xml:space="preserve">
+    <value>Connessione persa. La riconnessione automatica non è riuscita a ripristinarla negli ultimi {0} minuti. Riprova a connetterti manualmente quando sei pronto.</value>
+  </data>
+  <data name="Tip_ClassicMatching" xml:space="preserve">
+    <value>Usa la corrispondenza modelli classica (solo tipo, compagnia e classe) invece di quella intelligente</value>
+  </data>
+  <data name="MatchExplain_EngineNew" xml:space="preserve">
+    <value>Metodo di corrispondenza: intelligente (confronta anche dimensioni, peso, velocità, motori e costruttore, oltre a tipo, compagnia e classe). Avvia JoinFS con --classicmatching per il metodo classico.</value>
+  </data>
+  <data name="MatchExplain_EngineClassic" xml:space="preserve">
+    <value>Metodo di corrispondenza: classico (confronta solo tipo, compagnia, codice di classe e categoria di turbolenza), scelto con --classicmatching.</value>
   </data>
 </root>

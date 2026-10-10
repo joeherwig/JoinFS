@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -390,5 +390,11 @@
   </data>
   <data name="$this.Text" xml:space="preserve">
     <value>JoinFS: Gravador</value>
+  </data>
+  <data name="Check_Loop.Text" xml:space="preserve">
+    <value>Loop</value>
+  </data>
+  <data name="Button_Overdub.Text" xml:space="preserve">
+    <value>Overdub</value>
   </data>
 </root>
