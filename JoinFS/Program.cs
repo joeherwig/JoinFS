@@ -121,6 +121,15 @@ namespace JoinFS
         public bool settingsMultiObjects = false;
         public bool settingsMinimized = false;
         public bool settingsNoGui = false;
+
+        /// <summary>
+        /// Start the Avalonia UI, the default, and not the WinForms forms (-oldui). Builds with NEWUI only; the others always open the forms.
+        /// </summary>
+        public bool settingsNewUi = true;
+        /// <summary>
+        /// Language of the Avalonia UI (-lang de), instead of the system's
+        /// </summary>
+        public string settingsLanguage = "";
         public bool settingsNoSim = false;
         public bool settingsLoop = false;
         public bool settingsXplane = false;
@@ -150,6 +159,8 @@ namespace JoinFS
 #if XPLANE || CONSOLE
         public bool settingsGenerateCsl = false;
         public bool settingsSkipCsl = false;
+        /// <summary>Also generate one CSL model per livery of each aircraft (X-Plane)</summary>
+        public bool settingsGenerateLiveries = false;
 #endif
 
         public string settingsLocalAddress = "";
@@ -282,6 +293,7 @@ namespace JoinFS
 #if XPLANE || CONSOLE
                 settingsGenerateCsl = Settings.Default.GenerateCsl;
                 settingsSkipCsl = Settings.Default.SkipCsl;
+                settingsGenerateLiveries = Settings.Default.GenerateLiveries;
 #endif
 
 #if SERVER
@@ -547,6 +559,23 @@ namespace JoinFS
                                 settingsNoGui = true;
                                 break;
 
+                            case "-newui":
+                                // the default; accepted so that scripts written when it had to be asked for keep working
+                                settingsNewUi = true;
+                                break;
+
+                            case "-oldui":
+                                settingsNewUi = false;
+                                break;
+
+                            case "-lang":
+                                index++;
+                                if (index < args.Length)
+                                {
+                                    settingsLanguage = args[index];
+                                }
+                                break;
+
                             case "-quit":
                                 doQuit = true;
                                 settingsNoGui = true;
@@ -671,6 +700,10 @@ namespace JoinFS
                             case "-skipcsldone":
                                 settingsSkipCsl = true;
                                 break;
+
+                            case "-generateliveries":
+                                settingsGenerateLiveries = true;
+                                break;
 #endif
 
 #if CONSOLE
@@ -750,6 +783,7 @@ namespace JoinFS
                                 Console.WriteLine("  --backgrounddelay <ms> Idle delay of the --background shutdown poll (default 100, 0 to spin)");
                                 Console.WriteLine("  --nosim                " + Resources.Strings.Options_NoSim);
                                 Console.WriteLine("  --nogui                " + Resources.Strings.Options_NoGui);
+                                Console.WriteLine("  --oldui                Open the old forms instead of the new user interface");
                                 Console.WriteLine("  --multiobjects         " + Resources.Strings.Tip_MultiObjects);
                                 Console.WriteLine("  --simfolder \"<folder>\" " + Resources.Strings.Options_SimFolder);
                                 Console.WriteLine("  --scan                 " + Resources.Strings.ScanForModels);
@@ -971,6 +1005,9 @@ namespace JoinFS
                 {
                     // initialize sim folder
                     substitution.LoadFolders();
+#if XPLANE
+                    simFolder = XPlaneInstallLocator.NormalizeFolder(simFolder);
+#endif
                     substitution.simFolder = simFolder;
                     substitution.SaveFolders();
                     Settings.Default.XPlaneFolder = simFolder;
@@ -1001,7 +1038,7 @@ namespace JoinFS
                 // check for install plugin
                 if (doPlugin)
                 {
-                    sim.xplane.InstallPlugin(Settings.Default.XPlaneFolder);
+                    sim.xplane.InstallPluginIntoKnownFolder();
                     shutdown = "Finished plugin install.";
                 }
 #endif
@@ -2390,6 +2427,14 @@ namespace JoinFS
 #endif
                 }
             }
+#if NEWUI
+            else if (main.settingsNewUi && main.shutdown == null)
+            {
+                // launch the new gui, on this thread, in place of the forms. Until every service is wired
+                // (see Live/), the ones that are not run on JoinFS.UI's fakes.
+                JoinFS.Live.NewUiLauncher.Run(main);
+            }
+#endif
 #if !CONSOLE
             else if (main.shutdown == null)
             {

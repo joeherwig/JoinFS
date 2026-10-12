@@ -946,6 +946,18 @@ namespace JoinFS.Properties {
                 this["ToolTips"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("Standard")]
+        public string MapStyle {
+            get {
+                return ((string)(this["MapStyle"]));
+            }
+            set {
+                this["MapStyle"] = value;
+            }
+        }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
@@ -1676,6 +1688,30 @@ namespace JoinFS.Properties {
             }
             set {
                 this["SkipCsl"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool GenerateLiveries {
+            get {
+                return ((bool)(this["GenerateLiveries"]));
+            }
+            set {
+                this["GenerateLiveries"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string UnlinkedCslSources {
+            get {
+                return ((string)(this["UnlinkedCslSources"]));
+            }
+            set {
+                this["UnlinkedCslSources"] = value;
             }
         }
     }
