@@ -24,7 +24,6 @@ jobs:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/joinfs-console
           tags: |
             type=match,pattern=v(\d+(\.\d+)+.*),group=1
-            type=raw,value=latest
 
       - name: Build and push
         uses: docker/build-push-action@v6
